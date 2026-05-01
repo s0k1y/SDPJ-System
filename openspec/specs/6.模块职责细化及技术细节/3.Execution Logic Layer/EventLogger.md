@@ -7,7 +7,7 @@ EventLogger / 系统事件与日志管理模块
   5. 管理日志级别和日志输出目标
   6. 维护接口为上层模块提供支持
 不需要的:[日志持久化存储]
-依赖模块:无,调用接口:UtilsInterface
+依赖模块:无,调用接口:无
 应实现接口:EventLoggerInterface
 被依赖模块:StateScheduler
 技术细节:(暂定)
