@@ -68,3 +68,164 @@ For multi-step tasks, state a brief plan:
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
 These guidelines are working if: fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+---
+
+# 我的错误记录与自我约束（2026-05-03）
+
+> 以下是我在 Wave 0 开发中犯下的错误。每一条都已转化为我必须遵守的自我约束，确保不再重蹈覆辙。
+
+---
+
+## 错误 1：未遵循 OpenSpec 变更规范
+
+**我做了什么**：开发模块时只知道"要遵循 OpenSpec 规范"，但没有具体执行变更流程。
+- ❌ 没有在 `openspec/changes/archive/` 创建变更记录
+- ❌ 没有使用 openspec CLI 工具（`openspec-new-change`, `openspec-apply-change`, `openspec-archive-change` 等）
+- ❌ 没有创建变更工件（规格、任务、设计）
+
+**此后我必须**：
+1. 先阅读变更规范文件：`E:\Sky毕业设计\4.系统源代码\.agents\skills\spec-standards\`
+2. 使用 openspec CLI 工具管理所有变更
+3. 在 `openspec/changes/archive/` 留下完整变更记录
+
+---
+
+## 错误 2：没有编写测试报告
+
+**我做了什么**：写完单元测试就算了，没留下任何测试报告。
+- ❌ 没有在 `tests/unit/` 下创建报告文件
+- ❌ 没有记录测试覆盖率、通过率、失败原因
+
+**此后我必须**：
+1. 每个模块的单元测试附带一份测试报告
+2. 报告位置：`tests/unit/<层级>/<模块>/TEST_REPORT.md`
+3. 报告内容：测试用例数、通过率、覆盖的职责、失败原因
+
+---
+
+## 错误 3：目录结构不符合规范
+
+**我做了什么**：凭感觉创建目录，没有先对照 `8.项目目录结构设计.md`。
+- ❌ 创建了 `sdpj/resources/builtin_datasets/`（正确的是 `sdpj/infrastructure/database/sample_db/builtin_datasets/`）
+- ❌ 没有在动手前阅读目录结构规范
+
+**此后我必须**：
+1. 先阅读 `8.项目目录结构设计.md`，再创建任何文件
+2. 创建完成后对照规范自查目录结构
+
+---
+
+## 错误 4：上一波没验证就开下一波
+
+**我做了什么**：Wave 0 刚写完，没测试没检查，就直接进入 Wave 1。
+- ❌ 没有运行单元测试
+- ❌ 没有检查代码是否符合规格文档
+- ❌ 没有检查目录结构
+- ❌ 导致 UtilsLib 导入错误（`PBKDF2` 不存在）、LLMAdapterLib 分类错误
+
+**此后我必须**：
+1. 每个 Wave 完成后：跑通所有测试 → 检查目录结构 → 检查 OpenSpec 变更 → 检查测试报告
+2. 四项全部通过后才进入下一阶段
+
+---
+
+## 错误 5：用错了依赖库的 API
+
+**我做了什么**：调用 `PBKDF2` 类，但这个类根本不存在，正确的名称是 `PBKDF2HMAC`。
+- ❌ 没有先查文档确认 API 是否存在
+- ❌ 凭记忆/猜测使用类名
+
+**此后我必须**：
+1. 使用依赖库前，先验证类/方法是否真实存在
+2. 不确定时使用 WebSearch 查文档，或 `python -c "import xxx; print(dir(xxx))"` 直接探测
+
+---
+
+## 错误 6：没有检查清单
+
+**我做了什么**：没有系统化验证流程，做完就宣布完成，全靠事后发现遗漏。
+
+**此后我必须**：完成每个模块后逐项核对——
+
+**自检清单**：
+- [ ] 所有单元测试通过
+- [ ] 测试报告已创建
+- [ ] 目录结构符合 `8.项目目录结构设计.md`
+- [ ] 遵循 OpenSpec 变更规范，变更记录已归档
+- [ ] 代码符合规格文档，没有规格外的功能
+- [ ] 依赖库 API 全部验证正确
+- [ ] 没有创建额外的验证脚本和文档
+- [ ] 代码在 `SDPJ-System` Anaconda 环境中可正常运行
+
+---
+
+## 错误 7：没有读规格文档就动手 ⚠️ 最严重
+
+**我做了什么**：`openspec/specs/` 是唯一真理源，但我没有先读完对应的模块职责文档就直接写代码。
+- ❌ 没有先精读 `6.模块职责细化及技术细节/<层级>/<模块名>.md`
+- ❌ 不理解全部职责就开始实现
+- ❌ 导致遗漏职责或实现规格外功能
+
+**此后我必须**：
+1. **第一步永远是阅读对应的规格文档**：`E:\Sky毕业设计\4.系统源代码\SDPJ-System\openspec\specs\6.模块职责细化及技术细节\<层级>\<模块名>.md`
+2. 理解全部职责后，逐条对照实现，一条不漏
+3. 完成后对照规格文档自查，确认每条职责都有对应实现
+4. **规格文档是唯一真理源**，不实现规格外的任何东西
+
+---
+
+## 错误 8：不清楚项目运行环境
+
+**我做了什么**：不知道项目运行在 Anaconda 环境 `SDPJ-System` 中，干活时可能用错 Python 或依赖。
+- ❌ 不知道 Anaconda 环境名：`SDPJ-System`
+- ❌ 不知道 Python 版本是 3.11.15
+- ❌ 不知道该用 `conda run -n SDPJ-System` 执行命令
+
+**此后我必须记住的项目环境**：
+| 项目 | 值 |
+|------|-----|
+| Anaconda 环境名 | `SDPJ-System` |
+| Python 版本 | 3.11.15（`5.项目技术选型.md`） |
+| 依赖安装 | `conda run -n SDPJ-System pip install <package>` |
+| 测试运行 | `conda run -n SDPJ-System python -m pytest` |
+| 原则 | 所有开发、测试、验证都必须在 `SDPJ-System` 环境中 |
+
+---
+
+## 错误 9：没有验证依赖是否已安装
+
+**我做了什么**：直接 import 就写代码，没检查 `requirements.txt` 是否包含该依赖、环境中是否已安装。
+- ❌ 没检查 `requirements.txt`
+- ❌ 没验证依赖版本
+
+**此后我必须**：
+1. 使用新依赖前，先查 `requirements.txt`
+2. 缺失则先更新 `requirements.txt`
+3. 用 `conda run -n SDPJ-System pip install <package>` 安装
+4. 安装成功后验证 `import` 可用
+
+---
+
+## 错误 10：完成后不自查就直接交差
+
+**我做了什么**：写完代码就宣布完成，从不对照 Checklist 自查。问题全是用户后来发现的，而不是我自己发现的。
+
+**此后我必须**：完成任何开发后，逐项核对以下 12 条并输出结果——
+
+| # | 检查项 | 状态 |
+|---|--------|------|
+| 1 | 已阅读规格文档，理解所有职责 | ✅/❌ |
+| 2 | 逐条实现了规格文档中的所有职责，无遗漏 | ✅/❌ |
+| 3 | 没有实现规格文档之外的功能 | ✅/❌ |
+| 4 | 目录结构符合 `8.项目目录结构设计.md` | ✅/❌ |
+| 5 | 文件路径完全正确（接口、实现、测试） | ✅/❌ |
+| 6 | 已创建单元测试，覆盖所有职责 | ✅/❌ |
+| 7 | 已运行单元测试，全部通过 | ✅/❌ |
+| 8 | 已创建测试报告（`TEST_REPORT.md`） | ✅/❌ |
+| 9 | 已遵循 OpenSpec 变更规范，创建变更记录 | ✅/❌ |
+| 10 | 已更新 `requirements.txt`（如有新依赖） | ✅/❌ |
+| 11 | 没有创建额外的验证脚本和文档 | ✅/❌ |
+| 12 | 代码在 `SDPJ-System` Anaconda 环境中运行正常 | ✅/❌ |
+
+**只有 12 项全部 ✅，我才能认为任务真正完成。**
