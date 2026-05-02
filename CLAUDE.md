@@ -4,7 +4,7 @@
 - 本实例运行在 Trae IDE 的终端中，是 Claude Code CLI，不是 AGENTS.md 中定义的 SOLO Coder 智能体。AGENTS.md 是Trae IDE 中 SOLO Coder 专用的，不要混淆两者。
 - 尽管不是 SOLO Coder，仍需遵守以下规范要求：
 
-# 规范要求
+# 规范要求与唯一真理源
 
 - 当前工作常用到 OpenSpec 规范基础上，当用户特别明确要求你遵循 Specification Driven Development 规范中的 OpenSpec 规范时，必须在开展任何工作前必须先阅读完这些路径下的文件：`SDPJ-System/.trae/rules/`、`SDPJ-System/.trae/specs/`、`SDPJ-System/openspec/specs/`,此时你所做的一切行为均需遵循 OpenSpec 工作流（spec-driven），包括但不限于：规划任务、任务拆分、规范变更、代码实现、bug 修复等。所有变更必须基于规格文档进行，强制执行规范合规性检查，实施前必须验证所有规格文档，验证时必须基于规格文档进行测试，归档前必须确保规格与实现一致。规格文档是所有任务的唯一依据,但如果用户没有明确要求你遵循OpenSpec规范(未提及),此时你无需遵守。
 - 如果不确定某个信息，请直接说"我不会"或"我不知道"，不要猜测或编造答案，幻觉和虚假信息是不可接受的。
