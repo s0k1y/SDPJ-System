@@ -98,20 +98,6 @@ class DataProcessorInterface(Protocol):
         """
         ...
 
-    async def remove_sample(self, sample_id: int) -> bool:
-        """移除私有数据集的单条样本
-
-        Args:
-            sample_id: 样本 ID
-
-        Returns:
-            删除结果
-
-        触发场景:
-            用户移除单条样本
-        """
-        ...
-
     # ==================== 检测结果的持久化 ====================
 
     async def create_task_group(
@@ -356,7 +342,7 @@ class DataProcessorInterface(Protocol):
             target_format: 目标文件格式
 
         Returns:
-            可供用户下载的文件内容（序列化字符串）
+            可供用户下载的临时文件路径（调用方负责清理）
 
         触发场景:
             用户下载检测报告
@@ -466,14 +452,12 @@ class DataProcessorInterface(Protocol):
         self,
         content: Union[str, bytes],
         expected_format: Literal["csv", "json", "yaml"],
-        schema: Optional[dict[str, Any]] = None
     ) -> tuple[bool, str]:
         """预校验上传文件格式
 
         Args:
             content: 文件内容
             expected_format: 期望格式（csv/json/yaml）
-            schema: 可选的 schema 定义
 
         Returns:
             (格式合规性判定结果, 关键错误信息)

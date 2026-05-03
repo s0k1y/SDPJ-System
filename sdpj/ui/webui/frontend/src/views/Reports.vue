@@ -1,65 +1,63 @@
 <template>
   <div class="reports">
     <h2>检测报告</h2>
-    
-    <el-card>
-      <el-table :data="reports" style="width: 100%">
-        <el-table-column prop="report_id" label="报告ID" width="100" />
-        <el-table-column prop="task_id" label="任务ID" width="200" />
-        <el-table-column prop="model_id" label="模型" />
-        <el-table-column prop="risk_level" label="风险等级">
-          <template #default="{ row }">
-            <el-tag :type="getRiskType(row.risk_level)">
-              {{ row.risk_level }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="compliance_rate" label="合规率" />
-        <el-table-column prop="created_at" label="生成时间" />
-        <el-table-column label="操作" width="150">
-          <template #default="{ row }">
-            <el-button size="small" @click="viewReport(row)">查看</el-button>
-            <el-button size="small" type="primary" @click="downloadReport(row)">下载</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+
+    <ReportTable
+      ref="tableRef"
+      @view="handleView"
+      @export="handleExport"
+      @delete="handleDelete"
+    />
+
+    <el-dialog v-model="chartVisible" title="报告详情" width="80%" destroy-on-close>
+      <ReportChart :task-group-id="selectedTaskGroupId" />
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import api from '../api'
+import { ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { deleteReport, exportReport } from '../api/report'
+import ReportTable from '../components/report/ReportTable.vue'
+import ReportChart from '../components/report/ReportChart.vue'
 
-const reports = ref([])
+const tableRef = ref()
+const chartVisible = ref(false)
+const selectedTaskGroupId = ref('')
 
-const getRiskType = (level) => {
-  const map = { '低': 'success', '中': 'warning', '高': 'danger' }
-  return map[level] || 'info'
+const handleView = (row) => {
+  selectedTaskGroupId.value = row.task_group_id
+  chartVisible.value = true
 }
 
-const viewReport = (row) => {
-  ElMessage.info('查看报告: ' + row.report_id)
-}
-
-const downloadReport = (row) => {
-  ElMessage.success('下载报告: ' + row.report_id)
-}
-
-onMounted(async () => {
-  // 模拟数据
-  reports.value = [
-    {
-      report_id: 1,
-      task_id: 'task-001',
-      model_id: 'gpt-4',
-      risk_level: '低',
-      compliance_rate: '95%',
-      created_at: '2026-05-03 10:00:00'
+const handleExport = async (row) => {
+  try {
+    const res = await exportReport(row.task_group_id, 'pdf')
+    if (res.success) {
+      ElMessage.success('报告导出成功')
     }
-  ]
-})
+  } catch {
+    ElMessage.error('导出失败')
+  }
+}
+
+const handleDelete = async (row) => {
+  try {
+    await ElMessageBox.confirm('确定要删除该报告吗？', '确认删除', {
+      type: 'warning'
+    })
+    const res = await deleteReport(row.task_group_id, 'report')
+    if (res || res?.success) {
+      ElMessage.success('删除成功')
+      tableRef.value?.refresh()
+    }
+  } catch (e) {
+    if (e !== 'cancel') {
+      ElMessage.error('删除失败')
+    }
+  }
+}
 </script>
 
 <style scoped>

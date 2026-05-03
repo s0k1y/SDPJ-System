@@ -30,12 +30,12 @@ class UserRepository:
         """
         self._session = session
 
-    async def create(self, username: str, password_hash: str) -> User:
+    async def create(self, username: str, password: str) -> User:
         """创建用户
 
         Args:
             username: 账号
-            password_hash: 密码哈希
+            password: 密码
 
         Returns:
             新创建的用户对象
@@ -43,7 +43,7 @@ class UserRepository:
         Raises:
             ValueError: 账号重复时抛出
         """
-        user = User(username=username, password_hash=password_hash)
+        user = User(username=username, password=password)
         self._session.add(user)
         try:
             await self._session.flush()
@@ -66,12 +66,12 @@ class UserRepository:
         await self._session.flush()
         return result.rowcount > 0
 
-    async def update_password(self, user_id: int, new_password_hash: str) -> bool:
+    async def update_password(self, user_id: int, new_password: str) -> bool:
         """更新用户密码
 
         Args:
             user_id: 用户 ID
-            new_password_hash: 新密码哈希
+            new_password: 新密码
 
         Returns:
             更新结果（True 表示成功）
@@ -83,7 +83,15 @@ class UserRepository:
         if not user:
             raise ValueError(f"用户 ID {user_id} 不存在")
 
-        user.password_hash = new_password_hash
+        user.password = new_password
+        await self._session.flush()
+        return True
+
+    async def update_username(self, user_id: int, new_username: str) -> bool:
+        user = await self.get_by_id(user_id)
+        if not user:
+            raise ValueError(f"用户 ID {user_id} 不存在")
+        user.username = new_username
         await self._session.flush()
         return True
 

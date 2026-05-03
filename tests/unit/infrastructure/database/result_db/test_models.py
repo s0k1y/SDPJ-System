@@ -8,7 +8,6 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sdpj.infrastructure.database.result_db.models import (
     Base,
-    TargetModel,
     TaskGroup,
     DetectionTask,
     DetectionReport,
@@ -33,24 +32,8 @@ async def async_session():
 
 
 @pytest.mark.asyncio
-async def test_target_model_creation(async_session):
-    """测试被测大模型创建"""
-    model = TargetModel(model_id="gpt-4")
-    async_session.add(model)
-    await async_session.commit()
-
-    assert model.model_id == "gpt-4"
-
-
-@pytest.mark.asyncio
 async def test_task_group_creation(async_session):
     """测试任务组创建"""
-    # 先创建被测大模型
-    model = TargetModel(model_id="gpt-4")
-    async_session.add(model)
-    await async_session.flush()
-
-    # 创建任务组
     task_group = TaskGroup(
         task_group_id="tg_001",
         user_id="user_001",
@@ -67,11 +50,6 @@ async def test_task_group_creation(async_session):
 @pytest.mark.asyncio
 async def test_detection_task_creation(async_session):
     """测试检测任务创建"""
-    # 创建依赖数据
-    model = TargetModel(model_id="gpt-4")
-    async_session.add(model)
-    await async_session.flush()
-
     task_group = TaskGroup(
         task_group_id="tg_001",
         user_id="user_001",
@@ -80,7 +58,6 @@ async def test_detection_task_creation(async_session):
     async_session.add(task_group)
     await async_session.flush()
 
-    # 创建检测任务
     start_time = datetime.now()
     task = DetectionTask(
         task_id="task_001",
@@ -100,11 +77,6 @@ async def test_detection_task_creation(async_session):
 @pytest.mark.asyncio
 async def test_detection_report_creation(async_session):
     """测试检测报告创建"""
-    # 创建依赖数据
-    model = TargetModel(model_id="gpt-4")
-    async_session.add(model)
-    await async_session.flush()
-
     task_group = TaskGroup(
         task_group_id="tg_001",
         user_id="user_001",
@@ -123,7 +95,6 @@ async def test_detection_report_creation(async_session):
     async_session.add(task)
     await async_session.flush()
 
-    # 创建检测报告
     report = DetectionReport(
         report_id="report_001",
         task_id="task_001"
@@ -138,11 +109,6 @@ async def test_detection_report_creation(async_session):
 @pytest.mark.asyncio
 async def test_result_data_creation(async_session):
     """测试结果数据创建"""
-    # 创建依赖数据
-    model = TargetModel(model_id="gpt-4")
-    async_session.add(model)
-    await async_session.flush()
-
     task_group = TaskGroup(
         task_group_id="tg_001",
         user_id="user_001",
@@ -168,7 +134,6 @@ async def test_result_data_creation(async_session):
     async_session.add(report)
     await async_session.flush()
 
-    # 创建结果数据
     result_data = ResultData(
         result_data_id="result_001",
         report_id="report_001",
@@ -187,11 +152,6 @@ async def test_result_data_creation(async_session):
 @pytest.mark.asyncio
 async def test_cascade_delete_task_group(async_session):
     """测试任务组级联删除"""
-    # 创建完整的数据链
-    model = TargetModel(model_id="gpt-4")
-    async_session.add(model)
-    await async_session.flush()
-
     task_group = TaskGroup(
         task_group_id="tg_001",
         user_id="user_001",
@@ -227,11 +187,9 @@ async def test_cascade_delete_task_group(async_session):
     async_session.add(result_data)
     await async_session.commit()
 
-    # 删除任务组，应该级联删除所有相关数据
     await async_session.delete(task_group)
     await async_session.commit()
 
-    # 验证级联删除
     from sqlalchemy import select
 
     task_result = await async_session.execute(select(DetectionTask).where(DetectionTask.task_id == "task_001"))

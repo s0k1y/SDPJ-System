@@ -1,24 +1,36 @@
-"""LLM适配器库"""
-from .llm_adapter_interface import LLMAdapterInterface
-from .errors import (
+"""LLM 适配器库"""
+from sdpj.infrastructure.llm_adapters.base import LLMAdapter
+from sdpj.infrastructure.llm_adapters.adapter_engine import OpenAICompatibleAdapter
+from sdpj.infrastructure.llm_adapters.llm_adapter_interface import (
+    LLMAdapterLibInterface,
+    LLMAdapterInterface,
+)
+from sdpj.infrastructure.llm_adapters.llm_adapter_lib import LLMAdapterLib
+from sdpj.infrastructure.llm_adapters.loader import load_adapter_from_config
+from sdpj.infrastructure.llm_adapters.openai_adapter import OpenAIAdapter
+from sdpj.infrastructure.llm_adapters.anthropic_adapter import AnthropicAdapter
+from sdpj.infrastructure.llm_adapters.errors import (
     ErrorCategory,
     StandardizedLLMError,
     AdapterNotFoundError,
-    LLMServiceInstance,
     AdapterValidationError,
-    AdapterAlreadyExistsError
+    AdapterAlreadyExistsError,
+    LLMServiceInstance,
 )
 
-# 为了向后兼容,添加别名
-AdapterMetadata = dict
-
 __all__ = [
-    'LLMAdapterInterface',
-    'ErrorCategory',
-    'StandardizedLLMError',
-    'AdapterNotFoundError',
-    'LLMServiceInstance',
-    'AdapterMetadata',
-    'AdapterValidationError',
-    'AdapterAlreadyExistsError'
+    "LLMAdapter",
+    "OpenAICompatibleAdapter",
+    "OpenAIAdapter",
+    "AnthropicAdapter",
+    "LLMAdapterLibInterface",
+    "LLMAdapterInterface",
+    "LLMAdapterLib",
+    "load_adapter_from_config",
+    "ErrorCategory",
+    "StandardizedLLMError",
+    "AdapterNotFoundError",
+    "AdapterValidationError",
+    "AdapterAlreadyExistsError",
+    "LLMServiceInstance",
 ]

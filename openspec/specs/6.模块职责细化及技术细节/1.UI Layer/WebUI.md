@@ -145,3 +145,4 @@ WebUI / 前端交互模块
 被依赖模块:无
 技术细节:
 
+- Session 认证中间件对所有 `/api/*` 路径生效，以下路径为公开路径（无需认证）：`/api/auth/login`、`/api/auth/register`、`/api/auth/logout`、`/api/auth/public-key`、`/api/status`

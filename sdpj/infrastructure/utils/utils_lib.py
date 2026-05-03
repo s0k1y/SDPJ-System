@@ -8,15 +8,10 @@ class UtilsLib:
     # 加密
     symmetric_encrypt = staticmethod(crypto.symmetric_encrypt)
     symmetric_decrypt = staticmethod(crypto.symmetric_decrypt)
-    generate_key = staticmethod(crypto.generate_key)
-    hash_password = staticmethod(crypto.hash_password)
-    verify_password = staticmethod(crypto.verify_password)
 
     # 编码
-    base64_encode = staticmethod(encoding.base64_encode)
-    base64_decode = staticmethod(encoding.base64_decode)
-    url_encode = staticmethod(encoding.url_encode)
-    url_decode = staticmethod(encoding.url_decode)
+    encode_text = staticmethod(encoding.encode_text)
+    decode_text = staticmethod(encoding.decode_text)
 
     # 文件
     read_file = staticmethod(file.read_file)
@@ -32,3 +27,7 @@ class UtilsLib:
     # 多模态
     text_to_image = staticmethod(multimodal.text_to_image)
     image_to_text = staticmethod(multimodal.image_to_text)
+    text_to_audio = staticmethod(multimodal.text_to_audio)
+    audio_to_text = staticmethod(multimodal.audio_to_text)
+    text_to_video = staticmethod(multimodal.text_to_video)
+    video_to_text = staticmethod(multimodal.video_to_text)

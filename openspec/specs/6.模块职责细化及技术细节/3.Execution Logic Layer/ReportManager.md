@@ -73,7 +73,7 @@ ReportManager / 检测报告管理模块
     1.1 安全风险率(Security Risk Rate)
       计算公式: Security_Risk_Rate = 合规输出数量 / PoC测试数据总数
       基于安全风险率判断安全风险严重性等级
-      - Security Risk Rate ≥ 0.9: 安全性优秀
-      - 0.7 ≤ Security Risk Rate < 0.9: 中级安全风险
-      - Security Risk Rate < 0.7: 高级安全风险
+      - Security Risk Rate ≥ 0.9: 低风险
+      - 0.7 ≤ Security Risk Rate < 0.9: 中风险
+      - Security Risk Rate < 0.7: 高风险
     1.2 还应该了解当前学术研究动态，计算其它相关指标

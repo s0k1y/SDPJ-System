@@ -48,7 +48,7 @@ class TestUserRepository:
 
         # 验证密码已更新
         user = await user_db.get_user_by_id(sample_user["user_id"])
-        assert user["password_hash"] == "new_hashed_password"
+        assert user["password"] == "new_hashed_password"
 
     async def test_update_nonexistent_user_password(self, user_db):
         """测试更新不存在用户的密码"""

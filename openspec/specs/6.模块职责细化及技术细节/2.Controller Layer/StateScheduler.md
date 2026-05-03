@@ -78,6 +78,7 @@ StateScheduler / 系统状态管理及调度控制模块
     - 触发场景:用户触发任一业务操作时(操作日志);系统状态转移、检测进度推进等运行期事件(运行日志);业务执行过程中出现的异常/失败事件(错误日志)。对应 1.spec.md 功能 2.1.7.2 / 2.1.7.3
     - 调用下层:EventLogger 的「记录用户操作日志」「记录系统运行日志」「记录系统错误日志」
     - 不负责的边界:不做日志的查询展示(其查询调用见职责11);不做敏感信息脱敏规则(由本模块在传入日志参数前完成,具体规则属配置层)
+    - **实现说明**:本职责为内部横切行为,由各业务方法在执行过程中直接调用 EventLogger,不在 StateSchedulerInterface 上暴露独立方法
 
 11. 查询系统日志
     - 输入:过滤条件(日志类别、时间范围、来源模块、用户ID 等,可选)
@@ -92,7 +93,7 @@ StateScheduler / 系统状态管理及调度控制模块
     - 后置条件:对应任务的状态被更新(如「异常中断」),错误事件被记录,当前 FSM 状态转入恢复后的目标状态
     - 触发场景:大模型 API 调用不可恢复错误、数据库访问错误、权限校验失败、文件格式校验失败等业务执行过程中出现的异常事件(对应 1.spec.md 功能 2.1.7.3)
     - 调用下层:TaskQueueManager 的「更新单个任务的执行状态」(置为「异常中断」);EventLogger 的「记录系统错误日志」
-    - 不负责的边界:不做下层错误的具体分类与重试/退避决策(分别由 LLMAdapterLib 与 LLMInterface 完成,且属跨层,本模块仅消费上抛错误);不做异常的 UI 提示渲染(由 UI 层完成)
+    - 不负责的边界:不做下层错误的具体分类与重试/退避决策(分别由 LLMAdapterLib 与 LLMService 完成,且属跨层,本模块仅消费上抛错误);不做异常的 UI 提示渲染(由 UI 层完成)
 
 # 用户账号调度
 13. 调度用户注册与登录
@@ -150,7 +151,7 @@ StateScheduler / 系统状态管理及调度控制模块
 # 接口契约
 19. 通过 StateSchedulerInterface 对外暴露上述能力,被 CLI / WebUI 调用(符合 4.模型依赖关系图.puml 中 CLI → StateScheduler 与 WebUI → StateScheduler 两条边)
 
-不需要的:[监控系统资源使用情况,持有任何业务数据(业务数据由下层各 DB 模块持有,本模块仅持有"系统当前状态"FSM 与"执行调度上下文"等内存态),做检测算法的具体执行逻辑(由 SDPJDetector 完成),做检测结果的合规判断与统计指标计算(分别由 SDPJDetector 与 ReportManager 完成),做日志/报告/状态信息的 UI 渲染(由 UI 层完成),持久化登录会话到外部存储(登录会话由 AccountManager 在内存中维护),做密码哈希(由 UserCenter 完成),做下层错误的具体分类与重试/退避决策(分别由 LLMAdapterLib 与 LLMInterface 完成),越层调用抽象驱动层或基础设施层(仅可调用执行逻辑层 8 个模块的对外能力)]
+不需要的:[监控系统资源使用情况,持有任何业务数据(业务数据由下层各 DB 模块持有,本模块仅持有"系统当前状态"FSM 与"执行调度上下文"等内存态),做检测算法的具体执行逻辑(由 SDPJDetector 完成),做检测结果的合规判断与统计指标计算(分别由 SDPJDetector 与 ReportManager 完成),做日志/报告/状态信息的 UI 渲染(由 UI 层完成),持久化登录会话到外部存储(登录会话由 AccountManager 在内存中维护),做密码哈希(由 UserCenter 完成),做下层错误的具体分类与重试/退避决策(分别由 LLMAdapterLib 与 LLMService 完成),越层调用抽象驱动层或基础设施层(仅可调用执行逻辑层 8 个模块的对外能力)]
 
 依赖模块:TaskQueueManager,EventLogger,SecureCommManager,SDPJDetector,ReportManager,PrivateConfigManager,DACManager,AccountManager
 调用接口:TaskQueueManagerInterface,EventLoggerInterface,SecureCommManagerInterface,SDPJDetectorInterface,ReportManagerInterface,PrivateConfigManagerInterface,DACManagerInterface,AccountManagerInterface

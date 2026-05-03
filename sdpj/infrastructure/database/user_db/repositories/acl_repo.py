@@ -104,6 +104,11 @@ class ACLRepository:
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_by_id(self, acl_id: int) -> Optional[AccessControl]:
+        stmt = select(AccessControl).where(AccessControl.acl_id == acl_id)
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def exists(self, resource_id: int, grantee_user_id: int) -> bool:
         """判定访问控制项是否存在
 

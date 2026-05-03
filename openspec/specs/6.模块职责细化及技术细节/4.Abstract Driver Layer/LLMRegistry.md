@@ -50,7 +50,7 @@ LLMRegistry / 大模型注册中心模块
 # 接口契约
 7. 通过 LLMRegistryInterface 对外暴露上述能力,PrivateConfigManager 为唯一调用方(符合 4.模型依赖关系图.puml 中 PrivateConfigManager → LLMRegistry 边)
 
-不需要的:[不实际发起大模型 API 调用(由 LLMInterface 经 LLMAdapterLib 完成),不维护适配器制品的具体内容(仅在注册表中维护大模型标识与服务实例的映射),不做调用方权限判定(由 DACManager 完成),不做 API 密钥/鉴权凭据管理,不做被测大模型的使用情况统计]
+不需要的:[不实际发起大模型 API 调用(由 LLMService 经 LLMAdapterLib 完成),不维护适配器制品的具体内容(仅在注册表中维护大模型标识与服务实例的映射),不做调用方权限判定(由 DACManager 完成),不做 API 密钥/鉴权凭据管理,不做被测大模型的使用情况统计]
 依赖模块:LLMAdapterLib,UtilsLib,调用接口:LLMAdapterInterface,UtilsInterface
 应实现接口:LLMRegistryInterface
 被依赖模块:PrivateConfigManager

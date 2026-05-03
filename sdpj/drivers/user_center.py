@@ -6,33 +6,13 @@
 
 from typing import Optional
 from sdpj.infrastructure.database.user_db.interface import UserDBInterface
-from sdpj.infrastructure.utils.utils_interface import UtilsInterface
 
 
 class UserCenter:
-    """用户管理中心实现类
+    """用户管理中心实现类"""
 
-    职责：
-    - 账号生命周期管理（注册、注销、修改密码、查询）
-    - 凭据校验（登录验证）
-    - 资源登记与查询
-    - ACL 授权管理
-    - 私有检测配置内容管理
-
-    依赖：
-    - UserDB: 用户信息数据库
-    - UtilsLib: 哈希摘要工具
-    """
-
-    def __init__(self, user_db: UserDBInterface, utils_lib: UtilsInterface):
-        """初始化 UserCenter
-
-        Args:
-            user_db: UserDB 实例
-            utils_lib: UtilsLib 实例
-        """
+    def __init__(self, user_db: UserDBInterface):
         self._user_db = user_db
-        self._utils = utils_lib
 
     # ==================== 账号生命周期 ====================
 
@@ -49,12 +29,7 @@ class UserCenter:
         Raises:
             ValueError: 账号已存在时拒绝注册
         """
-        # 对密码进行哈希处理
-        password_hash = self._utils.hash_data(password)
-
-        # 调用 UserDB 创建用户
-        user_id = await self._user_db.create_user(username, password_hash)
-
+        user_id = await self._user_db.create_user(username, password)
         return user_id
 
     async def delete_user(self, user_id: int) -> bool:
@@ -67,6 +42,9 @@ class UserCenter:
             注销结果（True 表示成功）
         """
         return await self._user_db.delete_user(user_id)
+
+    async def update_username(self, user_id: int, new_username: str) -> bool:
+        return await self._user_db.update_username(user_id, new_username)
 
     async def update_user_password(self, user_id: int, new_password: str) -> bool:
         """修改用户密码
@@ -81,11 +59,7 @@ class UserCenter:
         Raises:
             ValueError: 用户 ID 不存在时抛出
         """
-        # 对新密码进行哈希处理
-        new_password_hash = self._utils.hash_data(new_password)
-
-        # 调用 UserDB 更新密码
-        return await self._user_db.update_user_password(user_id, new_password_hash)
+        return await self._user_db.update_user_password(user_id, new_password)
 
     async def get_user_by_username(self, username: str) -> Optional[dict]:
         """按账号查询用户信息
@@ -147,11 +121,7 @@ class UserCenter:
         if user is None:
             return None
 
-        # 对输入密码进行哈希
-        password_hash = self._utils.hash_data(password)
-
-        # 比对哈希值
-        if password_hash == user["password_hash"]:
+        if user["password"] == password:
             return user["user_id"]
 
         return None
@@ -246,16 +216,10 @@ class UserCenter:
         return await self._user_db.get_access_controls_by_resource(resource_id)
 
     async def check_access(self, resource_id: int, user_id: int) -> bool:
-        """判定用户对资源是否具备访问权
-
-        Args:
-            resource_id: 资源 ID
-            user_id: 用户 ID
-
-        Returns:
-            是否具备访问权的布尔判定
-        """
         return await self._user_db.check_access_control_exists(resource_id, user_id)
+
+    async def get_acl_by_id(self, acl_id: int):
+        return await self._user_db.get_access_control_by_id(acl_id)
 
     # ==================== 私有检测配置内容管理 ====================
 

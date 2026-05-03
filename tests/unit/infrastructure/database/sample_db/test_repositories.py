@@ -2,7 +2,9 @@
 
 import pytest
 import pytest_asyncio
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.pool import StaticPool
 from sdpj.infrastructure.database.sample_db.models import Base, Dataset, DetectionSample
 from sdpj.infrastructure.database.sample_db.repositories import DatasetRepository, SampleRepository
 
@@ -10,7 +12,18 @@ from sdpj.infrastructure.database.sample_db.repositories import DatasetRepositor
 @pytest_asyncio.fixture
 async def async_session():
     """创建测试用的异步数据库会话"""
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        echo=False,
+        poolclass=StaticPool,
+        connect_args={"check_same_thread": False},
+    )
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def _enable_fk(dbapi_conn, connection_record):
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -224,19 +237,3 @@ async def test_sample_repo_delete(async_session):
     assert result is False
 
 
-@pytest.mark.asyncio
-async def test_sample_repo_count_by_dataset(async_session):
-    """测试样本仓储统计功能"""
-    # 创建数据集
-    dataset_repo = DatasetRepository(async_session)
-    dataset = await dataset_repo.create("统计测试数据集", "提示词注入")
-    await async_session.commit()
-
-    # 创建样本
-    sample_repo = SampleRepository(async_session)
-    await sample_repo.create("子类1", "PoC1", dataset.dataset_id)
-    await sample_repo.create("子类2", "PoC2", dataset.dataset_id)
-    await async_session.commit()
-
-    count = await sample_repo.count_by_dataset(dataset.dataset_id)
-    assert count == 2

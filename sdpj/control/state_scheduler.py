@@ -1,176 +1,535 @@
-"""StateScheduler 系统状态管理及调度控制"""
-from sdpj.core.task_queue_manager_interface import TaskQueueManagerInterface
-from sdpj.core.event_logger_interface import EventLoggerInterface
-from sdpj.core.secure_comm_manager_interface import SecureCommManagerInterface
-from sdpj.core.sdpj_detector_interface import SDPJDetectorInterface
+"""StateScheduler 系统状态管理及调度控制
+
+依赖模块: AccountManager, DACManager, PrivateConfigManager,
+          ReportManager, SDPJDetector, EventLogger, TaskQueueManager, SecureCommManager
+被依赖模块: CLI, WebUI
+"""
+import asyncio
+import uuid
+import base64
+from typing import Callable, Optional
+
 from sdpj.core.account_manager_interface import AccountManagerInterface
 from sdpj.core.dac_manager_interface import DACManagerInterface
 from sdpj.core.private_config_manager_interface import PrivateConfigManagerInterface
 from sdpj.core.report_manager_interface import ReportManagerInterface
-from sdpj.core.task_queue_manager import TaskQueueManager
-from sdpj.core.event_logger import EventLogger
-from sdpj.core.secure_comm_manager import SecureCommManager
-from sdpj.core.sdpj_detector import SDPJDetector
-from sdpj.core.account_manager import AccountManager
-from sdpj.core.dac_manager import DACManager
-from sdpj.core.private_config_manager import PrivateConfigManager
-from sdpj.core.report_manager import ReportManager
-from .state_machine import SystemStateMachine
+from sdpj.core.sdpj_detector_interface import SDPJDetectorInterface
+from sdpj.core.event_logger_interface import EventLoggerInterface, LogCategory
+from sdpj.core.task_queue_manager_interface import TaskQueueManagerInterface, TaskStatus
+from sdpj.core.secure_comm_manager_interface import SecureCommManagerInterface
+from sdpj.control.state_scheduler_interface import StateSchedulerInterface
+from sdpj.drivers.llm_registry_interface import LLMRegistryInterface
+
+from sdpj.control.system_states import SystemStateMachine
 
 
-class StateScheduler:
+class StateScheduler(StateSchedulerInterface):
     """系统状态管理及调度控制"""
 
     def __init__(
         self,
-        task_queue: TaskQueueManagerInterface | None = None,
-        event_logger: EventLoggerInterface | None = None,
-        secure_comm: SecureCommManagerInterface | None = None,
-        detector: SDPJDetectorInterface | None = None,
-        account_manager: AccountManagerInterface | None = None,
-        dac_manager: DACManagerInterface | None = None,
-        config_manager: PrivateConfigManagerInterface | None = None,
-        report_manager: ReportManagerInterface | None = None
+        account_manager: AccountManagerInterface,
+        dac_manager: DACManagerInterface,
+        config_manager: PrivateConfigManagerInterface,
+        report_manager: ReportManagerInterface,
+        detector: SDPJDetectorInterface,
+        event_logger: EventLoggerInterface,
+        task_queue_manager: TaskQueueManagerInterface,
+        secure_comm_manager: SecureCommManagerInterface,
+        llm_registry: LLMRegistryInterface,
     ):
-        """初始化StateScheduler
+        self._account = account_manager
+        self._dac = dac_manager
+        self._config = config_manager
+        self._report = report_manager
+        self._detector = detector
+        self._logger = event_logger
+        self._fsm = SystemStateMachine()
+        self._task_queue = task_queue_manager
+        self._secure_comm = secure_comm_manager
+        self._registry = llm_registry
+        self._state_callbacks: list = []
+        self._error_callbacks: list = []
 
-        Args:
-            task_queue: 任务队列管理器接口(可选,用于依赖注入)
-            event_logger: 事件日志管理器接口(可选,用于依赖注入)
-            secure_comm: 安全通信管理器接口(可选,用于依赖注入)
-            detector: SDPJ检测器接口(可选,用于依赖注入)
-            account_manager: 账号管理器接口(可选,用于依赖注入)
-            dac_manager: DAC管理器接口(可选,用于依赖注入)
-            config_manager: 配置管理器接口(可选,用于依赖注入)
-            report_manager: 报告管理器接口(可选,用于依赖注入)
-        """
-        # Wave 0 基础设施层
-        self.task_queue = task_queue if task_queue is not None else TaskQueueManager()
-        self.event_logger = event_logger if event_logger is not None else EventLogger()
-        self.secure_comm = secure_comm if secure_comm is not None else SecureCommManager()
+    # ── 内部日志辅助 ──
 
-        # Wave 2 执行逻辑层
-        self.detector = detector if detector is not None else SDPJDetector()
-        self.account_manager = account_manager if account_manager is not None else AccountManager()
-        self.dac_manager = dac_manager if dac_manager is not None else DACManager()
-        self.config_manager = config_manager if config_manager is not None else PrivateConfigManager()
-        self.report_manager = report_manager if report_manager is not None else ReportManager()
+    async def startup(self) -> None:
+        await self._registry.initialize()
 
-        # 状态机
-        self.state_machine = SystemStateMachine()
-        self._initialized = False
+    async def shutdown(self) -> None:
+        await self._registry.shutdown()
 
-    async def init(self):
-        """初始化所有模块"""
-        if not self._initialized:
-            await self.detector.init()
-            await self.account_manager.init()
-            await self.dac_manager.init()
-            await self.config_manager.init()
-            await self.report_manager.init()
-            self._initialized = True
+    def _log_op(self, user_id: int, op: str, ctx: dict) -> None:
+        self._logger.log_operation(str(user_id), op, ctx)
 
-    # ==================== 检测调度 ====================
+    def _log_rt(self, event: str, desc: str) -> None:
+        self._logger.log_runtime("StateScheduler", event, desc)
+
+    def _log_err(self, err_type: str, desc: str) -> None:
+        self._logger.log_error("StateScheduler", err_type, desc)
+
+    # ── 检测调度 (职责 1-4) ──
 
     async def start_detection(self, user_id: int, config_data: dict) -> dict:
-        """接收并解析检测启动指令并下发为可执行任务组"""
+        model_id: str = config_data["model_id"]
+        detection_type: str = config_data.get("detection_type", "static")
+        dataset_ids: list = config_data.get("dataset_ids", [])
+        max_iterations: int = config_data.get("max_iterations", 3)
+        config_id: int | None = config_data.get("config_id")
+
+        if config_id is not None:
+            loaded = await self._config.read_config(config_id)
+            if loaded:
+                dataset_ids = loaded.get("dataset_ids", dataset_ids)
+                model_id = loaded.get("model_id", model_id)
+
         try:
-            self.state_machine.start_detection()
-            
-            # 创建任务组
-            model_id = config_data.get("model_id")
-            dataset_id = config_data.get("dataset_id")
-            
-            # 入队任务
-            task_desc = {
-                "user_id": user_id,
+            self._fsm.start_detection()
+            self._notify_state()
+        except Exception:
+            return {"success": False, "error": "系统状态不允许启动检测"}
+
+        task_group_id = str(uuid.uuid4())
+        task_ids: list[str] = []
+        for ds_id in dataset_ids:
+            tid = await self._task_queue.enqueue_task({
+                "user_id": str(user_id),
                 "model_id": model_id,
-                "dataset_id": dataset_id,
-                "algorithm_type": config_data.get("algorithm_type", "static")
+                "algorithm_type": detection_type,
+                "dataset_id": str(ds_id),
+                "metadata": {
+                    "task_group_id": task_group_id,
+                    "max_iterations": max_iterations,
+                },
+            })
+            task_ids.append(tid)
+
+        self._log_op(user_id, "start_detection", {
+            "task_group_id": task_group_id, "task_ids": task_ids,
+        })
+        self._log_rt("detection_queued", f"任务组 {task_group_id} 已入队, 共 {len(task_ids)} 个子任务")
+
+        return {"success": True, "task_group_id": task_group_id, "task_ids": task_ids}
+
+    async def execute_detection_task(self, task_id: str, task_params: dict) -> dict:
+        await self._task_queue.update_task_status(task_id, TaskStatus.RUNNING)
+        self._log_rt("task_started", f"子任务 {task_id} 开始执行")
+
+        model_id = task_params["model_id"]
+        user_id = str(task_params["user_id"])
+        detection_type = task_params.get("detection_type", "static")
+        max_iterations = task_params.get("max_iterations", 3)
+
+        try:
+            if detection_type == "static":
+                result = await self._detector.run_static_detection(model_id, user_id)
+            elif detection_type == "dynamic":
+                static_result = task_params.get("static_result", {})
+                result = await self._detector.run_dynamic_detection(
+                    model_id, user_id, static_result, max_iterations
+                )
+            else:
+                static_result = await self._detector.run_static_detection(model_id, user_id)
+                if static_result["status"] != "completed":
+                    result = static_result
+                else:
+                    dynamic_result = await self._detector.run_dynamic_detection(
+                        model_id, user_id, static_result, max_iterations
+                    )
+                    result = {
+                        "status": "completed",
+                        "static_task_group_id": static_result["task_group_id"],
+                        "dynamic_task_group_id": dynamic_result.get("task_group_id"),
+                    }
+            await self._task_queue.update_task_status(task_id, TaskStatus.COMPLETED)
+            self._log_rt("task_completed", f"子任务 {task_id} 执行完成")
+            return {"success": True, "task_id": task_id, "result": result}
+        except Exception as e:
+            await self._task_queue.update_task_status(task_id, TaskStatus.FAILED)
+            self._log_err("DetectionError", f"子任务 {task_id} 异常: {e}")
+            return {"success": False, "task_id": task_id, "error": str(e)}
+
+    async def execute_concurrent_tasks(self, max_concurrency: int = 3) -> dict:
+        batch = await self._task_queue.dequeue_tasks(max_concurrency)
+        if not batch:
+            self._fsm.detection_done()
+            self._notify_state()
+            return {"success": True, "tasks": [], "message": "队列为空"}
+
+        async def _run(task) -> dict:
+            params = {
+                "model_id": task.model_id,
+                "user_id": task.user_id,
+                "detection_type": task.algorithm_type,
+                "max_iterations": task.metadata.get("max_iterations", 3),
             }
-            task_id = await self.task_queue.enqueue_task(task_desc)
-            
-            # 记录日志
-            await self.event_logger.log_user_operation(
-                user_id, "start_detection", {"task_id": task_id}
-            )
-            
-            return {"success": True, "task_id": task_id}
-        except Exception as e:
-            self.state_machine.trigger_error()
-            await self.event_logger.log_error("StateScheduler", "DetectionError", str(e))
-            return {"success": False, "error": str(e)}
+            return await self.execute_detection_task(task.task_id, params)
 
-    async def execute_detection_task(self, task_id: str) -> dict:
-        """调度执行单个检测子任务"""
+        async with asyncio.TaskGroup() as tg:
+            futures = [tg.create_task(_run(task)) for task in batch]
+
+        results = [f.result() for f in futures]
+
+        queue_view = await self._task_queue.get_queue_view()
+        has_pending = any(t.status == TaskStatus.PENDING for t in queue_view)
+        if not has_pending:
+            try:
+                self._fsm.detection_done()
+                self._notify_state()
+            except Exception as e:
+                self._log_err("FSMError", f"detection_done 状态转换失败: {e}")
+
+    async def query_detection_progress(self, task_id: Optional[str] = None) -> dict:
+        if task_id is not None:
+            status = await self._task_queue.get_task_status(task_id)
+            if status is None:
+                return {"success": False, "error": "任务不存在"}
+            return {"success": True, "task_id": task_id, "status": status.value}
+        queue_view = await self._task_queue.get_queue_view()
+        return {"success": True, "queue": [
+            {"task_id": t.task_id, "status": t.status.value, "model_id": t.model_id, "dataset_id": t.dataset_id}
+            for t in queue_view
+        ]}
+
+    # ── 报告管理调度 (职责 5-8) ──
+
+    async def generate_report(self, task_group_id: str, detection_type: str) -> dict:
         try:
-            # 出队任务
-            task = await self.task_queue.dequeue_task()
-            if not task:
-                return {"success": False, "error": "No task available"}
-            
-            # 更新状态
-            await self.task_queue.update_task_status(task_id, "进行中")
-            
-            # 执行检测（简化实现）
-            # result = await self.detector.static_detect(...)
-            
-            # 更新状态
-            await self.task_queue.update_task_status(task_id, "已完成")
-            
-            self.state_machine.detection_done()
-            return {"success": True}
-        except Exception as e:
-            self.state_machine.trigger_error()
-            return {"success": False, "error": str(e)}
+            self._fsm.start_report()
+            self._notify_state()
+        except Exception:
+            return {"success": False, "error": "系统状态不允许生成报告"}
 
-    async def query_detection_progress(self, task_id: str) -> dict:
-        """查询检测任务执行进度"""
-        status = await self.task_queue.query_task_status(task_id)
-        return {"task_id": task_id, "status": status}
-
-    # ==================== 报告管理 ====================
-
-    async def generate_report(self, task_group_id: int) -> dict:
-        """生成检测报告"""
         try:
-            self.state_machine.report_done()
-            report = await self.report_manager.generate_static_report(task_group_id)
+            if detection_type == "static":
+                report = await self._report.generate_static_report(task_group_id)
+            else:
+                report = await self._report.generate_dynamic_report(task_group_id)
+            self._fsm.report_done()
+            self._notify_state()
+            self._log_rt("report_generated", f"报告已生成: {task_group_id}")
             return {"success": True, "report": report}
         except Exception as e:
+            self._handle_error(e, "ReportError")
             return {"success": False, "error": str(e)}
 
-    # ==================== 用户管理 ====================
+    async def view_report(self, task_group_id: str) -> dict:
+        report = await self._report.view_report(task_group_id)
+        return {"success": True, "report": report}
 
-    async def register_user(self, username: str, password: str) -> dict:
-        """调度用户注册"""
-        # 解密（WebUI 模式）
-        decrypted_password = self.secure_comm.decrypt_credentials(password.encode()) if isinstance(password, str) and len(password) > 50 else password
-        
-        success, msg = await self.account_manager.register(username, decrypted_password)
-        
-        if success:
-            await self.event_logger.log_user_operation(0, "register", {"username": username})
-        
-        return {"success": success, "message": msg}
+    async def list_reports(self, filters: Optional[dict] = None) -> list:
+        f = filters or {}
+        return await self._report.list_reports(
+            user_id=f.get("user_id"), model_id=f.get("model_id"),
+        )
 
-    async def login_user(self, username: str, password: str) -> dict:
-        """调度用户登录"""
-        decrypted_password = self.secure_comm.decrypt_credentials(password.encode()) if isinstance(password, str) and len(password) > 50 else password
-        
-        success, session_id = await self.account_manager.login(username, decrypted_password)
-        
-        if success:
-            await self.event_logger.log_user_operation(0, "login", {"username": username})
-        
-        return {"success": success, "session_id": session_id}
+    async def delete_report(
+        self, target_id: str, caller_user_id: int, granularity: str = "task_group"
+    ) -> dict:
+        has_access = await self._dac.check_access(int(target_id), caller_user_id)
+        if not has_access:
+            return {"success": False, "error": "无访问权限"}
 
-    # ==================== 状态查询 ====================
+        kwargs: dict = {}
+        if granularity == "task_group":
+            kwargs["task_group_id"] = target_id
+        elif granularity == "task":
+            kwargs["task_id"] = target_id
+        elif granularity == "report":
+            kwargs["report_id"] = target_id
+        elif granularity == "result_data":
+            kwargs["result_data_id"] = target_id
+
+        ok, msg = await self._report.delete_report(**kwargs)
+        self._log_op(caller_user_id, "delete_report", {"target_id": target_id, "granularity": granularity})
+        return {"success": ok, "message": msg}
+
+    async def export_report(self, task_group_id: str, target_format: str) -> dict:
+        content = await self._report.export_report(task_group_id, target_format)
+        self._log_rt("report_exported", f"报告 {task_group_id} 已导出为 {target_format}")
+        return {"success": True, "content": content}
+
+    async def prepare_visualization_data(self, task_group_id: str) -> dict:
+        data = await self._report.prepare_visualization_data(task_group_id)
+        return {"success": True, "data": data}
+
+    # ── 系统状态与日志 (职责 9-12) ──
 
     def get_system_state(self) -> str:
-        """获取当前系统状态"""
-        return self.state_machine.current_state_value
+        return next(iter(self._fsm.configuration)).id
 
-    async def query_logs(self, filters: dict) -> list:
-        """查询系统日志"""
-        return await self.event_logger.query_logs(filters)
+    def subscribe_state_changes(self, callback: Callable[[str], None]) -> None:
+        if callback not in self._state_callbacks:
+            self._state_callbacks.append(callback)
+
+    def unsubscribe_state_changes(self, callback: Callable[[str], None]) -> None:
+        if callback in self._state_callbacks:
+            self._state_callbacks.remove(callback)
+
+    def subscribe_errors(self, callback: Callable[[str, str], None]) -> None:
+        if callback not in self._error_callbacks:
+            self._error_callbacks.append(callback)
+
+    def unsubscribe_errors(self, callback: Callable[[str, str], None]) -> None:
+        if callback in self._error_callbacks:
+            self._error_callbacks.remove(callback)
+
+    def _notify_state(self) -> None:
+        state = self.get_system_state()
+        for cb in list(self._state_callbacks):
+            try:
+                cb(state)
+            except Exception as e:
+                self._logger.log_error("StateScheduler", "CallbackError", f"状态回调异常: {e}")
+
+    def _notify_error(self, err_type: str, desc: str) -> None:
+        for cb in list(self._error_callbacks):
+            try:
+                cb(err_type, desc)
+            except Exception as e:
+                self._logger.log_error("StateScheduler", "CallbackError", f"错误回调异常: {e}")
+
+    def get_comm_public_key(self) -> str:
+        return self._secure_comm.get_public_key_spki_b64()
+
+    async def query_logs(self, filters: Optional[dict] = None) -> list:
+        f = filters or {}
+        category = None
+        cat_str = f.get("category")
+        if cat_str:
+            category = LogCategory(cat_str)
+        entries = self._logger.query_logs(
+            category=category,
+            time_start=f.get("time_start"),
+            time_end=f.get("time_end"),
+            source_module=f.get("source_module"),
+            user_id=f.get("user_id"),
+        )
+        return [
+            {
+                "log_id": e.log_id,
+                "category": e.category.value,
+                "level": e.level.value,
+                "timestamp": e.timestamp.isoformat(),
+                "source_module": e.source_module,
+                "user_id": e.user_id,
+                "event_type": e.event_type,
+                "description": e.description,
+                "context": e.context,
+            }
+            for e in entries
+        ]
+
+    def _handle_error(self, exc: Exception, err_type: str) -> None:
+        self._log_err(err_type, str(exc))
+        self._notify_error(err_type, str(exc))
+        try:
+            self._fsm.to_error()
+            self._notify_state()
+        except Exception:
+            pass
+        try:
+            self._fsm.recover()
+            self._notify_state()
+        except Exception:
+            pass
+
+    # ── 用户账号调度 (职责 13-14) ──
+
+    async def schedule_user_auth(
+        self, username: str, password: str, action: str, is_encrypted: bool = False
+    ) -> dict:
+        if is_encrypted:
+            pwd = self._secure_comm.decrypt_from_client(base64.b64decode(password))
+        else:
+            pwd = password
+
+        if action == "register":
+            ok, msg = await self._account.register(username, pwd)
+            if ok:
+                self._log_op(0, "register", {"username": username})
+            return {"success": ok, "message": msg}
+
+        if action == "login":
+            ok, user_id = await self._account.login(username, pwd)
+            if ok:
+                self._log_op(user_id or 0, "login", {"username": username})
+            return {"success": ok, "user_id": user_id}
+
+        return {"success": False, "error": f"未知操作: {action}"}
+
+    async def schedule_account_operation(self, operation: str, params: dict) -> dict:
+        dispatch = {
+            "change_password": self._op_change_password,
+            "switch_account": self._op_switch_account,
+            "logout": self._op_logout,
+            "unregister": self._op_unregister,
+            "get_profile": self._op_get_profile,
+            "update_profile": self._op_update_profile,
+            "list_resources": self._op_list_resources,
+        }
+        handler = dispatch.get(operation)
+        if handler is None:
+            return {"success": False, "error": f"未知账号操作: {operation}"}
+        return await handler(params)
+
+    async def _op_change_password(self, p: dict) -> dict:
+        ok, msg = await self._account.change_password(p["old_password"], p["new_password"])
+        self._log_op(0, "change_password", {})
+        return {"success": ok, "message": msg}
+
+    async def _op_switch_account(self, p: dict) -> dict:
+        ok, uid = await self._account.switch_account(p["username"], p["password"])
+        if ok:
+            self._log_op(uid or 0, "switch_account", {"username": p["username"]})
+        return {"success": ok, "user_id": uid}
+
+    async def _op_logout(self, _p: dict) -> dict:
+        ok = self._account.logout()
+        self._log_op(0, "logout", {})
+        return {"success": ok}
+
+    async def _op_unregister(self, p: dict) -> dict:
+        ok, msg = await self._account.unregister(p["user_id"])
+        self._log_op(p["user_id"], "unregister", {})
+        return {"success": ok, "message": msg}
+
+    async def _op_get_profile(self, _p: dict) -> dict:
+        profile = await self._account.get_current_user_profile()
+        return {"success": profile is not None, "profile": profile}
+
+    async def _op_update_profile(self, p: dict) -> dict:
+        username = p.get("username")
+        if not username:
+            return {"success": False, "error": "username 不能为空"}
+        ok = await self._account.update_username(username)
+        return {"success": ok}
+
+    async def _op_list_resources(self, _p: dict) -> dict:
+        resources = await self._account.list_user_resources()
+        return {"success": True, "resources": resources}
+
+    # ── 权限授权调度 (职责 15-16) ──
+
+    async def schedule_dac_operation(self, operation: str, params: dict) -> dict:
+        caller = params["caller_user_id"]
+
+        if operation == "grant":
+            ok, msg = await self._dac.grant_access(
+                params["resource_id"], params["target_user_id"], caller,
+            )
+            self._log_op(caller, "grant_access", params)
+            return {"success": ok, "message": msg}
+
+        if operation == "revoke":
+            ok, msg = await self._dac.revoke_access(params["acl_id"], caller)
+            self._log_op(caller, "revoke_access", params)
+            return {"success": ok, "message": msg}
+
+        if operation == "list":
+            ok, acl_list = await self._dac.get_access_list(params["resource_id"], caller)
+            return {"success": ok, "acl_list": acl_list}
+
+        return {"success": False, "error": f"未知权限操作: {operation}"}
+
+    async def check_resource_access(self, resource_id: int, user_id: int) -> bool:
+        return await self._dac.check_access(resource_id, user_id)
+
+    # ── 私有资源调度 (职责 17, 17-1, 18) ──
+
+    async def schedule_config_operation(self, operation: str, params: dict) -> dict:
+        user_id: int = params.get("user_id", 0)
+
+        if operation == "create":
+            ok, cid = await self._config.create_config(user_id, params["config_content"])
+            self._log_op(user_id, "create_config", {"config_id": cid})
+            return {"success": ok, "config_id": cid}
+
+        if operation in ("read", "update", "delete", "export"):
+            config_id: int = params["config_id"]
+            has_access = await self._dac.check_access(config_id, user_id)
+            if not has_access:
+                return {"success": False, "error": "无访问权限"}
+
+        if operation == "read":
+            data = await self._config.read_config(params["config_id"])
+            return {"success": data is not None, "config": data}
+
+        if operation == "update":
+            ok, msg = await self._config.update_config(params["config_id"], params["config_content"])
+            self._log_op(user_id, "update_config", {"config_id": params["config_id"]})
+            return {"success": ok, "message": msg}
+
+        if operation == "delete":
+            ok = await self._config.delete_config(params["config_id"])
+            self._log_op(user_id, "delete_config", {"config_id": params["config_id"]})
+            return {"success": ok}
+
+        if operation == "list":
+            configs = await self._config.list_configs(user_id)
+            return {"success": True, "configs": configs}
+
+        if operation == "export":
+            content = await self._config.export_config(params["config_id"], params.get("format", "json"))
+            self._log_op(user_id, "export_config", {"config_id": params["config_id"]})
+            return {"success": True, "content": content}
+
+        if operation == "import":
+            file_content = params["file_content"]
+            if params.get("is_encrypted"):
+                file_content = self._secure_comm.decrypt_from_client(base64.b64decode(file_content))
+            ok, cid = await self._config.import_config(file_content, user_id)
+            self._log_op(user_id, "import_config", {"config_id": cid})
+            return {"success": ok, "config_id": cid}
+
+        return {"success": False, "error": f"未知配置操作: {operation}"}
+
+    async def query_available_datasets(self) -> list:
+        datasets = await self._config.query_datasets()
+        self._log_rt("query_datasets", "查询可用检测数据集清单")
+        return datasets
+
+    async def schedule_private_resource_operation(
+        self, operation: str, params: dict
+    ) -> dict:
+        user_id: int = params.get("user_id", 0)
+
+        if operation == "upload_adapter":
+            adapter_content = params["adapter_content"]
+            if params.get("is_encrypted"):
+                adapter_content = self._secure_comm.decrypt_from_client(base64.b64decode(adapter_content))
+            ok, msg, rid = await self._config.upload_adapter(
+                adapter_content, params["model_id"], user_id,
+            )
+            self._log_op(user_id, "upload_adapter", {"model_id": params["model_id"]})
+            return {"success": ok, "message": msg, "resource_id": rid}
+
+        if operation == "remove_adapter":
+            resource_id = params.get("resource_id")
+            if resource_id is None:
+                return {"success": False, "error": "缺少 resource_id"}
+            has_access = await self._dac.check_access(resource_id, user_id)
+            if not has_access:
+                return {"success": False, "error": "无访问权限"}
+            ok, msg = await self._config.remove_adapter(params["model_id"], resource_id)
+            self._log_op(user_id, "remove_adapter", {"model_id": params["model_id"]})
+            return {"success": ok, "message": msg}
+
+        if operation == "upload_dataset":
+            ok, info = await self._config.upload_dataset(
+                params["name"], params["risk_type"], params["samples"], user_id,
+            )
+            self._log_op(user_id, "upload_dataset", {"name": params["name"]})
+            return {"success": ok, "info": info}
+
+        if operation == "remove_dataset":
+            resource_id = params.get("resource_id")
+            if resource_id is not None:
+                has_access = await self._dac.check_access(resource_id, user_id)
+                if not has_access:
+                    return {"success": False, "error": "无访问权限"}
+            ok = await self._config.remove_dataset(params["dataset_id"], resource_id)
+            self._log_op(user_id, "remove_dataset", {"dataset_id": params["dataset_id"]})
+            return {"success": ok}
+
+        return {"success": False, "error": f"未知私有资源操作: {operation}"}

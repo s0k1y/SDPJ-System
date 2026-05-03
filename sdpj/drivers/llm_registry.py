@@ -1,5 +1,4 @@
-"""
-LLMRegistry - 大模型注册中心实现
+"""LLMRegistry - 大模型注册中心实现
 
 职责:
 1. 启动时批量注册已入库大模型
@@ -12,163 +11,109 @@ LLMRegistry - 大模型注册中心实现
 依赖: LLMAdapterLib, UtilsLib
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Optional
+
+from sdpj.infrastructure.llm_adapters.llm_adapter_interface import LLMAdapterLibInterface
+from sdpj.infrastructure.llm_adapters.errors import (
+    LLMServiceInstance,
+    AdapterNotFoundError,
+    AdapterValidationError,
+    AdapterAlreadyExistsError,
+)
+from sdpj.infrastructure.utils.utils_interface import UtilsInterface
+from sdpj.drivers.llm_registry_interface import ModelInfo
 
 
 class LLMRegistry:
     """大模型注册中心"""
 
-    def __init__(self, adapter_registry: Any = None, utils_lib: Any = None):
-        """初始化LLMRegistry
-
-        Args:
-            adapter_registry: 适配器注册中心(可选)
-            utils_lib: 工具库(可选)
-        """
-        self.adapter_registry = adapter_registry
-        self.utils_lib = utils_lib
-        self.adapters: Dict[str, dict] = {}
-        self._registry: Dict[str, Any] = {}
-
-    async def startup(self) -> None:
-        """启动注册中心"""
-        pass
+    def __init__(
+        self,
+        adapter_lib: LLMAdapterLibInterface,
+        utils_lib: UtilsInterface,
+    ):
+        self._adapter_lib = adapter_lib
+        self._utils = utils_lib
+        self._registry: dict[str, LLMServiceInstance] = {}
 
     async def initialize(self) -> bool:
-        """初始化并批量注册已入库大模型"""
-        if self.adapter_registry:
-            try:
-                adapters = await self.adapter_registry.list_adapters()
-                for adapter in adapters:
-                    model_id = adapter.get('model_id')
-                    if model_id:
-                        self.adapters[model_id] = adapter
-                        self._registry[model_id] = adapter
-                return True
-            except Exception:
-                return False
-        return True
-
-    async def list_registered_models(self) -> List[Any]:
-        """列出所有已注册的模型(返回ModelInfo列表)"""
-        result = []
-        for model_id, service in self._registry.items():
-            try:
-                # 尝试获取元信息
-                if self.adapter_registry and hasattr(self.adapter_registry, 'get_adapter_metadata'):
-                    metadata = await self.adapter_registry.get_adapter_metadata(model_id)
-                    result.append(metadata)
-                else:
-                    # 简单返回模型ID
-                    from sdpj.drivers.llm_registry_interface import ModelInfo
-                    result.append(ModelInfo(model_id=model_id))
-            except Exception:
-                # 跳过获取元信息失败的模型
-                continue
-        return result
-
-    def list_models(self) -> List[str]:
-        """列出所有已注册的模型ID"""
-        return list(self.adapters.keys())
-
-    def get_model_info(self, model_id: str) -> Optional[dict]:
-        """获取模型信息"""
-        return self.adapters.get(model_id)
-
-    async def is_model_available(self, model_id: str) -> tuple[bool, Any]:
-        """检查模型是否可用,返回(是否可用, 服务实例)"""
-        if model_id in self._registry:
-            return True, self._registry[model_id]
-        return False, None
-
-    async def register_model(self, model_id: str, config: dict) -> bool:
-        """注册新模型"""
-        self.adapters[model_id] = config
-        self._registry[model_id] = config
-        return True
-
-    async def register_private_model(self, adapter_content: str, model_id: str) -> tuple[bool, str, str]:
-        """注册私有模型
-
-        Returns:
-            (成功标志, 注册的模型ID, 错误信息)
-        """
         try:
-            # 1. 文件格式校验
-            if self.utils_lib and hasattr(self.utils_lib, 'validate_file_format'):
-                is_valid, error_msg = self.utils_lib.validate_file_format(adapter_content, 'json')
-                if not is_valid:
-                    return False, "", f"文件格式校验失败: {error_msg}"
-
-            # 2. 调用adapter_registry注册
-            if self.adapter_registry and hasattr(self.adapter_registry, 'register_adapter'):
-                service = await self.adapter_registry.register_adapter(adapter_content, model_id)
-                self._registry[model_id] = service
-                self.adapters[model_id] = {'model_id': model_id}
-                return True, model_id, ""
-
-            # 简单注册
-            self._registry[model_id] = {'model_id': model_id}
-            self.adapters[model_id] = {'model_id': model_id}
-            return True, model_id, ""
-
-        except Exception as e:
-            error_type = type(e).__name__
-            if 'Validation' in error_type:
-                return False, "", str(e)
-            elif 'AlreadyExists' in error_type:
-                return False, "", str(e)
-            else:
-                return False, "", f"注册失败: {str(e)}"
-
-    async def unregister_model(self, model_id: str) -> bool:
-        """注销模型"""
-        if model_id in self.adapters:
-            del self.adapters[model_id]
-            if model_id in self._registry:
-                del self._registry[model_id]
-            return True
-        return False
-
-    async def unregister_private_model(self, model_id: str) -> tuple[bool, str]:
-        """注销私有模型
-
-        Returns:
-            (成功标志, 错误信息)
-        """
-        try:
-            # 检查是否存在
-            if model_id not in self._registry:
-                return False, f"模型 {model_id} 不存在"
-
-            # 调用adapter_registry注销
-            if self.adapter_registry and hasattr(self.adapter_registry, 'unregister_adapter'):
-                success = await self.adapter_registry.unregister_adapter(model_id)
-                if not success:
-                    return False, f"模型 {model_id} 不存在"
-
-            # 从注册表移除
-            if model_id in self._registry:
-                del self._registry[model_id]
-            if model_id in self.adapters:
-                del self.adapters[model_id]
-
-            return True, ""
-
-        except Exception as e:
-            return False, f"注销失败: {str(e)}"
-
-    async def shutdown(self) -> bool:
-        """关闭并销毁所有服务实例"""
-        try:
-            # 销毁所有服务实例
-            if self.adapter_registry and hasattr(self.adapter_registry, 'destroy_service_instance'):
-                for model_id, service in list(self._registry.items()):
-                    await self.adapter_registry.destroy_service_instance(service)
-
-            # 清空注册表
-            self.adapters.clear()
-            self._registry.clear()
-            return True
+            adapters = self._adapter_lib.list_adapters()
         except Exception:
             return False
+        for adapter_meta in adapters:
+            model_id = adapter_meta.get("model_id")
+            if not model_id:
+                continue
+            try:
+                instance = await self._adapter_lib.get_service_instance(model_id)
+                self._registry[model_id] = instance
+            except (AdapterNotFoundError, Exception):
+                continue
+        return True
+
+    async def list_registered_models(self) -> list[ModelInfo]:
+        result: list[ModelInfo] = []
+        for model_id in self._registry:
+            try:
+                meta = self._adapter_lib.get_adapter_info(model_id)
+                result.append(ModelInfo(
+                    model_id=model_id,
+                    adapter_name=meta.get("adapter_name", "openai_compatible"),
+                    version=meta.get("version", "1.0"),
+                    description=meta.get("description", ""),
+                    supported_features=meta.get("supported_features", []),
+                ))
+            except AdapterNotFoundError:
+                result.append(ModelInfo(model_id=model_id, adapter_name="unknown", version="0.0"))
+        return result
+
+    async def is_model_available(self, model_id: str) -> tuple[bool, Optional[LLMServiceInstance]]:
+        instance = self._registry.get(model_id)
+        if instance is not None and instance.active:
+            return True, instance
+        return False, None
+
+    async def register_private_model(
+        self,
+        adapter_content: str,
+        model_id: str,
+    ) -> tuple[bool, str, str]:
+        try:
+            is_valid, error_msg = self._utils.validate_file_format(adapter_content, "json")
+            if not is_valid:
+                return False, "", f"适配器配置格式校验失败: {error_msg}"
+
+            instance = await self._adapter_lib.install_adapter(model_id, adapter_content)
+            self._registry[model_id] = instance
+            return True, model_id, ""
+
+        except AdapterAlreadyExistsError:
+            return False, "", f"模型 '{model_id}' 已存在"
+        except AdapterValidationError as e:
+            return False, "", f"适配器校验失败: {e}"
+        except Exception as e:
+            return False, "", f"注册失败: {e}"
+
+    async def unregister_private_model(self, model_id: str) -> tuple[bool, str]:
+        try:
+            if model_id not in self._registry:
+                return False, f"模型 '{model_id}' 未注册"
+
+            self._registry.pop(model_id)
+            await self._adapter_lib.remove_adapter(model_id)
+            return True, ""
+
+        except AdapterNotFoundError:
+            return False, f"模型 '{model_id}' 适配器不存在"
+        except Exception as e:
+            return False, f"注销失败: {e}"
+
+    async def shutdown(self) -> bool:
+        for model_id, instance in list(self._registry.items()):
+            try:
+                self._adapter_lib.destroy_service_instance(instance)
+            except Exception:
+                pass
+        self._registry.clear()
+        return True

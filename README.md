@@ -48,8 +48,7 @@ SDPJ-System是一个用于检测大语言模型安全风险的系统,实现了SD
 - ECharts 5.5+
 
 **数据库:**
-- SQLite (开发环境)
-- PostgreSQL (生产环境)
+- SQLite
 
 ## 快速开始
 

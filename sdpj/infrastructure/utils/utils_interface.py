@@ -1,73 +1,32 @@
 """UtilsLib 接口定义"""
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class UtilsInterface(Protocol):
-    """工具库接口"""
 
-    def base64_encode(self, text: str) -> str:
-        """Base64编码
+    # 多模态
+    def text_to_image(self, text: str, width: int = 400, height: int = 100) -> bytes: ...
+    def image_to_text(self, image_data: bytes) -> str: ...
+    def text_to_audio(self, text: str) -> bytes: ...
+    def audio_to_text(self, audio_data: bytes) -> str: ...
+    def text_to_video(self, text: str) -> bytes: ...
+    def video_to_text(self, video_data: bytes) -> str: ...
 
-        Args:
-            text: 原始文本
+    # 编码
+    def encode_text(self, text: str, encoding: str) -> str: ...
+    def decode_text(self, encoded: str, encoding: str) -> str: ...
 
-        Returns:
-            编码后的字符串
-        """
-        ...
+    # 文件 I/O
+    def read_file(self, file_path: str, mode: str = "text") -> str | bytes: ...
+    def write_file(self, file_path: str, content: str | bytes, mode: str = "text") -> bool: ...
+    def validate_file_format(self, content: str, format_type: str) -> tuple[bool, str]: ...
 
-    def base64_decode(self, encoded: str) -> str:
-        """Base64解码
+    # 加密
+    def symmetric_encrypt(self, plaintext: str, key: bytes) -> bytes: ...
+    def symmetric_decrypt(self, ciphertext: bytes, key: bytes) -> str: ...
 
-        Args:
-            encoded: 编码后的字符串
-
-        Returns:
-            原始文本
-        """
-        ...
-
-    def url_encode(self, text: str) -> str:
-        """URL编码
-
-        Args:
-            text: 原始文本
-
-        Returns:
-            编码后的字符串
-        """
-        ...
-
-    def url_decode(self, encoded: str) -> str:
-        """URL解码
-
-        Args:
-            encoded: 编码后的字符串
-
-        Returns:
-            原始文本
-        """
-        ...
-
-    def hash_password(self, password: str) -> str:
-        """密码哈希
-
-        Args:
-            password: 明文密码
-
-        Returns:
-            哈希后的密码
-        """
-        ...
-
-    def verify_password(self, password: str, hashed: str) -> bool:
-        """验证密码
-
-        Args:
-            password: 明文密码
-            hashed: 哈希后的密码
-
-        Returns:
-            验证成功返回True
-        """
-        ...
+    # 序列化
+    def serialize_json(self, obj: Any) -> str: ...
+    def deserialize_json(self, text: str) -> Any: ...
+    def serialize_yaml(self, obj: Any) -> str: ...
+    def deserialize_yaml(self, text: str) -> Any: ...

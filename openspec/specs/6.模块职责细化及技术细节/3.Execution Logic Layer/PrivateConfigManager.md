@@ -4,7 +4,7 @@ PrivateConfigManager / 用户私有检测配置管理模块
 # 私有检测配置 CRUD
 1. 创建用户私有检测配置
    - 输入:所属用户ID、检测配置内容(被测大模型标识、待选用数据集标识、静态/动态算法类型及参数等)
-   - 输出:新创建的私有检测配置ID(同时作为 UserCenter 中对应受控资源的资源ID)
+   - 输出:tuple[bool, int | None]，成功时返回新创建的私有检测配置ID(同时作为 UserCenter 中对应受控资源的资源ID)，失败时返回 None
    - 后置条件:对应受控资源已在 UserCenter 登记,ACL 承载点已建立;配置内容已落盘到 UserCenter 维护的私有配置内容存储中
    - 触发场景:用户创建一份私有检测配置文件(对应 1.spec.md 功能 3.1.1.2);该配置是 1.spec.md 功能 1.3(选择检测数据集)的输入之一
    - 调用下层:UserCenter 的「登记受控资源」建立 ACL 承载点;UserCenter 的「写入用户私有检测配置内容」持久化配置内容;LLMRegistry 的「按标识校验大模型是否可用」确认被测大模型可用
@@ -66,12 +66,12 @@ PrivateConfigManager / 用户私有检测配置管理模块
    - 触发场景:用户上传私有数据集(对应 1.spec.md 功能 3.1.1.2)
    - 调用下层:DataProcessor 的「预校验上传文件格式」做文件格式预校验;DataProcessor 的「导入用户私有数据集」写入样本;UserCenter 的「登记受控资源」建立 ACL 承载点
 
-9. 移除用户私有数据集或其单条样本
-   - 输入:数据集ID 或 样本ID
+9. 移除用户私有数据集
+   - 输入:数据集ID
    - 输出:移除结果
-   - 后置条件:对应数据或样本由 DataProcessor 在 SampleDB 中删除;若删除的是整个数据集,对应受控资源及 ACL 条目由下层级联清理
-   - 触发场景:用户移除私有数据集或其中单条样本(对应 1.spec.md 功能 3.1.1.2)
-   - 调用下层:DataProcessor 的「移除私有数据集或其单条样本」;若为整个数据集删除,追加调用 UserCenter 的「移除受控资源」
+   - 后置条件:对应数据集由 DataProcessor 在 SampleDB 中删除；对应受控资源及 ACL 条目由下层级联清理
+   - 触发场景:用户移除私有数据集(对应 1.spec.md 功能 3.1.1.2)
+   - 调用下层:DataProcessor 的「移除私有数据集」；追加调用 UserCenter 的「移除受控资源」
 
 # 私有检测配置的导入导出
 10. 导出用户私有检测配置
@@ -90,7 +90,7 @@ PrivateConfigManager / 用户私有检测配置管理模块
 # 接口契约
 13. 通过 PrivateConfigManagerInterface 对外暴露上述能力,被 StateScheduler 调用(符合 4.模型依赖关系图.puml 中 StateScheduler → PrivateConfigManager 边)
 
-不需要的:[做权限判定(由 DACManager 完成),做 C-S 链路上的加解密传输(由 SecureCommManager 完成),做密码/凭据管理(由 AccountManager / UserCenter 完成),做大模型 API 的实际调用(由 SDPJDetector 经 LLMInterface 完成),做适配器/数据集/配置文件的格式校验具体实现(由 UtilsLib 完成),做检测合规判断(由 SDPJDetector 完成)]
+不需要的:[做权限判定(由 DACManager 完成),做 C-S 链路上的加解密传输(由 SecureCommManager 完成),做密码/凭据管理(由 AccountManager / UserCenter 完成),做大模型 API 的实际调用(由 SDPJDetector 经 LLMService 完成),做适配器/数据集/配置文件的格式校验具体实现(由 UtilsLib 完成),做检测合规判断(由 SDPJDetector 完成)]
 
 依赖模块:DataProcessor,UserCenter,LLMRegistry,调用接口:DataProcessorInterface,UserCenterInterface,LLMRegistryInterface
 应实现接口:PrivateConfigManagerInterface

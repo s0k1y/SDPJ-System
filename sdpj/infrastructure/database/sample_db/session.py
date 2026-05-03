@@ -6,12 +6,14 @@
 
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Optional
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
     create_async_engine,
     async_sessionmaker,
     AsyncSession,
     AsyncEngine
 )
+from sqlalchemy.pool import NullPool, StaticPool
 from .models import Base
 
 
@@ -34,12 +36,21 @@ class SampleDBSessionManager:
     async def initialize(self) -> None:
         """初始化数据库引擎和会话工厂"""
         if self._engine is None:
+            is_memory = ":memory:" in self.database_url
             self._engine = create_async_engine(
                 self.database_url,
-                echo=False,  # 生产环境关闭 SQL 日志
+                echo=False,
                 future=True,
-                pool_pre_ping=True,  # 连接池健康检查
+                poolclass=StaticPool if is_memory else NullPool,
+                connect_args={"check_same_thread": False},
             )
+
+            if "sqlite" in self.database_url:
+                @event.listens_for(self._engine.sync_engine, "connect")
+                def _enable_fk(dbapi_conn, connection_record):
+                    cursor = dbapi_conn.cursor()
+                    cursor.execute("PRAGMA foreign_keys=ON")
+                    cursor.close()
 
             self._session_factory = async_sessionmaker(
                 self._engine,

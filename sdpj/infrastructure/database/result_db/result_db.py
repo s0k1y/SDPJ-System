@@ -30,36 +30,36 @@ class ResultDB:
         """
         self.session_manager = session_manager
 
+    # ==================== 被测大模型级能力 ====================
+
+    async def register_target_model(self, model_id: str) -> dict:
+        async with self.session_manager.session() as session:
+            repo = TargetModelRepository(session)
+            obj = await repo.register(model_id)
+            return {"model_id": obj.model_id}
+
+    async def get_target_model(self, model_id: str) -> Optional[dict]:
+        async with self.session_manager.session() as session:
+            repo = TargetModelRepository(session)
+            obj = await repo.get_by_id(model_id)
+            return {"model_id": obj.model_id} if obj else None
+
+    async def list_target_models(self) -> list[dict]:
+        async with self.session_manager.session() as session:
+            repo = TargetModelRepository(session)
+            return [{"model_id": m.model_id} for m in await repo.list_all()]
+
     # ==================== 检测任务组级能力 ====================
 
     async def create_task_group(self, user_id: str, model_id: str) -> str:
-        """创建检测任务组
-
-        Args:
-            user_id: 用户ID
-            model_id: 模型ID
-
-        Returns:
-            新创建任务组的任务组ID
-
-        Raises:
-            ValueError: 模型ID在被测大模型表中不存在
-        """
+        """创建检测任务组"""
         async with self.session_manager.session() as session:
-            # 检查模型是否存在
-            target_model_repo = TargetModelRepository(session)
-            if not await target_model_repo.exists(model_id):
-                raise ValueError(f"模型ID '{model_id}' 在被测大模型表中不存在")
-
-            # 生成任务组ID
-            import uuid
-            task_group_id = f"tg_{uuid.uuid4().hex[:16]}"
-
-            # 创建任务组
+            tm_repo = TargetModelRepository(session)
+            if await tm_repo.get_by_id(model_id) is None:
+                raise ValueError(f"模型ID '{model_id}' 未在被测大模型表中登记")
             task_group_repo = TaskGroupRepository(session)
-            await task_group_repo.create(task_group_id, user_id, model_id)
-
-            return task_group_id
+            task_group = await task_group_repo.create(user_id, model_id)
+            return task_group.task_group_id
 
     async def delete_task_group(self, task_group_id: str) -> bool:
         """删除检测任务组
@@ -249,45 +249,6 @@ class ResultDB:
                 "start_time": task.start_time,
                 "end_time": task.end_time,
             }
-
-    # ==================== 被测大模型级能力 ====================
-
-    async def register_target_model(self, model_id: str) -> bool:
-        """登记被测大模型
-
-        Args:
-            model_id: 模型ID
-
-        Returns:
-            登记是否成功
-        """
-        async with self.session_manager.session() as session:
-            target_model_repo = TargetModelRepository(session)
-
-            # 幂等操作：如果已存在则直接返回成功
-            if await target_model_repo.exists(model_id):
-                return True
-
-            await target_model_repo.create(model_id)
-            return True
-
-    async def get_target_model(self, model_id: str) -> Optional[dict]:
-        """按ID查询被测大模型
-
-        Args:
-            model_id: 模型ID
-
-        Returns:
-            被测大模型条目，不存在时返回None
-        """
-        async with self.session_manager.session() as session:
-            target_model_repo = TargetModelRepository(session)
-            model = await target_model_repo.get_by_id(model_id)
-
-            if model is None:
-                return None
-
-            return {"model_id": model.model_id}
 
     # ==================== 检测报告级能力 ====================
 

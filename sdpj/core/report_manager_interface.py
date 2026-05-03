@@ -1,55 +1,51 @@
-"""ReportManager 接口定义"""
-from typing import Protocol
+"""ReportManager 接口定义
+
+被依赖模块: StateScheduler
+"""
+from typing import Protocol, Optional, Literal
 
 
 class ReportManagerInterface(Protocol):
     """检测报告管理接口"""
 
-    async def init(self) -> None:
-        """初始化报告管理器"""
+    async def generate_static_report(self, task_group_id: str) -> dict:
+        """生成静态检测报告"""
         ...
 
-    async def generate_report(self, task_id: str, results: list) -> int:
-        """生成检测报告
-
-        Args:
-            task_id: 任务ID
-            results: 检测结果列表
-
-        Returns:
-            报告ID
-        """
+    async def generate_dynamic_report(self, task_group_id: str) -> dict:
+        """生成动态检测报告"""
         ...
 
-    async def get_report(self, report_id: int) -> dict:
-        """获取报告
-
-        Args:
-            report_id: 报告ID
-
-        Returns:
-            报告数据
-        """
+    def calculate_statistics(self, results: list[dict]) -> dict:
+        """计算报告统计指标"""
         ...
 
-    async def list_reports(self, user_id: int) -> list:
-        """列出用户的所有报告
-
-        Args:
-            user_id: 用户ID
-
-        Returns:
-            报告列表
-        """
+    async def list_reports(
+        self, user_id: Optional[str] = None, model_id: Optional[str] = None
+    ) -> list[dict]:
+        """查询检测报告列表"""
         ...
 
-    def calculate_statistics(self, results: list) -> dict:
-        """计算统计数据
+    async def view_report(self, task_group_id: str) -> dict:
+        """查看单份检测报告"""
+        ...
 
-        Args:
-            results: 检测结果列表
+    async def delete_report(
+        self,
+        task_group_id: Optional[str] = None,
+        task_id: Optional[str] = None,
+        report_id: Optional[str] = None,
+        result_data_id: Optional[str] = None,
+    ) -> tuple[bool, str]:
+        """删除检测报告"""
+        ...
 
-        Returns:
-            统计数据字典
-        """
+    async def export_report(
+        self, task_group_id: str, target_format: Literal["json", "yaml"] = "json"
+    ) -> str:
+        """导出检测报告文件"""
+        ...
+
+    async def prepare_visualization_data(self, task_group_id: str) -> dict:
+        """准备可视化图表数据"""
         ...

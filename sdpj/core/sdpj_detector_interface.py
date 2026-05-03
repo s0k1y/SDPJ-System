@@ -1,34 +1,29 @@
-"""SDPJDetector 接口定义"""
-from typing import Protocol
+"""SDPJDetector 接口定义
+
+被依赖模块: StateScheduler
+"""
+from typing import Protocol, Optional
 
 
 class SDPJDetectorInterface(Protocol):
-    """SDPJ检测内核接口"""
+    """SDPJ 检测内核接口"""
 
-    async def init(self) -> None:
-        """初始化检测器"""
+    async def run_static_detection(self, model_id: str, user_id: str) -> dict:
+        """执行静态自检测算法 (Algorithm 1)"""
         ...
 
-    async def static_detect(self, model_id: str, dataset_id: int) -> dict:
-        """执行静态检测算法
-
-        Args:
-            model_id: 目标模型ID
-            dataset_id: 数据集ID
-
-        Returns:
-            检测结果字典
-        """
+    async def run_dynamic_detection(
+        self, model_id: str, user_id: str, static_result: dict, max_iterations: int = 3
+    ) -> dict:
+        """执行动态自检测算法 (Algorithm 2)"""
         ...
 
-    async def dynamic_detect(self, model_id: str, dataset_id: int) -> dict:
-        """执行动态检测算法
+    async def judge_compliance(self, model_id: str, model_output: str, judge_template: str) -> str:
+        """对被测大模型单次响应做合规判断"""
+        ...
 
-        Args:
-            model_id: 目标模型ID
-            dataset_id: 数据集ID
-
-        Returns:
-            检测结果字典
-        """
+    async def write_result(
+        self, report_id: str, risk_subclass: str, model_output: str, compliance_result: str
+    ) -> str:
+        """将单条检测结果写入检测结果数据库"""
         ...

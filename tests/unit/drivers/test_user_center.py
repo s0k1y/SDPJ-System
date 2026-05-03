@@ -9,52 +9,31 @@
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 from datetime import datetime
 from sdpj.drivers.user_center import UserCenter
 
 
 @pytest.fixture
 def mock_user_db():
-    """Mock UserDB 实例"""
     return AsyncMock()
 
 
 @pytest.fixture
-def mock_utils():
-    """Mock UtilsLib 实例"""
-    mock = MagicMock()
-    # 模拟哈希函数：简单地在密码前加 "hashed_" 前缀
-    mock.hash_data.side_effect = lambda x: f"hashed_{x}"
-    return mock
-
-
-@pytest.fixture
-def user_center(mock_user_db, mock_utils):
-    """创建 UserCenter 实例"""
-    return UserCenter(mock_user_db, mock_utils)
+def user_center(mock_user_db):
+    return UserCenter(mock_user_db)
 
 
 # ==================== 账号生命周期测试 ====================
 
 @pytest.mark.asyncio
-async def test_register_user_success(user_center, mock_user_db, mock_utils):
-    """测试成功注册用户"""
-    # 准备测试数据
+async def test_register_user_success(user_center, mock_user_db):
     username = "testuser"
     password = "password123"
-    expected_user_id = 1
-
-    # 配置 mock
-    mock_user_db.create_user.return_value = expected_user_id
-
-    # 执行测试
+    mock_user_db.create_user.return_value = 1
     user_id = await user_center.register_user(username, password)
-
-    # 验证结果
-    assert user_id == expected_user_id
-    mock_utils.hash_data.assert_called_once_with(password)
-    mock_user_db.create_user.assert_called_once_with(username, "hashed_password123")
+    assert user_id == 1
+    mock_user_db.create_user.assert_called_once_with(username, password)
 
 
 @pytest.mark.asyncio
@@ -83,22 +62,11 @@ async def test_delete_user_success(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_update_user_password_success(user_center, mock_user_db, mock_utils):
-    """测试成功修改密码"""
-    # 准备测试数据
-    user_id = 1
-    new_password = "newpassword456"
-
-    # 配置 mock
+async def test_update_user_password_success(user_center, mock_user_db):
     mock_user_db.update_user_password.return_value = True
-
-    # 执行测试
-    result = await user_center.update_user_password(user_id, new_password)
-
-    # 验证结果
+    result = await user_center.update_user_password(1, "newpassword456")
     assert result is True
-    mock_utils.hash_data.assert_called_once_with(new_password)
-    mock_user_db.update_user_password.assert_called_once_with(user_id, "hashed_newpassword456")
+    mock_user_db.update_user_password.assert_called_once_with(1, "newpassword456")
 
 
 @pytest.mark.asyncio
@@ -120,7 +88,7 @@ async def test_get_user_by_username_success(user_center, mock_user_db):
     mock_user_data = {
         "user_id": 1,
         "username": username,
-        "password_hash": "hashed_password",
+        "password": "password123",
         "created_at": datetime(2026, 5, 1, 10, 0, 0)
     }
 
@@ -160,7 +128,7 @@ async def test_get_user_by_id_success(user_center, mock_user_db):
     mock_user_data = {
         "user_id": user_id,
         "username": "testuser",
-        "password_hash": "hashed_password",
+        "password": "password123",
         "created_at": datetime(2026, 5, 1, 10, 0, 0)
     }
 
@@ -195,50 +163,24 @@ async def test_get_user_by_id_not_found(user_center, mock_user_db):
 # ==================== 凭据校验测试 ====================
 
 @pytest.mark.asyncio
-async def test_verify_credentials_success(user_center, mock_user_db, mock_utils):
-    """测试凭据校验成功"""
-    # 准备测试数据
+async def test_verify_credentials_success(user_center, mock_user_db):
     username = "testuser"
     password = "password123"
-    mock_user_data = {
-        "user_id": 1,
-        "username": username,
-        "password_hash": "hashed_password123",
+    mock_user_db.get_user_by_username.return_value = {
+        "user_id": 1, "username": username, "password": password,
         "created_at": datetime(2026, 5, 1, 10, 0, 0)
     }
-
-    # 配置 mock
-    mock_user_db.get_user_by_username.return_value = mock_user_data
-
-    # 执行测试
     user_id = await user_center.verify_credentials(username, password)
-
-    # 验证结果
     assert user_id == 1
-    mock_utils.hash_data.assert_called_once_with(password)
-    mock_user_db.get_user_by_username.assert_called_once_with(username)
 
 
 @pytest.mark.asyncio
-async def test_verify_credentials_wrong_password(user_center, mock_user_db, mock_utils):
-    """测试凭据校验失败：密码错误"""
-    # 准备测试数据
-    username = "testuser"
-    password = "wrongpassword"
-    mock_user_data = {
-        "user_id": 1,
-        "username": username,
-        "password_hash": "hashed_password123",
+async def test_verify_credentials_wrong_password(user_center, mock_user_db):
+    mock_user_db.get_user_by_username.return_value = {
+        "user_id": 1, "username": "testuser", "password": "password123",
         "created_at": datetime(2026, 5, 1, 10, 0, 0)
     }
-
-    # 配置 mock
-    mock_user_db.get_user_by_username.return_value = mock_user_data
-
-    # 执行测试
-    user_id = await user_center.verify_credentials(username, password)
-
-    # 验证结果：密码不匹配应返回 None
+    user_id = await user_center.verify_credentials("testuser", "wrongpassword")
     assert user_id is None
 
 

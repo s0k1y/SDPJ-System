@@ -42,7 +42,7 @@ class UserCenterInterface(Protocol):
             ValueError: 账号已存在时拒绝注册
 
         后置条件:
-            用户记录已持久化，存储密码为不可逆摘要形式
+            用户记录已持久化
 
         触发场景:
             用户注册（对应 1.spec.md 功能 3.1.1.1）
@@ -67,24 +67,11 @@ class UserCenterInterface(Protocol):
         ...
 
     async def update_user_password(self, user_id: int, new_password: str) -> bool:
-        """修改用户密码
+        """修改用户密码"""
+        ...
 
-        Args:
-            user_id: 用户 ID
-            new_password: 新明文密码
-
-        Returns:
-            修改结果（True 表示成功）
-
-        Raises:
-            ValueError: 用户 ID 不存在时抛出
-
-        后置条件:
-            存储密码已更新为新密码的不可逆摘要
-
-        触发场景:
-            用户修改密码（对应 1.spec.md 功能 3.1.1.2）
-        """
+    async def update_username(self, user_id: int, new_username: str) -> bool:
+        """更新用户名"""
         ...
 
     async def get_user_by_username(self, username: str) -> Optional[dict]:
@@ -295,6 +282,20 @@ class UserCenterInterface(Protocol):
 
         触发场景:
             DACManager 校验某用户对某资源的访问权（对应 1.spec.md 功能 3.1.2）
+        """
+        ...
+
+    async def get_acl_by_id(self, acl_id: int) -> Optional[dict]:
+        """按 ID 查询单条访问控制项
+
+        Args:
+            acl_id: 访问控制项 ID
+
+        Returns:
+            访问控制项字典（acl_id, resource_id, grantee_user_id, created_at），不存在时返回 None
+
+        触发场景:
+            DACManager 在撤销授权前定位 ACL 归属资源（对应 1.spec.md 功能 3.1.2）
         """
         ...
 

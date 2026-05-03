@@ -21,39 +21,13 @@ class DataProcessor:
 
     def __init__(
         self,
-        sample_db: Optional[SampleDBInterface] = None,
-        result_db: Optional[ResultDBInterface] = None,
-        utils_lib: Optional[UtilsInterface] = None,
-        database_url: str = "sqlite+aiosqlite:///./data/db/sdpj.db"
+        sample_db: SampleDBInterface,
+        result_db: ResultDBInterface,
+        utils_lib: UtilsInterface,
     ):
-        """初始化 DataProcessor
-
-        Args:
-            sample_db: SampleDB 接口实例(可选)
-            result_db: ResultDB 接口实例(可选)
-            utils_lib: UtilsLib 接口实例(可选)
-            database_url: 数据库URL(当未提供数据库实例时使用)
-        """
-        # 如果未提供实例,则创建默认实例
-        if sample_db is None:
-            from sdpj.infrastructure.database.sample_db import SampleDB, get_session_manager
-            sample_session = get_session_manager(database_url)
-            self._sample_db = SampleDB(sample_session)
-        else:
-            self._sample_db = sample_db
-
-        if result_db is None:
-            from sdpj.infrastructure.database.result_db import ResultDB, SessionManager
-            result_session = SessionManager(database_url, echo=False)
-            self._result_db = ResultDB(result_session)
-        else:
-            self._result_db = result_db
-
-        if utils_lib is None:
-            from sdpj.infrastructure.utils.utils_lib import UtilsLib
-            self._utils = UtilsLib()
-        else:
-            self._utils = utils_lib
+        self._sample_db = sample_db
+        self._result_db = result_db
+        self._utils = utils_lib
 
     # ==================== 检测样本与数据集的查询与维护 ====================
 
@@ -151,17 +125,6 @@ class DataProcessor:
         """
         return await self._sample_db.delete_dataset(dataset_id)
 
-    async def remove_sample(self, sample_id: int) -> bool:
-        """移除私有数据集的单条样本
-
-        Args:
-            sample_id: 样本 ID
-
-        Returns:
-            删除结果
-        """
-        return await self._sample_db.delete_sample(sample_id)
-
     # ==================== 检测结果的持久化 ====================
 
     async def create_task_group(
@@ -169,19 +132,8 @@ class DataProcessor:
         user_id: str,
         model_id: str
     ) -> str:
-        """开设检测任务组
-
-        Args:
-            user_id: 用户 ID
-            model_id: 目标被测大模型 ID
-
-        Returns:
-            新创建任务组的任务组 ID
-        """
-        # 先确保被测大模型已登记
+        """开设检测任务组"""
         await self._result_db.register_target_model(model_id)
-
-        # 创建任务组
         task_group_id = await self._result_db.create_task_group(user_id, model_id)
         return task_group_id
 
@@ -414,16 +366,17 @@ class DataProcessor:
         report_data: dict,
         target_format: Literal["json", "yaml"]
     ) -> str:
-        """导出检测报告文件
-
-        Args:
-            report_data: 已汇总的报告结构化数据
-            target_format: 目标文件格式
-
-        Returns:
-            可供用户下载的文件内容（序列化字符串）
-        """
-        return self._utils.serialize(report_data, target_format)
+        content = (
+            self._utils.serialize_json(report_data)
+            if target_format == "json"
+            else self._utils.serialize_yaml(report_data)
+        )
+        task_group_id = report_data.get("task_group_id", "unknown")
+        export_dir = Path("data/reports/exports")
+        export_dir.mkdir(parents=True, exist_ok=True)
+        path = export_dir / f"{task_group_id}.{target_format}"
+        self._utils.write_file(str(path), content)
+        return str(path)
 
     # ==================== 多模态与多编码的样本构造及响应处理 ====================
 
@@ -432,47 +385,32 @@ class DataProcessor:
         poc: str,
         target_modality: Literal["image", "audio", "video"]
     ) -> bytes:
-        """构造多模态检测样本
-
-        Args:
-            poc: 文本形式的漏洞概念验证数据 PoC
-            target_modality: 目标模态
-
-        Returns:
-            目标模态形式的样本数据
-        """
-        return self._utils.text_to_multimodal(poc, target_modality)
+        if target_modality == "image":
+            return self._utils.text_to_image(poc)
+        if target_modality == "audio":
+            return self._utils.text_to_audio(poc)
+        if target_modality == "video":
+            return self._utils.text_to_video(poc)
+        raise NotImplementedError(f"模态 '{target_modality}' 暂未支持")
 
     def parse_multimodal_response(
         self,
         response_data: bytes,
         source_modality: Literal["image", "audio", "video"]
     ) -> str:
-        """解析大模型多模态响应
-
-        Args:
-            response_data: 大模型返回的多模态响应内容
-            source_modality: 源模态类型
-
-        Returns:
-            从中提取的文本内容
-        """
-        return self._utils.multimodal_to_text(response_data, source_modality)
+        if source_modality == "image":
+            return self._utils.image_to_text(response_data)
+        if source_modality == "audio":
+            return self._utils.audio_to_text(response_data)
+        if source_modality == "video":
+            return self._utils.video_to_text(response_data)
+        raise NotImplementedError(f"模态 '{source_modality}' 暂未支持")
 
     def construct_encoded_sample(
         self,
         poc: str,
         encoding_type: Literal["base64", "url", "unicode_escape", "hex"]
     ) -> str:
-        """构造多编码检测样本
-
-        Args:
-            poc: 文本形式的 PoC
-            encoding_type: 目标编码形式
-
-        Returns:
-            目标编码下的样本文本
-        """
         return self._utils.encode_text(poc, encoding_type)
 
     def decode_response_content(
@@ -480,15 +418,6 @@ class DataProcessor:
         encoded_content: str,
         encoding_type: Literal["base64", "url", "unicode_escape", "hex"]
     ) -> str:
-        """还原编码响应内容
-
-        Args:
-            encoded_content: 大模型响应中的编码文本
-            encoding_type: 已知编码形式
-
-        Returns:
-            还原后的原始文本
-        """
         return self._utils.decode_text(encoded_content, encoding_type)
 
     # ==================== 文件导入及结构化数据序列化 ====================
@@ -498,63 +427,30 @@ class DataProcessor:
         file_path: Union[Path, str],
         mode: Literal["text", "binary"] = "text"
     ) -> Union[str, bytes]:
-        """读取本地数据集/配置文件
-
-        Args:
-            file_path: 文件路径或文件流
-            mode: 读取模式
-
-        Returns:
-            文件内容
-        """
-        return self._utils.read_file(file_path, mode)
+        return self._utils.read_file(str(file_path), mode)
 
     def validate_file_format(
         self,
         content: Union[str, bytes],
         expected_format: Literal["csv", "json", "yaml"],
-        schema: Optional[dict[str, Any]] = None
     ) -> tuple[bool, str]:
-        """预校验上传文件格式
-
-        Args:
-            content: 文件内容
-            expected_format: 期望格式
-            schema: 可选的 schema 定义
-
-        Returns:
-            (格式合规性判定结果, 关键错误信息)
-        """
-        return self._utils.validate_file_format(content, expected_format, schema)
+        text = content if isinstance(content, str) else content.decode("utf-8")
+        return self._utils.validate_file_format(text, expected_format)
 
     def serialize_data(
         self,
         data: Any,
         format: Literal["json", "yaml"]
     ) -> str:
-        """结构化数据的序列化
-
-        Args:
-            data: 结构化对象
-            format: 目标格式
-
-        Returns:
-            转换结果
-        """
-        return self._utils.serialize(data, format)
+        if format == "json":
+            return self._utils.serialize_json(data)
+        return self._utils.serialize_yaml(data)
 
     def deserialize_data(
         self,
         serialized_data: str,
         format: Literal["json", "yaml"]
     ) -> Any:
-        """结构化数据的反序列化
-
-        Args:
-            serialized_data: 序列化字符串
-            format: 源格式
-
-        Returns:
-            转换结果
-        """
-        return self._utils.deserialize(serialized_data, format)
+        if format == "json":
+            return self._utils.deserialize_json(serialized_data)
+        return self._utils.deserialize_yaml(serialized_data)

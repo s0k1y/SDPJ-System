@@ -100,12 +100,12 @@ class TestRuntimeLogging:
         """测试记录大模型调用阶段"""
         logger = EventLogger()
         log_id = logger.log_runtime(
-            source_module="LLMInterface",
+            source_module="LLMService",
             event_type="call_phase",
             description="大模型调用阶段: 请求发送"
         )
 
-        logs = logger.query_logs(source_module="LLMInterface")
+        logs = logger.query_logs(source_module="LLMService")
         assert len(logs) == 1
 
 
@@ -116,7 +116,7 @@ class TestErrorLogging:
         """测试成功记录错误日志"""
         logger = EventLogger()
         log_id = logger.log_error(
-            source_module="LLMInterface",
+            source_module="LLMService",
             error_type="api_error",
             description="API 调用失败: 超时"
         )
@@ -161,7 +161,7 @@ class TestLogQuery:
         logger = EventLogger()
         logger.log_operation("user1", "login", {})
         logger.log_runtime("StateScheduler", "state_change", "状态转移")
-        logger.log_error("LLMInterface", "api_error", "API 错误")
+        logger.log_error("LLMService", "api_error", "API 错误")
 
         # 查询错误日志
         error_logs = logger.query_logs(category=LogCategory.ERROR)

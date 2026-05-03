@@ -27,12 +27,12 @@ class UserDBInterface(Protocol):
 
     # ==================== 用户账号级能力 ====================
 
-    async def create_user(self, username: str, password_hash: str) -> int:
+    async def create_user(self, username: str, password: str) -> int:
         """创建用户
 
         Args:
             username: 账号
-            password_hash: 密码（已由调用方完成加密/哈希处理）
+            password: 密码
 
         Returns:
             新创建用户的用户 ID
@@ -57,12 +57,12 @@ class UserDBInterface(Protocol):
         """
         ...
 
-    async def update_user_password(self, user_id: int, new_password_hash: str) -> bool:
+    async def update_user_password(self, user_id: int, new_password: str) -> bool:
         """更新用户密码
 
         Args:
             user_id: 用户 ID
-            new_password_hash: 新密码（已由调用方完成加密/哈希处理）
+            new_password: 新密码
 
         Returns:
             更新结果（True 表示成功）
@@ -82,23 +82,7 @@ class UserDBInterface(Protocol):
             用户信息字典，包含：
             - user_id: 用户 ID
             - username: 账号
-            - password_hash: 已存储密码
-            - created_at: 创建时间
-            不存在时返回 None
-        """
-        ...
-
-    async def get_user_by_id(self, user_id: int) -> Optional[dict]:
-        """按 ID 查询用户
-
-        Args:
-            user_id: 用户 ID
-
-        Returns:
-            用户信息字典，包含：
-            - user_id: 用户 ID
-            - username: 账号
-            - password_hash: 已存储密码
+            - password: 已存储密码
             - created_at: 创建时间
             不存在时返回 None
         """

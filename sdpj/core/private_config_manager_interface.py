@@ -1,56 +1,61 @@
-"""PrivateConfigManager 接口定义"""
-from typing import Protocol
+"""PrivateConfigManager 接口定义
+
+被依赖模块: StateScheduler
+"""
+from typing import Protocol, Optional, Literal
 
 
 class PrivateConfigManagerInterface(Protocol):
     """用户私有检测配置管理接口"""
 
-    async def init(self) -> None:
-        """初始化配置管理器"""
+    async def create_config(self, user_id: int, config_content: dict) -> tuple[bool, int | None]:
+        """创建用户私有检测配置"""
         ...
 
-    async def create_config(self, user_id: int, config_data: dict) -> int:
-        """创建私有配置
-
-        Args:
-            user_id: 用户ID
-            config_data: 配置数据
-
-        Returns:
-            配置ID
-        """
+    async def read_config(self, config_id: int) -> Optional[dict]:
+        """读取用户私有检测配置"""
         ...
 
-    async def get_config(self, config_id: int) -> dict:
-        """获取配置
-
-        Args:
-            config_id: 配置ID
-
-        Returns:
-            配置数据
-        """
-        ...
-
-    async def update_config(self, config_id: int, config_data: dict) -> bool:
-        """更新配置
-
-        Args:
-            config_id: 配置ID
-            config_data: 配置数据
-
-        Returns:
-            更新成功返回True
-        """
+    async def update_config(self, config_id: int, config_content: dict) -> tuple[bool, str]:
+        """修改用户私有检测配置"""
         ...
 
     async def delete_config(self, config_id: int) -> bool:
-        """删除配置
+        """删除用户私有检测配置"""
+        ...
 
-        Args:
-            config_id: 配置ID
+    async def list_configs(self, user_id: int) -> list[dict]:
+        """列出用户的私有检测配置清单"""
+        ...
 
-        Returns:
-            删除成功返回True
-        """
+    async def query_datasets(self) -> list[dict]:
+        """查询可用检测数据集清单"""
+        ...
+
+    async def upload_adapter(
+        self, adapter_content: str, model_id: str, user_id: int
+    ) -> tuple[bool, str, int | None]:
+        """上传用户私有大模型适配器"""
+        ...
+
+    async def remove_adapter(self, model_id: str, resource_id: int) -> tuple[bool, str]:
+        """移除用户私有大模型适配器"""
+        ...
+
+    async def upload_dataset(
+        self, name: str, risk_type: str, samples: list[dict], user_id: int
+    ) -> tuple[bool, dict]:
+        """上传用户私有数据集"""
+        ...
+
+    async def remove_dataset(self, dataset_id: int, resource_id: int | None = None) -> bool:
+        """移除用户私有数据集"""
+        ...
+
+    async def export_config(self, config_id: int, target_format: Literal["json", "yaml"]) -> str:
+        """导出用户私有检测配置"""
+        ...
+
+    async def import_config(self, file_content: str, user_id: int) -> tuple[bool, int | None]:
+        """导入用户私有检测配置"""
         ...

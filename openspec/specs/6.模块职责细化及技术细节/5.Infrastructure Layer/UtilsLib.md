@@ -36,7 +36,7 @@ UtilsLib / 杂项组件库模块
    - 触发场景:ReportManager 通过 DataProcessor 导出检测报告文件供用户下载(对应 1.spec.md 功能 1.6)
 
 7. 文件格式校验
-   - 输入:文件内容、期望格式(如 CSV / JSON / 特定 schema)
+   - 输入:文件内容、期望格式(如 CSV / JSON / JSONL)
    - 输出:格式合规性判定结果及关键错误信息
    - 触发场景:用户上传私有数据集文件、私有检测配置文件、私有大模型适配器文件时的格式预校验(对应 1.spec.md 功能 3.1.1.2)
    - 不负责的边界:不做内容业务语义审查(如 PoC 语义分析)
@@ -47,11 +47,6 @@ UtilsLib / 杂项组件库模块
    - 输出:密文或明文
    - 触发场景:UserCenter 对用户密码等敏感信息进行可逆加密处理(对应 1.spec.md 功能 3.1.1.1 / 3.1.1.2)
    - 不负责的边界:不持有密钥、不做密钥生命周期管理(密钥由调用方或外部安全组件管理)
-
-9. 哈希摘要
-   - 输入:明文、可选盐值
-   - 输出:哈希值
-   - 触发场景:UserCenter 对密码做单向哈希以便登录校验(对应 1.spec.md 功能 3.1.1.1);文件完整性校验等辅助场景
 
 # 数据序列化
 10. 结构化数据序列化
@@ -65,11 +60,11 @@ UtilsLib / 杂项组件库模块
     - 触发场景:各调用方从文件/输入中读入结构化数据时
 
 # 接口契约
-12. 通过 UtilsInterface 对外暴露上述能力,DataProcessor / LLMInterface / LLMRegistry / UserCenter 为调用方(符合 4.模型依赖关系图.puml 中四条 → UtilsLib 的依赖边)
+12. 通过 UtilsInterface 对外暴露上述能力,DataProcessor / LLMService / LLMRegistry / UserCenter 为调用方(符合 4.模型依赖关系图.puml 中四条 → UtilsLib 的依赖边)
 
 不需要的:[维护业务状态与流程编排,持有或管理加解密密钥生命周期,做样本/报告/配置等数据的业务语义解析,做网络通信与协议处理,做数据库访问,做第三方大模型 API 调用]
 依赖模块:无
 应实现接口:UtilsInterface
-被依赖模块:DataProcessor,LLMInterface,LLMRegistry,UserCenter
+被依赖模块:DataProcessor,LLMService,LLMRegistry,UserCenter
 技术细节:(暂定)
 核心功能是为 DataProcessor 传入的检测样本数据提供多模态/多编码处理能力,以支撑多模态注入与多编码注入的检测样本构造。

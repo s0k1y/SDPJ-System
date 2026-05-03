@@ -153,16 +153,6 @@ class TestDatasetOperations:
         assert result is True
         mock_sample_db.delete_dataset.assert_called_once_with(10)
 
-    @pytest.mark.asyncio
-    async def test_remove_sample(self, data_processor, mock_sample_db):
-        """测试删除样本"""
-        mock_sample_db.delete_sample.return_value = True
-
-        result = await data_processor.remove_sample(201)
-
-        assert result is True
-        mock_sample_db.delete_sample.assert_called_once_with(201)
-
 
 class TestTaskAndReportOperations:
     """测试任务和报告相关操作"""
@@ -186,7 +176,6 @@ class TestTaskAndReportOperations:
     @pytest.mark.asyncio
     async def test_create_task_group(self, data_processor, mock_result_db):
         """测试创建任务组"""
-        mock_result_db.register_target_model.return_value = True
         mock_result_db.create_task_group.return_value = "tg_001"
 
         result = await data_processor.create_task_group(
@@ -195,7 +184,6 @@ class TestTaskAndReportOperations:
         )
 
         assert result == "tg_001"
-        mock_result_db.register_target_model.assert_called_once_with("gpt-4")
         mock_result_db.create_task_group.assert_called_once_with("user_123", "gpt-4")
 
     @pytest.mark.asyncio
@@ -352,7 +340,7 @@ class TestMultimodalAndEncoding:
 
     def test_construct_multimodal_sample(self, data_processor, mock_utils):
         """测试构造多模态样本"""
-        mock_utils.text_to_multimodal.return_value = b"fake_image_data"
+        mock_utils.text_to_image.return_value = b"fake_image_data"
 
         result = data_processor.construct_multimodal_sample(
             poc="测试PoC",
@@ -360,11 +348,11 @@ class TestMultimodalAndEncoding:
         )
 
         assert result == b"fake_image_data"
-        mock_utils.text_to_multimodal.assert_called_once_with("测试PoC", "image")
+        mock_utils.text_to_image.assert_called_once_with("测试PoC")
 
     def test_parse_multimodal_response(self, data_processor, mock_utils):
         """测试解析多模态响应"""
-        mock_utils.multimodal_to_text.return_value = "提取的文本内容"
+        mock_utils.image_to_text.return_value = "提取的文本内容"
 
         result = data_processor.parse_multimodal_response(
             response_data=b"fake_image_data",
@@ -372,9 +360,7 @@ class TestMultimodalAndEncoding:
         )
 
         assert result == "提取的文本内容"
-        mock_utils.multimodal_to_text.assert_called_once_with(
-            b"fake_image_data", "image"
-        )
+        mock_utils.image_to_text.assert_called_once_with(b"fake_image_data")
 
     def test_construct_encoded_sample(self, data_processor, mock_utils):
         """测试构造编码样本"""
@@ -443,12 +429,12 @@ class TestFileAndSerialization:
 
         assert result == (True, "")
         mock_utils.validate_file_format.assert_called_once_with(
-            '{"key": "value"}', "json", None
+            '{"key": "value"}', "json"
         )
 
     def test_serialize_data(self, data_processor, mock_utils):
         """测试序列化数据"""
-        mock_utils.serialize.return_value = '{"key": "value"}'
+        mock_utils.serialize_json.return_value = '{"key": "value"}'
 
         result = data_processor.serialize_data(
             data={"key": "value"},
@@ -456,11 +442,11 @@ class TestFileAndSerialization:
         )
 
         assert result == '{"key": "value"}'
-        mock_utils.serialize.assert_called_once_with({"key": "value"}, "json")
+        mock_utils.serialize_json.assert_called_once_with({"key": "value"})
 
     def test_deserialize_data(self, data_processor, mock_utils):
         """测试反序列化数据"""
-        mock_utils.deserialize.return_value = {"key": "value"}
+        mock_utils.deserialize_json.return_value = {"key": "value"}
 
         result = data_processor.deserialize_data(
             serialized_data='{"key": "value"}',
@@ -468,22 +454,20 @@ class TestFileAndSerialization:
         )
 
         assert result == {"key": "value"}
-        mock_utils.deserialize.assert_called_once_with('{"key": "value"}', "json")
+        mock_utils.deserialize_json.assert_called_once_with('{"key": "value"}')
 
     @pytest.mark.asyncio
     async def test_export_report_file(self, data_processor, mock_utils):
         """测试导出报告文件"""
-        report_data = {
-            "task_group_id": "tg_001",
-            "user_id": "user_123",
-            "tasks": []
-        }
-        mock_utils.serialize.return_value = '{"task_group_id": "tg_001"}'
+        report_data = {"task_group_id": "tg_001", "user_id": "user_123", "tasks": []}
+        mock_utils.serialize_json.return_value = '{"task_group_id": "tg_001"}'
+        mock_utils.write_file.return_value = True
 
         result = await data_processor.export_report_file(
             report_data=report_data,
             target_format="json"
         )
 
-        assert result == '{"task_group_id": "tg_001"}'
-        mock_utils.serialize.assert_called_once_with(report_data, "json")
+        assert result.endswith(".json")
+        mock_utils.serialize_json.assert_called_once_with(report_data)
+        mock_utils.write_file.assert_called_once()

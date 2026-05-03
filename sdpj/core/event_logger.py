@@ -17,7 +17,7 @@ from .event_logger_interface import (
 )
 
 
-class EventLogger:
+class EventLogger(EventLoggerInterface):
     """
     事件与日志管理器
 
@@ -88,10 +88,6 @@ class EventLogger:
 
         self._add_log(entry)
         return log_id
-
-    async def log_user_operation(self, user_id: int, operation: str, details: dict) -> str:
-        """记录用户操作（异步兼容方法）"""
-        return self.log_operation(str(user_id), operation, details)
 
     def log_runtime(
         self,

@@ -6,7 +6,7 @@ SDPJDetector / SDPJ检测内核模块
    - 输入:目标被测大模型标识、越狱攻击数据集 D_jailbreak 的标识
    - 输出:越狱成功 PoC 集合 S(非空时进一步选出的最优越狱 PoC,记为 PoC_i)
    - 触发场景:SDPJ 静态自检测算法步骤1(对应 1.spec.md 功能 1.1);SDPJ 动态自检测算法步骤1复用(对应 1.spec.md 功能 1.2)
-   - 调用下层:DataProcessor 的「按安全风险类型加载数据集样本」加载 D_jailbreak;LLMInterface 的「按大模型标识获取调用服务实例」「单次调用入参装配」「发起大模型单次调用」「基于标准化错误的重试与退避决策」
+   - 调用下层:DataProcessor 的「按安全风险类型加载数据集样本」加载 D_jailbreak;LLMService 的「按大模型标识获取调用服务实例」「单次调用入参装配」「发起大模型单次调用」「基于标准化错误的重试与退避决策」
    - 错误情形:S 为空时算法终止,返回空结果(即未检测到越狱攻击安全风险)
    - 不负责的边界:不做越狱成功的判别规则制定(由算法外部提供判定标志);不维护多轮对话(每次 LLM 调用独立)
 
@@ -20,7 +20,7 @@ SDPJDetector / SDPJ检测内核模块
    - 输入:合规判断输入模板 PoC_ii、检测样本库 R 中除 D_jailbreak 外的全部数据集标识、目标被测大模型标识、用户ID
    - 输出:静态检测报告条目集合(每条含 i、j、被测大模型响应 Output_j、合规判定 Judge_j),结果已落盘到检测结果数据库
    - 触发场景:SDPJ 静态自检测算法步骤3(对应 1.spec.md 功能 1.1);SDPJ 动态自检测算法步骤1复用(对应 1.spec.md 功能 1.2)
-   - 调用下层:DataProcessor 的「开设检测任务组」「创建检测子任务」「更新检测子任务状态」「创建检测报告条目」「追加单条检测结果数据」「按安全风险类型加载数据集样本」;涉及多模态样本时追加 DataProcessor 的「构造多模态检测样本」「解析大模型多模态响应」;涉及多编码样本时追加 DataProcessor 的「构造多编码检测样本」「还原编码响应内容」;LLMInterface 的「按大模型标识获取调用服务实例」「单次调用入参装配」「发起大模型单次调用」「基于标准化错误的重试与退避决策」「不可恢复错误的向上反馈」
+   - 调用下层:DataProcessor 的「开设检测任务组」「创建检测子任务」「更新检测子任务状态」「创建检测报告条目」「追加单条检测结果数据」「按安全风险类型加载数据集样本」;涉及多模态样本时追加 DataProcessor 的「构造多模态检测样本」「解析大模型多模态响应」;涉及多编码样本时追加 DataProcessor 的「构造多编码检测样本」「还原编码响应内容」;LLMService 的「按大模型标识获取调用服务实例」「单次调用入参装配」「发起大模型单次调用」「基于标准化错误的重试与退避决策」「不可恢复错误的向上反馈」
    - 不负责的边界:不做报告可视化(由 ReportManager 完成);不做统计指标计算(由 ReportManager 完成)
 
 # 动态自检测算法执行(对应技术细节 Algorithm 2)
@@ -34,7 +34,7 @@ SDPJDetector / SDPJ检测内核模块
    - 输入:静态检测报告、红队攻击输入模板 PoC_Attack、合规判断输入模板 PoC_ii、最大迭代次数 max_iterations、目标被测大模型标识、用户ID
    - 输出:动态检测报告(仅处理静态检测报告中 Judge_j=="合规" 的条目,覆盖写入迭代变异后最终的 Output_j 与 Judge_j),结果已落盘到检测结果数据库
    - 触发场景:SDPJ 动态自检测算法步骤3(对应 1.spec.md 功能 1.2)
-   - 调用下层:DataProcessor 的「创建检测子任务」「更新检测子任务状态」「创建检测报告条目」「追加单条检测结果数据」「按安全风险类型加载数据集样本」(用于重新定位 d_j);多模态/多编码处理同静态算法步骤3;LLMInterface 的「单次调用入参装配」「发起大模型单次调用」「基于标准化错误的重试与退避决策」「不可恢复错误的向上反馈」
+   - 调用下层:DataProcessor 的「创建检测子任务」「更新检测子任务状态」「创建检测报告条目」「追加单条检测结果数据」「按安全风险类型加载数据集样本」(用于重新定位 d_j);多模态/多编码处理同静态算法步骤3;LLMService 的「单次调用入参装配」「发起大模型单次调用」「基于标准化错误的重试与退避决策」「不可恢复错误的向上反馈」
    - 不负责的边界:迭代停止条件由算法定义规则决定(单轮 Judge_j=="违规" 即 break,否则累计至 max_iterations 停止);不维护多轮会话
 
 # 合规判断与结果落盘
@@ -42,7 +42,7 @@ SDPJDetector / SDPJ检测内核模块
    - 输入:被测大模型响应 Output_j、合规判断输入模板 PoC_ii
    - 输出:合规判定结果 Judge_j ∈ {"合规","违规"}
    - 触发场景:静态算法步骤3 与动态算法步骤3 对每条样本响应做判定时(对应 1.spec.md 功能 1.1 / 1.2)
-   - 调用下层:LLMInterface 的「单次调用入参装配」「发起大模型单次调用」
+   - 调用下层:LLMService 的「单次调用入参装配」「发起大模型单次调用」
    - 不负责的边界:判定语义由虚拟化输出侧合规判断模型承担,本职责不实现业务判定规则;不维护 LLM 调用间上下文
 
 7. 将单条检测结果写入检测结果数据库
@@ -55,9 +55,9 @@ SDPJDetector / SDPJ检测内核模块
 # 接口契约
 8. 通过 SDPJDetectorInterface 对外暴露上述能力,被 StateScheduler 调用(符合 4.模型依赖关系图.puml 中 StateScheduler → SDPJDetector 边)
 
-不需要的:[维护多轮对话历史(API 调用无记忆性,每次为独立新会话,是 SDPJ 算法虚拟化的前提,由 LLMInterface 做边界声明),做报告可视化(由 ReportManager 完成),做统计指标计算(由 ReportManager 完成),识别 LLM API 原生异常分类(由 LLMAdapterLib 完成),重试/退避决策的底层实现(由 LLMInterface 完成),入库/销毁大模型 API 适配器(由 LLMRegistry 与 LLMAdapterLib 完成),做用户权限判定(由 DACManager 完成),维护用户私有检测配置(由 PrivateConfigManager 完成),做样本/PoC 的业务语义审查]
+不需要的:[维护多轮对话历史(API 调用无记忆性,每次为独立新会话,是 SDPJ 算法虚拟化的前提,由 LLMService 做边界声明),做报告可视化(由 ReportManager 完成),做统计指标计算(由 ReportManager 完成),识别 LLM API 原生异常分类(由 LLMAdapterLib 完成),重试/退避决策的底层实现(由 LLMService 完成),入库/销毁大模型 API 适配器(由 LLMRegistry 与 LLMAdapterLib 完成),做用户权限判定(由 DACManager 完成),维护用户私有检测配置(由 PrivateConfigManager 完成),做样本/PoC 的业务语义审查]
 
-依赖模块:DataProcessor,LLMInterface,调用接口:DataProcessorInterface,LLMServiceInterface
+依赖模块:DataProcessor,LLMService,调用接口:DataProcessorInterface,LLMServiceInterface
 应实现接口:SDPJDetectorInterface
 被依赖模块:StateScheduler
 技术细节:

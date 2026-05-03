@@ -95,16 +95,3 @@ class SampleRepository:
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
-
-    async def count_by_dataset(self, dataset_id: int) -> int:
-        """统计数据集下的样本数量
-
-        Args:
-            dataset_id: 数据集 ID
-
-        Returns:
-            样本数量
-        """
-        stmt = select(DetectionSample).where(DetectionSample.dataset_id == dataset_id)
-        result = await self.session.execute(stmt)
-        return len(list(result.scalars().all()))

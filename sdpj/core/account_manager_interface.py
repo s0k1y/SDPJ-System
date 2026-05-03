@@ -1,45 +1,49 @@
-"""AccountManager 接口定义"""
-from typing import Protocol
+"""AccountManager 接口定义
+
+被依赖模块: StateScheduler
+"""
+from typing import Protocol, Optional
 
 
 class AccountManagerInterface(Protocol):
     """用户账号管理接口"""
 
-    async def init(self) -> None:
-        """初始化账号管理器"""
-        ...
-
     async def register(self, username: str, password: str) -> tuple[bool, str]:
-        """注册新用户
-
-        Args:
-            username: 用户名
-            password: 密码
-
-        Returns:
-            (成功标志, 消息)
-        """
+        """用户注册"""
         ...
 
-    async def login(self, username: str, password: str) -> tuple[bool, str | None]:
-        """用户登录
-
-        Args:
-            username: 用户名
-            password: 密码
-
-        Returns:
-            (成功标志, 会话ID)
-        """
+    async def unregister(self, user_id: int) -> tuple[bool, str]:
+        """用户注销"""
         ...
 
-    def logout(self, session_id: str) -> bool:
-        """用户登出
+    async def login(self, username: str, password: str) -> tuple[bool, Optional[int]]:
+        """用户登录，返回 (成功标志, 用户ID或None)"""
+        ...
 
-        Args:
-            session_id: 会话ID
+    def get_current_session(self) -> Optional[int]:
+        """获取当前登录用户ID"""
+        ...
 
-        Returns:
-            成功返回True
-        """
+    def logout(self) -> bool:
+        """用户登出"""
+        ...
+
+    async def change_password(self, old_password: str, new_password: str) -> tuple[bool, str]:
+        """修改当前用户密码"""
+        ...
+
+    async def switch_account(self, username: str, password: str) -> tuple[bool, Optional[int]]:
+        """账号切换"""
+        ...
+
+    async def get_current_user_profile(self) -> Optional[dict]:
+        """查询当前用户资料"""
+        ...
+
+    async def update_username(self, new_username: str) -> bool:
+        """更新当前用户名"""
+        ...
+
+    async def list_user_resources(self) -> list[dict]:
+        """列出当前用户拥有的受控资源"""
         ...

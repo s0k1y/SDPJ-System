@@ -6,13 +6,14 @@
 
 from typing import AsyncGenerator
 from contextlib import asynccontextmanager
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
     create_async_engine,
     async_sessionmaker,
     AsyncSession,
     AsyncEngine
 )
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import NullPool, StaticPool
 
 from .models import Base
 
@@ -33,12 +34,20 @@ class UserDBSessionManager:
             database_url: 数据库连接 URL（例如：sqlite+aiosqlite:///path/to/db.sqlite）
             echo: 是否输出 SQL 日志
         """
+        is_memory = ":memory:" in database_url
         self._engine: AsyncEngine = create_async_engine(
             database_url,
             echo=echo,
-            poolclass=NullPool,  # SQLite 使用 NullPool 避免并发问题
-            connect_args={"check_same_thread": False}  # SQLite 允许多线程访问
+            poolclass=StaticPool if is_memory else NullPool,
+            connect_args={"check_same_thread": False}
         )
+
+        if "sqlite" in database_url:
+            @event.listens_for(self._engine.sync_engine, "connect")
+            def _enable_fk(dbapi_conn, connection_record):
+                cursor = dbapi_conn.cursor()
+                cursor.execute("PRAGMA foreign_keys=ON")
+                cursor.close()
         self._session_factory = async_sessionmaker(
             self._engine,
             class_=AsyncSession,

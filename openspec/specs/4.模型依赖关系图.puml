@@ -23,7 +23,7 @@ Boundary(Layer3, "执行逻辑层") {
 
 Boundary(Layer4, "抽象驱动层") {
   Container(DataProcessor, "检测数据处理模块", "未设置")
-  Container(LLMInterface, "大模型服务接口模块", "未设置")
+  Container(LLMService, "大模型服务接口模块", "未设置")
   Container(LLMRegistry, "大模型注册中心模块", "未设置")
   Container(UserCenter, "用户管理中心模块", "未设置")
 }
@@ -50,7 +50,7 @@ Rel(StateScheduler,DACManager,"调用接口:DACManagerInterface")
 Rel(StateScheduler,AccountManager,"调用接口:AccountManagerInterface")
 
 Rel(SDPJDetector,DataProcessor,"调用接口:DataProcessorInterface")
-Rel(SDPJDetector,LLMInterface,"调用接口:LLMServiceInterface")
+Rel(SDPJDetector,LLMService,"调用接口:LLMServiceInterface")
 Rel(PrivateConfigManager,DataProcessor,"调用接口:DataProcessorInterface")
 Rel(PrivateConfigManager,UserCenter,"调用接口:UserCenterInterface")
 Rel(PrivateConfigManager,LLMRegistry,"调用接口:LLMRegistryInterface")
@@ -62,12 +62,13 @@ Rel(DACManager,UserCenter,"调用接口:UserCenterInterface")
 Rel(DataProcessor,SampleDB,"调用接口:SampleDBInterface")
 Rel(DataProcessor,ResultDB,"调用接口:ResultDBInterface")
 Rel(DataProcessor,UtilsLib,"调用接口:UtilsInterface")
-Rel(LLMInterface,LLMAdapterLib,"调用接口:LLMAdapterInterface")
-Rel(LLMInterface,UtilsLib,"调用接口:UtilsInterface")
+Rel(LLMService,LLMAdapterLib,"调用接口:LLMAdapterInterface")
+Rel(LLMService,UtilsLib,"调用接口:UtilsInterface")
 Rel(LLMRegistry,LLMAdapterLib,"调用接口:LLMAdapterInterface")
 Rel(LLMRegistry,UtilsLib,"调用接口:UtilsInterface")
 Rel(UserCenter,UserDB,"调用接口:UserDBInterface")
 Rel(UserCenter,UtilsLib,"调用接口:UtilsInterface")
+
 
 
 

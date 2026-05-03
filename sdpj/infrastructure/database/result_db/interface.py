@@ -19,6 +19,31 @@ class ResultDBInterface(Protocol):
     - 检测结果数据管理
     """
 
+    # ==================== 被测大模型级能力 ====================
+
+    async def register_target_model(self, model_id: str) -> dict:
+        """登记被测大模型（幂等）
+
+        Args:
+            model_id: 模型ID
+
+        Returns:
+            {"model_id": model_id}
+        """
+        ...
+
+    async def get_target_model(self, model_id: str) -> Optional[dict]:
+        """查询被测大模型
+
+        Returns:
+            {"model_id": model_id} 或 None
+        """
+        ...
+
+    async def list_target_models(self) -> list[dict]:
+        """列出所有被测大模型"""
+        ...
+
     # ==================== 检测任务组级能力 ====================
 
     async def create_task_group(
@@ -169,32 +194,6 @@ class ResultDBInterface(Protocol):
 
         Raises:
             ValueError: 任务不存在
-        """
-        ...
-
-    # ==================== 被测大模型级能力 ====================
-
-    async def register_target_model(self, model_id: str) -> bool:
-        """登记被测大模型
-
-        幂等操作，模型ID已存在时不视为错误。
-
-        Args:
-            model_id: 模型ID
-
-        Returns:
-            登记是否成功
-        """
-        ...
-
-    async def get_target_model(self, model_id: str) -> Optional[dict]:
-        """按ID查询被测大模型
-
-        Args:
-            model_id: 模型ID
-
-        Returns:
-            被测大模型条目，不存在时返回None
         """
         ...
 

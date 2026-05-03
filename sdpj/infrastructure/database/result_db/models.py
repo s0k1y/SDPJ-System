@@ -15,22 +15,10 @@ class Base(DeclarativeBase):
 
 
 class TargetModel(Base):
-    """被测大模型表
-
-    存储被检测的大模型标识，不维护业务元数据。
-    """
+    """被测大模型"""
     __tablename__ = "TargetModel"
 
-    model_id: Mapped[str] = mapped_column(String(255), primary_key=True, comment="模型ID")
-
-    # 关系
-    task_groups: Mapped[list["TaskGroup"]] = relationship(
-        back_populates="target_model",
-        cascade="all, delete-orphan"
-    )
-
-    def __repr__(self) -> str:
-        return f"<TargetModel(model_id={self.model_id})>"
+    model_id: Mapped[str] = mapped_column(String(255), primary_key=True)
 
 
 class TaskGroup(Base):
@@ -41,16 +29,9 @@ class TaskGroup(Base):
     __tablename__ = "TaskGroup"
 
     task_group_id: Mapped[str] = mapped_column(String(255), primary_key=True, comment="任务组ID")
-    user_id: Mapped[str] = mapped_column(String(255), nullable=False, comment="用户ID（跨库外键）")
-    model_id: Mapped[str] = mapped_column(
-        String(255),
-        ForeignKey("TargetModel.model_id", ondelete="CASCADE"),
-        nullable=False,
-        comment="模型ID"
-    )
+    user_id: Mapped[str] = mapped_column(String(255), nullable=False, comment="用户ID（跨库引用）")
+    model_id: Mapped[str] = mapped_column(String(255), nullable=False, comment="模型ID（引用 TargetModel.model_id）")
 
-    # 关系
-    target_model: Mapped["TargetModel"] = relationship(back_populates="task_groups")
     detection_tasks: Mapped[list["DetectionTask"]] = relationship(
         back_populates="task_group",
         cascade="all, delete-orphan"

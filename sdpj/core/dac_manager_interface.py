@@ -1,48 +1,25 @@
-"""DACManager 接口定义"""
+"""DACManager 接口定义
+
+被依赖模块: StateScheduler
+"""
 from typing import Protocol
 
 
 class DACManagerInterface(Protocol):
     """自主访问控制管理接口"""
 
-    async def init(self) -> None:
-        """初始化DAC管理器"""
+    async def grant_access(self, resource_id: int, target_user_id: int, caller_user_id: int) -> tuple[bool, str]:
+        """授予其他用户对私有资源的读权限"""
         ...
 
-    async def grant_access(self, user_id: int, resource_id: int, permission: str) -> bool:
-        """授予访问权限
-
-        Args:
-            user_id: 用户ID
-            resource_id: 资源ID
-            permission: 权限类型
-
-        Returns:
-            授予成功返回True
-        """
+    async def revoke_access(self, acl_id: int, caller_user_id: int) -> tuple[bool, str]:
+        """移除已授予的读权限"""
         ...
 
-    async def revoke_access(self, user_id: int, resource_id: int) -> bool:
-        """撤销访问权限
-
-        Args:
-            user_id: 用户ID
-            resource_id: 资源ID
-
-        Returns:
-            撤销成功返回True
-        """
+    async def check_access(self, resource_id: int, user_id: int) -> bool:
+        """判定用户对资源是否具备访问权"""
         ...
 
-    async def check_access(self, user_id: int, resource_id: int, permission: str) -> bool:
-        """检查访问权限
-
-        Args:
-            user_id: 用户ID
-            resource_id: 资源ID
-            permission: 权限类型
-
-        Returns:
-            有权限返回True
-        """
+    async def get_access_list(self, resource_id: int, caller_user_id: int) -> tuple[bool, list[dict]]:
+        """查询某资源的授权清单"""
         ...

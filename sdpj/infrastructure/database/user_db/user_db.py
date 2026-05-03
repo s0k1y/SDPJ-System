@@ -34,11 +34,11 @@ class UserDB:
 
     # ==================== 用户账号级能力 ====================
 
-    async def create_user(self, username: str, password_hash: str) -> int:
+    async def create_user(self, username: str, password: str) -> int:
         """创建用户"""
         async with self._session_manager.session() as session:
             user_repo = UserRepository(session)
-            user = await user_repo.create(username, password_hash)
+            user = await user_repo.create(username, password)
             return user.user_id
 
     async def delete_user(self, user_id: int) -> bool:
@@ -47,25 +47,17 @@ class UserDB:
             user_repo = UserRepository(session)
             return await user_repo.delete(user_id)
 
-    async def update_user_password(self, user_id: int, new_password_hash: str) -> bool:
+    async def update_user_password(self, user_id: int, new_password: str) -> bool:
         """更新用户密码"""
         async with self._session_manager.session() as session:
             user_repo = UserRepository(session)
-            return await user_repo.update_password(user_id, new_password_hash)
+            return await user_repo.update_password(user_id, new_password)
 
-    async def get_user_by_username(self, username: str) -> Optional[dict]:
-        """按账号查询用户"""
+    async def update_username(self, user_id: int, new_username: str) -> bool:
+        """更新用户名"""
         async with self._session_manager.session() as session:
             user_repo = UserRepository(session)
-            user = await user_repo.get_by_username(username)
-            if not user:
-                return None
-            return {
-                "user_id": user.user_id,
-                "username": user.username,
-                "password_hash": user.password_hash,
-                "created_at": user.created_at,
-            }
+            return await user_repo.update_username(user_id, new_username)
 
     async def get_user_by_id(self, user_id: int) -> Optional[dict]:
         """按 ID 查询用户"""
@@ -77,7 +69,21 @@ class UserDB:
             return {
                 "user_id": user.user_id,
                 "username": user.username,
-                "password_hash": user.password_hash,
+                "password": user.password,
+                "created_at": user.created_at,
+            }
+
+    async def get_user_by_username(self, username: str) -> Optional[dict]:
+        """按账号查询用户"""
+        async with self._session_manager.session() as session:
+            user_repo = UserRepository(session)
+            user = await user_repo.get_by_username(username)
+            if not user:
+                return None
+            return {
+                "user_id": user.user_id,
+                "username": user.username,
+                "password": user.password,
                 "created_at": user.created_at,
             }
 
@@ -154,6 +160,19 @@ class UserDB:
                 }
                 for acl in acls
             ]
+
+    async def get_access_control_by_id(self, acl_id: int) -> Optional[dict]:
+        async with self._session_manager.session() as session:
+            acl_repo = ACLRepository(session)
+            acl = await acl_repo.get_by_id(acl_id)
+            if acl is None:
+                return None
+            return {
+                "acl_id": acl.acl_id,
+                "resource_id": acl.resource_id,
+                "grantee_user_id": acl.grantee_user_id,
+                "created_at": acl.created_at,
+            }
 
     async def check_access_control_exists(self, resource_id: int, grantee_user_id: int) -> bool:
         """判定访问控制项是否存在"""

@@ -5,12 +5,14 @@
 
 from typing import AsyncGenerator, Optional
 from contextlib import asynccontextmanager
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
     create_async_engine,
     async_sessionmaker,
     AsyncSession,
     AsyncEngine
 )
+from sqlalchemy.pool import NullPool, StaticPool
 from .models import Base
 
 
@@ -35,11 +37,22 @@ class SessionManager:
     async def initialize(self) -> None:
         """初始化数据库引擎和会话工厂"""
         if self.engine is None:
+            is_memory = ":memory:" in self.database_url
             self.engine = create_async_engine(
                 self.database_url,
                 echo=self.echo,
-                future=True
+                future=True,
+                poolclass=StaticPool if is_memory else NullPool,
+                connect_args={"check_same_thread": False},
             )
+
+            if "sqlite" in self.database_url:
+                @event.listens_for(self.engine.sync_engine, "connect")
+                def _enable_fk(dbapi_conn, connection_record):
+                    cursor = dbapi_conn.cursor()
+                    cursor.execute("PRAGMA foreign_keys=ON")
+                    cursor.close()
+
             self.async_session_maker = async_sessionmaker(
                 self.engine,
                 class_=AsyncSession,

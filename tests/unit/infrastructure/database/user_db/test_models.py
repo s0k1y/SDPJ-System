@@ -11,14 +11,14 @@ class TestUserModel:
 
     def test_user_creation(self):
         """测试用户对象创建"""
-        user = User(username="testuser", password_hash="hashed_password")
+        user = User(username="testuser", password="password123")
         assert user.username == "testuser"
-        assert user.password_hash == "hashed_password"
+        assert user.password == "password123"
         assert user.user_id is None  # 未持久化前为 None
 
     def test_user_repr(self):
         """测试用户对象字符串表示"""
-        user = User(username="testuser", password_hash="hashed_password")
+        user = User(username="testuser", password="password123")
         user.user_id = 1
         assert "user_id=1" in repr(user)
         assert "username='testuser'" in repr(user)

@@ -9,14 +9,14 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://sdpj:sdpj123@postgres:5432/sdpj
+      - SAMPLE_DB_URL=sqlite+aiosqlite:///./data/db/sample.db
+      - RESULT_DB_URL=sqlite+aiosqlite:///./data/db/result.db
+      - USER_DB_URL=sqlite+aiosqlite:///./data/db/user.db
       - API_HOST=0.0.0.0
       - API_PORT=8000
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
-    depends_on:
-      - postgres
     restart: unless-stopped
 
   frontend:
@@ -29,19 +29,3 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
-
-  postgres:
-    image: postgres:16-alpine
-    container_name: sdpj-postgres
-    environment:
-      - POSTGRES_USER=sdpj
-      - POSTGRES_PASSWORD=sdpj123
-      - POSTGRES_DB=sdpj
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    restart: unless-stopped
-
-volumes:
-  postgres_data:

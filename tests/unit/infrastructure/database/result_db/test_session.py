@@ -5,7 +5,7 @@
 
 import pytest
 from sdpj.infrastructure.database.result_db.session import SessionManager
-from sdpj.infrastructure.database.result_db.models import Base, TargetModel
+from sdpj.infrastructure.database.result_db.models import Base, TaskGroup
 
 
 @pytest.fixture
@@ -21,6 +21,7 @@ async def session_manager():
 async def test_session_manager_initialization():
     """测试会话管理器初始化"""
     manager = SessionManager("sqlite+aiosqlite:///:memory:")
+    await manager.initialize()
     assert manager.engine is not None
     assert manager.async_session_maker is not None
     await manager.close()
@@ -29,34 +30,30 @@ async def test_session_manager_initialization():
 @pytest.mark.asyncio
 async def test_create_tables(session_manager):
     """测试创建表"""
-    # 表已在 fixture 中创建，验证可以使用
     async with session_manager.session() as session:
-        model = TargetModel(model_id="test-model")
-        session.add(model)
+        tg = TaskGroup(task_group_id="test-tg", user_id="u1", model_id="m1")
+        session.add(tg)
         await session.commit()
 
-        # 验证数据已保存
         from sqlalchemy import select
-        result = await session.execute(select(TargetModel).where(TargetModel.model_id == "test-model"))
-        retrieved_model = result.scalar_one_or_none()
-        assert retrieved_model is not None
-        assert retrieved_model.model_id == "test-model"
+        result = await session.execute(select(TaskGroup).where(TaskGroup.task_group_id == "test-tg"))
+        retrieved = result.scalar_one_or_none()
+        assert retrieved is not None
+        assert retrieved.task_group_id == "test-tg"
 
 
 @pytest.mark.asyncio
 async def test_session_context_manager(session_manager):
     """测试会话上下文管理器"""
     async with session_manager.session() as session:
-        model = TargetModel(model_id="context-test")
-        session.add(model)
-        # commit 会在上下文管理器退出时自动执行
+        tg = TaskGroup(task_group_id="context-test", user_id="u1", model_id="m1")
+        session.add(tg)
 
-    # 验证数据已提交
     async with session_manager.session() as session:
         from sqlalchemy import select
-        result = await session.execute(select(TargetModel).where(TargetModel.model_id == "context-test"))
-        retrieved_model = result.scalar_one_or_none()
-        assert retrieved_model is not None
+        result = await session.execute(select(TaskGroup).where(TaskGroup.task_group_id == "context-test"))
+        retrieved = result.scalar_one_or_none()
+        assert retrieved is not None
 
 
 @pytest.mark.asyncio
@@ -64,20 +61,18 @@ async def test_session_rollback_on_exception(session_manager):
     """测试异常时自动回滚"""
     try:
         async with session_manager.session() as session:
-            model = TargetModel(model_id="rollback-test")
-            session.add(model)
+            tg = TaskGroup(task_group_id="rollback-test", user_id="u1", model_id="m1")
+            session.add(tg)
             await session.flush()
-            # 模拟异常
             raise ValueError("Test exception")
     except ValueError:
         pass
 
-    # 验证数据未提交
     async with session_manager.session() as session:
         from sqlalchemy import select
-        result = await session.execute(select(TargetModel).where(TargetModel.model_id == "rollback-test"))
-        retrieved_model = result.scalar_one_or_none()
-        assert retrieved_model is None
+        result = await session.execute(select(TaskGroup).where(TaskGroup.task_group_id == "rollback-test"))
+        retrieved = result.scalar_one_or_none()
+        assert retrieved is None
 
 
 @pytest.mark.asyncio
@@ -86,21 +81,17 @@ async def test_drop_tables():
     manager = SessionManager("sqlite+aiosqlite:///:memory:")
     await manager.create_tables()
 
-    # 添加数据
     async with manager.session() as session:
-        model = TargetModel(model_id="drop-test")
-        session.add(model)
+        tg = TaskGroup(task_group_id="drop-test", user_id="u1", model_id="m1")
+        session.add(tg)
 
-    # 删除表
     await manager.drop_tables()
-
-    # 重新创建表（应该是空的）
     await manager.create_tables()
 
     async with manager.session() as session:
         from sqlalchemy import select
-        result = await session.execute(select(TargetModel))
-        models = result.scalars().all()
-        assert len(models) == 0
+        result = await session.execute(select(TaskGroup))
+        items = result.scalars().all()
+        assert len(items) == 0
 
     await manager.close()

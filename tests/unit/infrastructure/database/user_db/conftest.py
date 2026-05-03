@@ -25,8 +25,8 @@ async def user_db(session_manager):
 @pytest_asyncio.fixture
 async def sample_user(user_db):
     """创建示例用户"""
-    user_id = await user_db.create_user("testuser", "hashed_password_123")
-    return {"user_id": user_id, "username": "testuser", "password_hash": "hashed_password_123"}
+    user_id = await user_db.create_user("testuser", "password123")
+    return {"user_id": user_id, "username": "testuser", "password": "password123"}
 
 
 @pytest_asyncio.fixture

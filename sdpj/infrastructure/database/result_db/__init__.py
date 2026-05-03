@@ -8,7 +8,6 @@ from .result_db import ResultDB
 from .session import SessionManager
 from .models import (
     Base,
-    TargetModel,
     TaskGroup,
     DetectionTask,
     DetectionReport,
@@ -20,7 +19,6 @@ __all__ = [
     "ResultDB",
     "SessionManager",
     "Base",
-    "TargetModel",
     "TaskGroup",
     "DetectionTask",
     "DetectionReport",
