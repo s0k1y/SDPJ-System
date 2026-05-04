@@ -6,12 +6,8 @@
 from datetime import datetime
 from typing import List
 from sqlalchemy import String, Text, DateTime, ForeignKey, UniqueConstraint
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-
-
-class Base(DeclarativeBase):
-    """ORM 模型基类"""
-    pass
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sdpj.infrastructure.database.base import Base
 
 
 class Dataset(Base):

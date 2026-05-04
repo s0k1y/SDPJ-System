@@ -8,7 +8,7 @@ from typing import Protocol, Optional
 class SDPJDetectorInterface(Protocol):
     """SDPJ 检测内核接口"""
 
-    async def run_static_detection(self, model_id: str, user_id: str) -> dict:
+    async def run_static_detection(self, model_id: str, user_id: str, dataset_ids: list[int] | None = None) -> dict:
         """执行静态自检测算法 (Algorithm 1)"""
         ...
 

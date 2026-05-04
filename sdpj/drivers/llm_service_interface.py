@@ -2,9 +2,22 @@
 
 SDPJDetector 为唯一调用方 (符合 4.模型依赖关系图.puml 中 SDPJDetector → LLMService 边)。
 """
-from typing import Protocol, Dict, Any, Optional
+from typing import Protocol, Dict, Any, Optional, runtime_checkable
 
-from sdpj.drivers.llm_types import LLMError, LLMServiceInstanceProtocol
+from sdpj.infrastructure.llm_adapters.errors import LLMError
+
+
+@runtime_checkable
+class LLMServiceInstanceProtocol(Protocol):
+    """LLM 服务实例协议"""
+    model_id: str
+
+    @property
+    def active(self) -> bool: ...
+
+    async def call(self, system_prompt: str, user_message: str, **kwargs: Any) -> dict: ...
+
+    def destroy(self) -> None: ...
 
 
 class LLMServiceInterface(Protocol):

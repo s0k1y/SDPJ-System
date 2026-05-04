@@ -51,14 +51,11 @@ class ResultDB:
 
     # ==================== 检测任务组级能力 ====================
 
-    async def create_task_group(self, user_id: str, model_id: str) -> str:
-        """创建检测任务组"""
+    async def create_task_group(self, user_id: int, model_id: str) -> str:
+        """创建检测任务组（同一 session 内 upsert 模型后建组，消除竞态）"""
         async with self.session_manager.session() as session:
-            tm_repo = TargetModelRepository(session)
-            if await tm_repo.get_by_id(model_id) is None:
-                raise ValueError(f"模型ID '{model_id}' 未在被测大模型表中登记")
-            task_group_repo = TaskGroupRepository(session)
-            task_group = await task_group_repo.create(user_id, model_id)
+            await TargetModelRepository(session).register(model_id)
+            task_group = await TaskGroupRepository(session).create(user_id, model_id)
             return task_group.task_group_id
 
     async def delete_task_group(self, task_group_id: str) -> bool:
@@ -76,7 +73,7 @@ class ResultDB:
 
     async def list_task_groups(
         self,
-        user_id: Optional[str] = None,
+        user_id: Optional[int] = None,
         model_id: Optional[str] = None
     ) -> list[dict]:
         """查询检测任务组列表
@@ -131,7 +128,7 @@ class ResultDB:
     async def create_detection_task(
         self,
         task_group_id: str,
-        dataset_id: str,
+        dataset_id: int,
         task_status: str,
         start_time: datetime
     ) -> str:

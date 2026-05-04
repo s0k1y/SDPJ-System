@@ -179,12 +179,12 @@ class TestTaskAndReportOperations:
         mock_result_db.create_task_group.return_value = "tg_001"
 
         result = await data_processor.create_task_group(
-            user_id="user_123",
+            user_id="123",
             model_id="gpt-4"
         )
 
         assert result == "tg_001"
-        mock_result_db.create_task_group.assert_called_once_with("user_123", "gpt-4")
+        mock_result_db.create_task_group.assert_called_once_with(123, "gpt-4")
 
     @pytest.mark.asyncio
     async def test_create_detection_task(self, data_processor, mock_result_db):
@@ -202,7 +202,7 @@ class TestTaskAndReportOperations:
         assert result == "task_001"
         mock_result_db.create_detection_task.assert_called_once_with(
             task_group_id="tg_001",
-            dataset_id="1",
+            dataset_id=1,
             task_status="进行中",
             start_time=start_time
         )
@@ -300,12 +300,12 @@ class TestTaskAndReportOperations:
             {"task_group_id": "tg_001", "user_id": "user_123", "model_id": "gpt-4"}
         ]
 
-        result = await data_processor.list_task_groups(user_id="user_123")
+        result = await data_processor.list_task_groups(user_id="123")
 
         assert len(result) == 1
         assert result[0]["task_group_id"] == "tg_001"
         mock_result_db.list_task_groups.assert_called_once_with(
-            user_id="user_123", model_id=None
+            user_id=123, model_id=None
         )
 
     @pytest.mark.asyncio

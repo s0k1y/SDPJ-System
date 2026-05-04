@@ -61,7 +61,11 @@ SampleDB / 检测样本数据库模块
 依赖模块:无
 应实现接口:SampleDBInterface
 被依赖模块:DataProcessor
-技术细节:(暂定)
+技术细节:
+
+
+
+模块间逻辑隔离通过 `SampleDBInterface` 接口层维持，物理合并不影响模块边界。
 检测样本数据库模块:
 检测样本数据库，存储用于检测的漏洞测试集/安全风险测试集。
 检测样本数据库(Repository，R)，漏洞测试集/安全风险测试集(Dataset, D)将遵循以下逻辑结构:
@@ -113,3 +117,9 @@ SampleDB / 检测样本数据库模块
 安全风险检测数据集(数据集ID[主键], 数据集名称, 安全风险类型)
 检测样本数据(样本ID[主键], 风险具体子类, 漏洞概念验证数据, 数据集ID)
 在此基础上进行数据表设计，得到对应的两张数据表，即可实现该模块基本功能。
+
+# 物理结构合并
+
+SampleDB 的数据表（`Dataset`、`DetectionSample`）与 UserDB、ResultDB 的数据表合并存储于同一 SQLite 文件 `data/db/sdpj.db`。
+
+原因：ResultDB 的 `DetectionTask.dataset_id` 引用本模块的 `Dataset.dataset_id`。若两模块使用独立文件，该外键无法被 SQLite 引擎强制执行（跨文件外键约束不可用），数据完整性将崩溃。合并后由数据库引擎通过 `PRAGMA foreign_keys=ON` 统一执行所有约束。

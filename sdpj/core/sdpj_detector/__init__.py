@@ -4,8 +4,7 @@
 被依赖模块: StateScheduler
 """
 from sdpj.drivers.data_processor_interface import DataProcessorInterface
-from sdpj.drivers.llm_service_interface import LLMServiceInterface
-from sdpj.drivers.llm_types import LLMError
+from sdpj.drivers.llm_service_interface import LLMServiceInterface, LLMError
 
 from .static_detector import run_static_detection, select_best_poc, _call_llm
 from .dynamic_detector import run_dynamic_detection
@@ -35,9 +34,9 @@ class SDPJDetector:
         self._data_processor = data_processor
         self._llm = llm_service
 
-    async def run_static_detection(self, model_id: str, user_id: str) -> dict:
+    async def run_static_detection(self, model_id: str, user_id: str, dataset_ids: list[int] | None = None) -> dict:
         return await run_static_detection(
-            self._llm, self._data_processor, model_id, user_id
+            self._llm, self._data_processor, model_id, user_id, dataset_ids
         )
 
     async def run_dynamic_detection(

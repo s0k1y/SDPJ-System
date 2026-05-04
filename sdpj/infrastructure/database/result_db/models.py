@@ -5,13 +5,9 @@
 
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import String, DateTime, ForeignKey, Text
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-
-
-class Base(DeclarativeBase):
-    """ORM 基类"""
-    pass
+from sqlalchemy import Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sdpj.infrastructure.database.base import Base
 
 
 class TargetModel(Base):
@@ -29,8 +25,18 @@ class TaskGroup(Base):
     __tablename__ = "TaskGroup"
 
     task_group_id: Mapped[str] = mapped_column(String(255), primary_key=True, comment="任务组ID")
-    user_id: Mapped[str] = mapped_column(String(255), nullable=False, comment="用户ID（跨库引用）")
-    model_id: Mapped[str] = mapped_column(String(255), nullable=False, comment="模型ID（引用 TargetModel.model_id）")
+    user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("User.user_id", ondelete="CASCADE"),
+        nullable=False,
+        comment="用户ID"
+    )
+    model_id: Mapped[str] = mapped_column(
+        String(255),
+        ForeignKey("TargetModel.model_id", ondelete="RESTRICT"),
+        nullable=False,
+        comment="模型ID"
+    )
 
     detection_tasks: Mapped[list["DetectionTask"]] = relationship(
         back_populates="task_group",
@@ -55,7 +61,12 @@ class DetectionTask(Base):
         nullable=False,
         comment="任务组ID"
     )
-    dataset_id: Mapped[str] = mapped_column(String(255), nullable=False, comment="数据集ID（跨库外键）")
+    dataset_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("Dataset.dataset_id", ondelete="CASCADE"),
+        nullable=False,
+        comment="数据集ID"
+    )
     task_status: Mapped[str] = mapped_column(String(50), nullable=False, comment="任务状态")
     start_time: Mapped[datetime] = mapped_column(DateTime, nullable=False, comment="开始时间")
     end_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, comment="结束时间")

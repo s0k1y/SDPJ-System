@@ -2,8 +2,7 @@
 from datetime import datetime
 
 from sdpj.drivers.data_processor_interface import DataProcessorInterface
-from sdpj.drivers.llm_service_interface import LLMServiceInterface
-from sdpj.drivers.llm_types import LLMError
+from sdpj.drivers.llm_service_interface import LLMServiceInterface, LLMError
 
 from . import prompt_builder, result_parser
 from .static_detector import _call_llm

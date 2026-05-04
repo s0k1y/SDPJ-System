@@ -16,6 +16,18 @@ async def result_db():
     db = ResultDB(session_manager)
     await db.register_target_model("gpt-4")
     await db.register_target_model("claude-3")
+    from sdpj.infrastructure.database.user_db.models import User
+    from sdpj.infrastructure.database.sample_db.models import Dataset
+    async with session_manager.session() as session:
+        session.add_all([
+            User(username="user_001", password="pw"),
+            User(username="user_002", password="pw"),
+        ])
+        await session.flush()
+        session.add_all([
+            Dataset(name="dataset_001", risk_type="jailbreak"),
+            Dataset(name="dataset_002", risk_type="injection"),
+        ])
     yield db
     await session_manager.close()
 
@@ -25,18 +37,18 @@ async def result_db():
 @pytest.mark.asyncio
 async def test_create_task_group(result_db):
     """测试创建检测任务组"""
-    task_group_id = await result_db.create_task_group("user_001", "gpt-4")
+    task_group_id = await result_db.create_task_group(1, "gpt-4")
     assert task_group_id.startswith("tg_")
 
 
 @pytest.mark.asyncio
 async def test_get_task_group(result_db):
     """测试查询单个任务组"""
-    task_group_id = await result_db.create_task_group("user_001", "gpt-4")
+    task_group_id = await result_db.create_task_group(1, "gpt-4")
 
     task_group = await result_db.get_task_group(task_group_id)
     assert task_group["task_group_id"] == task_group_id
-    assert task_group["user_id"] == "user_001"
+    assert task_group["user_id"] == 1
     assert task_group["model_id"] == "gpt-4"
 
 
@@ -50,14 +62,14 @@ async def test_get_task_group_not_found(result_db):
 @pytest.mark.asyncio
 async def test_list_task_groups(result_db):
     """测试查询任务组列表"""
-    tg1 = await result_db.create_task_group("user_001", "gpt-4")
-    tg2 = await result_db.create_task_group("user_001", "claude-3")
-    tg3 = await result_db.create_task_group("user_002", "gpt-4")
+    tg1 = await result_db.create_task_group(1, "gpt-4")
+    tg2 = await result_db.create_task_group(1, "claude-3")
+    tg3 = await result_db.create_task_group(2, "gpt-4")
 
     all_groups = await result_db.list_task_groups()
     assert len(all_groups) == 3
 
-    user_groups = await result_db.list_task_groups(user_id="user_001")
+    user_groups = await result_db.list_task_groups(user_id=1)
     assert len(user_groups) == 2
 
     model_groups = await result_db.list_task_groups(model_id="gpt-4")
@@ -67,7 +79,7 @@ async def test_list_task_groups(result_db):
 @pytest.mark.asyncio
 async def test_delete_task_group(result_db):
     """测试删除任务组"""
-    task_group_id = await result_db.create_task_group("user_001", "gpt-4")
+    task_group_id = await result_db.create_task_group(1, "gpt-4")
 
     result = await result_db.delete_task_group(task_group_id)
     assert result is True
@@ -81,11 +93,11 @@ async def test_delete_task_group(result_db):
 @pytest.mark.asyncio
 async def test_create_detection_task(result_db):
     """测试创建检测任务"""
-    task_group_id = await result_db.create_task_group("user_001", "gpt-4")
+    task_group_id = await result_db.create_task_group(1, "gpt-4")
 
     start_time = datetime.now()
     task_id = await result_db.create_detection_task(
-        task_group_id, "dataset_001", "running", start_time
+        task_group_id, 1, "running", start_time
     )
     assert task_id.startswith("task_")
 
@@ -95,29 +107,29 @@ async def test_create_detection_task_invalid_group(result_db):
     """测试创建任务时任务组不存在"""
     with pytest.raises(ValueError, match="不存在"):
         await result_db.create_detection_task(
-            "non-existent", "dataset_001", "running", datetime.now()
+            "non-existent", 1, "running", datetime.now()
         )
 
 
 @pytest.mark.asyncio
 async def test_get_detection_task(result_db):
     """测试查询单个检测任务"""
-    task_group_id = await result_db.create_task_group("user_001", "gpt-4")
+    task_group_id = await result_db.create_task_group(1, "gpt-4")
     task_id = await result_db.create_detection_task(
-        task_group_id, "dataset_001", "running", datetime.now()
+        task_group_id, 1, "running", datetime.now()
     )
 
     task = await result_db.get_detection_task(task_id)
     assert task["task_id"] == task_id
     assert task["task_status"] == "running"
-    assert task["dataset_id"] == "dataset_001"
+    assert task["dataset_id"] == 1
 
 @pytest.mark.asyncio
 async def test_update_task_status(result_db):
     """测试更新任务状态"""
-    task_group_id = await result_db.create_task_group("user_001", "gpt-4")
+    task_group_id = await result_db.create_task_group(1, "gpt-4")
     task_id = await result_db.create_detection_task(
-        task_group_id, "dataset_001", "running", datetime.now()
+        task_group_id, 1, "running", datetime.now()
     )
 
     end_time = datetime.now()
@@ -132,13 +144,13 @@ async def test_update_task_status(result_db):
 @pytest.mark.asyncio
 async def test_list_tasks_by_group(result_db):
     """测试按任务组查询任务列表"""
-    task_group_id = await result_db.create_task_group("user_001", "gpt-4")
+    task_group_id = await result_db.create_task_group(1, "gpt-4")
 
     await result_db.create_detection_task(
-        task_group_id, "dataset_001", "running", datetime.now()
+        task_group_id, 1, "running", datetime.now()
     )
     await result_db.create_detection_task(
-        task_group_id, "dataset_002", "completed", datetime.now()
+        task_group_id, 2, "completed", datetime.now()
     )
 
     tasks = await result_db.list_tasks_by_group(task_group_id)
@@ -148,9 +160,9 @@ async def test_list_tasks_by_group(result_db):
 @pytest.mark.asyncio
 async def test_delete_detection_task(result_db):
     """测试删除检测任务"""
-    task_group_id = await result_db.create_task_group("user_001", "gpt-4")
+    task_group_id = await result_db.create_task_group(1, "gpt-4")
     task_id = await result_db.create_detection_task(
-        task_group_id, "dataset_001", "running", datetime.now()
+        task_group_id, 1, "running", datetime.now()
     )
 
     result = await result_db.delete_detection_task(task_id)
@@ -165,9 +177,9 @@ async def test_delete_detection_task(result_db):
 @pytest.mark.asyncio
 async def test_create_detection_report(result_db):
     """测试创建检测报告"""
-    task_group_id = await result_db.create_task_group("user_001", "gpt-4")
+    task_group_id = await result_db.create_task_group(1, "gpt-4")
     task_id = await result_db.create_detection_task(
-        task_group_id, "dataset_001", "completed", datetime.now()
+        task_group_id, 1, "completed", datetime.now()
     )
 
     report_id = await result_db.create_detection_report(task_id)
@@ -183,9 +195,9 @@ async def test_create_detection_report_invalid_task(result_db):
 @pytest.mark.asyncio
 async def test_get_detection_report(result_db):
     """测试查询单份检测报告"""
-    task_group_id = await result_db.create_task_group("user_001", "gpt-4")
+    task_group_id = await result_db.create_task_group(1, "gpt-4")
     task_id = await result_db.create_detection_task(
-        task_group_id, "dataset_001", "completed", datetime.now()
+        task_group_id, 1, "completed", datetime.now()
     )
     report_id = await result_db.create_detection_report(task_id)
 
@@ -197,9 +209,9 @@ async def test_get_detection_report(result_db):
 @pytest.mark.asyncio
 async def test_get_report_by_task(result_db):
     """测试按任务ID查询报告"""
-    task_group_id = await result_db.create_task_group("user_001", "gpt-4")
+    task_group_id = await result_db.create_task_group(1, "gpt-4")
     task_id = await result_db.create_detection_task(
-        task_group_id, "dataset_001", "completed", datetime.now()
+        task_group_id, 1, "completed", datetime.now()
     )
     report_id = await result_db.create_detection_report(task_id)
 
@@ -211,12 +223,12 @@ async def test_get_report_by_task(result_db):
 @pytest.mark.asyncio
 async def test_list_detection_reports(result_db):
     """测试查询报告列表"""
-    tg1 = await result_db.create_task_group("user_001", "gpt-4")
-    tg2 = await result_db.create_task_group("user_002", "gpt-4")
+    tg1 = await result_db.create_task_group(1, "gpt-4")
+    tg2 = await result_db.create_task_group(2, "gpt-4")
 
-    task1 = await result_db.create_detection_task(tg1, "dataset_001", "completed", datetime.now())
-    task2 = await result_db.create_detection_task(tg1, "dataset_002", "completed", datetime.now())
-    task3 = await result_db.create_detection_task(tg2, "dataset_001", "completed", datetime.now())
+    task1 = await result_db.create_detection_task(tg1, 1, "completed", datetime.now())
+    task2 = await result_db.create_detection_task(tg1, 2, "completed", datetime.now())
+    task3 = await result_db.create_detection_task(tg2, 1, "completed", datetime.now())
 
     await result_db.create_detection_report(task1)
     await result_db.create_detection_report(task2)
@@ -232,9 +244,9 @@ async def test_list_detection_reports(result_db):
 @pytest.mark.asyncio
 async def test_delete_detection_report(result_db):
     """测试删除检测报告"""
-    task_group_id = await result_db.create_task_group("user_001", "gpt-4")
+    task_group_id = await result_db.create_task_group(1, "gpt-4")
     task_id = await result_db.create_detection_task(
-        task_group_id, "dataset_001", "completed", datetime.now()
+        task_group_id, 1, "completed", datetime.now()
     )
     report_id = await result_db.create_detection_report(task_id)
 
@@ -249,9 +261,9 @@ async def test_delete_detection_report(result_db):
 @pytest.mark.asyncio
 async def test_append_result_data(result_db):
     """测试追加检测结果数据"""
-    task_group_id = await result_db.create_task_group("user_001", "gpt-4")
+    task_group_id = await result_db.create_task_group(1, "gpt-4")
     task_id = await result_db.create_detection_task(
-        task_group_id, "dataset_001", "completed", datetime.now()
+        task_group_id, 1, "completed", datetime.now()
     )
     report_id = await result_db.create_detection_report(task_id)
 
@@ -273,9 +285,9 @@ async def test_append_result_data_invalid_report(result_db):
 @pytest.mark.asyncio
 async def test_list_result_data_by_report(result_db):
     """测试按报告ID查询结果数据"""
-    task_group_id = await result_db.create_task_group("user_001", "gpt-4")
+    task_group_id = await result_db.create_task_group(1, "gpt-4")
     task_id = await result_db.create_detection_task(
-        task_group_id, "dataset_001", "completed", datetime.now()
+        task_group_id, 1, "completed", datetime.now()
     )
     report_id = await result_db.create_detection_report(task_id)
 
@@ -289,9 +301,9 @@ async def test_list_result_data_by_report(result_db):
 @pytest.mark.asyncio
 async def test_delete_result_data(result_db):
     """测试删除结果数据"""
-    task_group_id = await result_db.create_task_group("user_001", "gpt-4")
+    task_group_id = await result_db.create_task_group(1, "gpt-4")
     task_id = await result_db.create_detection_task(
-        task_group_id, "dataset_001", "completed", datetime.now()
+        task_group_id, 1, "completed", datetime.now()
     )
     report_id = await result_db.create_detection_report(task_id)
     result_data_id = await result_db.append_result_data(
@@ -310,9 +322,9 @@ async def test_delete_result_data(result_db):
 @pytest.mark.asyncio
 async def test_cascade_delete_full_chain(result_db):
     """测试完整的级联删除链"""
-    task_group_id = await result_db.create_task_group("user_001", "gpt-4")
+    task_group_id = await result_db.create_task_group(1, "gpt-4")
     task_id = await result_db.create_detection_task(
-        task_group_id, "dataset_001", "completed", datetime.now()
+        task_group_id, 1, "completed", datetime.now()
     )
     report_id = await result_db.create_detection_report(task_id)
     await result_db.append_result_data(

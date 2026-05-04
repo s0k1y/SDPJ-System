@@ -48,7 +48,7 @@ class ResultDBInterface(Protocol):
 
     async def create_task_group(
         self,
-        user_id: str,
+        user_id: int,
         model_id: str
     ) -> str:
         """创建检测任务组
@@ -80,7 +80,7 @@ class ResultDBInterface(Protocol):
 
     async def list_task_groups(
         self,
-        user_id: Optional[str] = None,
+        user_id: Optional[int] = None,
         model_id: Optional[str] = None
     ) -> list[dict]:
         """查询检测任务组列表
@@ -116,7 +116,7 @@ class ResultDBInterface(Protocol):
     async def create_detection_task(
         self,
         task_group_id: str,
-        dataset_id: str,
+        dataset_id: int,
         task_status: str,
         start_time: datetime
     ) -> str:

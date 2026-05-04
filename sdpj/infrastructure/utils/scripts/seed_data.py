@@ -20,7 +20,11 @@ async def seed() -> None:
     await result_sm.create_tables()
     await user_sm.create_tables()
 
-    print("Database tables created. Seed data ready.")
+    from sdpj.infrastructure.database.sample_db.builtin_datasets import load_builtin_datasets
+    sample_db = SampleDB(sample_sm)
+    await load_builtin_datasets(sample_db)
+
+    print("Database tables created and builtin datasets loaded.")
 
 
 def main() -> None:

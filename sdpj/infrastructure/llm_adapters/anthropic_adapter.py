@@ -25,6 +25,16 @@ class AnthropicAdapter(LLMAdapter):
         self._api_key = api_key
         self._model_name = model_name or model_id
         self._timeout = timeout
+        self._session: aiohttp.ClientSession | None = None
+
+    def _get_session(self) -> aiohttp.ClientSession:
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession()
+        return self._session
+
+    async def close(self) -> None:
+        if self._session and not self._session.closed:
+            await self._session.close()
 
     async def call(
         self,
@@ -62,23 +72,23 @@ class AnthropicAdapter(LLMAdapter):
             payload["temperature"] = temperature
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    url,
-                    json=payload,
-                    headers=headers,
-                    timeout=aiohttp.ClientTimeout(total=actual_timeout),
-                ) as resp:
-                    data = await resp.json()
-                    if resp.status == 200:
-                        content = data["content"][0]["text"]
-                        return {
-                            "success": True,
-                            "content": content,
-                            "model": data.get("model", self._model_name),
-                            "usage": data.get("usage", {}),
-                        }
-                    self._raise_api_error(resp.status, data)
+            session = self._get_session()
+            async with session.post(
+                url,
+                json=payload,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=actual_timeout),
+            ) as resp:
+                data = await resp.json()
+                if resp.status == 200:
+                    content = data["content"][0]["text"]
+                    return {
+                        "success": True,
+                        "content": content,
+                        "model": data.get("model", self._model_name),
+                        "usage": data.get("usage", {}),
+                    }
+                self._raise_api_error(resp.status, data)
         except StandardizedLLMError:
             raise
         except aiohttp.ServerTimeoutError as e:

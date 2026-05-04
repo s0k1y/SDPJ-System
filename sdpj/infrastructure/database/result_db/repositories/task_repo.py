@@ -25,7 +25,7 @@ class TaskRepository:
         self,
         task_id: str,
         task_group_id: str,
-        dataset_id: str,
+        dataset_id: int,
         task_status: str,
         start_time: datetime
     ) -> DetectionTask:

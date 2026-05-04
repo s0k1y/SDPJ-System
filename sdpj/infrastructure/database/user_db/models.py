@@ -7,12 +7,8 @@
 from datetime import datetime
 from typing import Optional
 from sqlalchemy import String, Integer, Text, DateTime, ForeignKey, UniqueConstraint
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-
-
-class Base(DeclarativeBase):
-    """ORM 基类"""
-    pass
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sdpj.infrastructure.database.base import Base
 
 
 class User(Base):

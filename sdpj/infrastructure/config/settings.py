@@ -36,9 +36,7 @@ class Settings(BaseSettings):
 
     env: Literal["development", "test", "production"] = "development"
     debug: bool = True
-    sample_db_url: str = "sqlite+aiosqlite:///./data/db/sample.db"
-    result_db_url: str = "sqlite+aiosqlite:///./data/db/result.db"
-    user_db_url: str = "sqlite+aiosqlite:///./data/db/user.db"
+    db_url: str = "sqlite+aiosqlite:///./sdpj/infrastructure/database/sdpj.db"
     secret_key: str = ""
     adapters_dir: str = "~/.sdpj/adapters/"
     log_level: str = "INFO"

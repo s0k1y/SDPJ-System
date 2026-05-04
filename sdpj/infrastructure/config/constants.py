@@ -4,9 +4,9 @@ from pathlib import Path
 APP_NAME = "SDPJ-System"
 APP_VERSION = "1.0.0"
 
-DEFAULT_LOG_DIR = "data/logs"
-DEFAULT_REPORT_DIR = "data/reports"
-DEFAULT_UPLOAD_DIR = "data/uploads"
+DEFAULT_LOG_DIR = "sdpj/infrastructure/database/logs"
+DEFAULT_REPORT_DIR = "sdpj/infrastructure/database/reports"
+DEFAULT_UPLOAD_DIR = "sdpj/infrastructure/database/uploads"
 
 USER_CONFIG_DIR_NAME = ".sdpj"
 SECRET_KEY_FILENAME = "secret.key"

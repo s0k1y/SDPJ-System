@@ -6,12 +6,15 @@ from typing import Optional
 
 from sdpj.drivers.data_processor_interface import DataProcessorInterface
 from sdpj.drivers.llm_service_interface import LLMServiceInterface
-from sdpj.drivers.llm_types import LLMError
+from sdpj.drivers.llm_service_interface import LLMServiceInstanceProtocol, LLMError
+from sdpj.infrastructure.llm_adapters.errors import StandardizedLLMError
 
 from . import prompt_builder, result_parser
 
 _MODALITY_MAP = {"图像": "image", "image": "image", "音频": "audio", "audio": "audio", "视频": "video", "video": "video"}
 _ENCODING_MAP = {"base64": "base64", "url": "url", "unicode": "unicode_escape", "hex": "hex", "十六进制": "hex"}
+
+_CONCURRENCY = 10
 
 
 def _prepare_poc(poc: str, subtype: str, dp: DataProcessorInterface) -> str:
@@ -44,32 +47,32 @@ async def select_best_poc(
     dataset_id: Optional[str] = None,
 ) -> Optional[str]:
     """Algorithm 1 Step 1: 遍历越狱数据集，筛选最优 PoC"""
-    datasets = await data_processor.load_dataset_by_risk_type("越狱攻击")
+    datasets = await data_processor.load_dataset_by_risk_type("jailbreak")
     if dataset_id is not None:
         datasets = [ds for ds in datasets if ds.get("dataset_id") == dataset_id]
     if not datasets:
         return None
 
     instance = await llm.get_service_instance(model_id)
-    successful: list[str] = []
+    sem = asyncio.Semaphore(_CONCURRENCY)
 
-    for ds in datasets:
-        for sample in ds.get("samples", []):
-            poc = sample.get("poc", "")
-            subtype = sample.get("subtype", "")
-            if not poc:
-                continue
-            prepared = _prepare_poc(poc, subtype, data_processor)
+    async def _check(sample) -> Optional[str]:
+        poc = sample.get("poc", "")
+        subtype = sample.get("subtype", "")
+        if not poc:
+            return None
+        prepared = _prepare_poc(poc, subtype, data_processor)
+        async with sem:
             try:
                 resp = await _call_llm(llm, instance, "", prepared)
-                if result_parser.is_jailbreak_success(resp):
-                    successful.append(poc)
+                return poc if result_parser.is_jailbreak_success(resp) else None
             except LLMError:
-                continue
+                return None
 
-    if not successful:
-        return None
-    return min(successful, key=len)
+    all_samples = [s for ds in datasets for s in ds.get("samples", [])]
+    results = await asyncio.gather(*[_check(s) for s in all_samples])
+    successful = [r for r in results if r is not None]
+    return min(successful, key=len) if successful else None
 
 
 async def run_static_detection(
@@ -77,21 +80,28 @@ async def run_static_detection(
     data_processor: DataProcessorInterface,
     model_id: str,
     user_id: str,
+    dataset_ids: list[int] | None = None,
 ) -> dict:
     """执行完整的静态检测算法 (Algorithm 1)"""
-    best_poc = await select_best_poc(llm, data_processor, model_id)
-    if best_poc is None:
-        return {"status": "no_jailbreak_risk", "task_group_id": None}
-
-    judge_template = prompt_builder.build_judge_template(best_poc)
+    all_datasets = await data_processor.get_all_datasets()
+    non_jailbreak = [ds for ds in all_datasets if ds.get("risk_type") != "jailbreak"]
+    if dataset_ids is not None:
+        non_jailbreak = [ds for ds in non_jailbreak if ds["dataset_id"] in dataset_ids]
 
     task_group_id = await data_processor.create_task_group(user_id, model_id)
-    instance = await llm.get_service_instance(model_id)
 
-    all_datasets = await data_processor.get_all_datasets()
-    non_jailbreak = [
-        ds for ds in all_datasets if ds.get("risk_type") != "越狱攻击"
-    ]
+    best_poc = await select_best_poc(llm, data_processor, model_id)
+    if best_poc is None:
+        for ds_meta in non_jailbreak:
+            task_id = await data_processor.create_detection_task(
+                task_group_id, ds_meta["dataset_id"], "no_jailbreak_risk", datetime.now()
+            )
+            await data_processor.update_task_status(task_id, "no_jailbreak_risk", datetime.now())
+        return {"status": "no_jailbreak_risk", "task_group_id": task_group_id}
+
+    judge_template = prompt_builder.build_judge_template(best_poc)
+    instance = await llm.get_service_instance(model_id)
+    sem = asyncio.Semaphore(_CONCURRENCY)
 
     for ds_meta in non_jailbreak:
         ds_id = ds_meta["dataset_id"]
@@ -101,29 +111,27 @@ async def run_static_detection(
         report_id = await data_processor.create_detection_report(task_id)
 
         datasets = await data_processor.load_dataset_by_risk_type(ds_meta["risk_type"])
-        for ds in datasets:
-            if ds["dataset_id"] != ds_id:
-                continue
-            for sample in ds.get("samples", []):
-                poc = sample.get("poc", "")
-                subtype = sample.get("subtype", "")
-                prepared = _prepare_poc(poc, subtype, data_processor)
+        samples = next(
+            (ds.get("samples", []) for ds in datasets if ds["dataset_id"] == ds_id), []
+        )
+
+        async def _process(sample, _report_id=report_id):
+            poc = sample.get("poc", "")
+            subtype = sample.get("subtype", "")
+            prepared = _prepare_poc(poc, subtype, data_processor)
+            async with sem:
                 try:
                     resp = await _call_llm(llm, instance, "", prepared)
                     output_text = result_parser.extract_model_output(resp)
-
                     judge_input = prompt_builder.build_judge_input(judge_template, output_text)
                     judge_resp = await _call_llm(llm, instance, "", judge_input)
                     judgment = result_parser.parse_compliance_judgment(judge_resp)
-
-                    await data_processor.append_result_data(
-                        report_id, subtype, output_text, judgment
-                    )
                 except StandardizedLLMError as e:
-                    await data_processor.append_result_data(
-                        report_id, subtype, f"[ERROR] {e.message}", "违规"
-                    )
+                    output_text = f"[ERROR] {e.message}"
+                    judgment = "违规"
+            await data_processor.append_result_data(_report_id, subtype, output_text, judgment)
 
+        await asyncio.gather(*[_process(s) for s in samples])
         await data_processor.update_task_status(task_id, "completed", datetime.now())
 
     return {

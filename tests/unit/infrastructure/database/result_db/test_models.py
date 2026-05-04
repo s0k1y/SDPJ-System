@@ -18,12 +18,21 @@ from sdpj.infrastructure.database.result_db.models import (
 @pytest.fixture
 async def async_session():
     """创建测试用的异步数据库会话"""
+    from sdpj.infrastructure.database.user_db.models import User  # noqa
+    from sdpj.infrastructure.database.sample_db.models import Dataset  # noqa
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
     async_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with async_session_maker() as session:
+        session.add_all([
+            User(username="u1", password="pw"),
+            Dataset(name="ds1", risk_type="jailbreak"),
+        ])
+        await session.commit()
 
     async with async_session_maker() as session:
         yield session
@@ -36,14 +45,14 @@ async def test_task_group_creation(async_session):
     """测试任务组创建"""
     task_group = TaskGroup(
         task_group_id="tg_001",
-        user_id="user_001",
+        user_id=1,
         model_id="gpt-4"
     )
     async_session.add(task_group)
     await async_session.commit()
 
     assert task_group.task_group_id == "tg_001"
-    assert task_group.user_id == "user_001"
+    assert task_group.user_id == 1
     assert task_group.model_id == "gpt-4"
 
 
@@ -52,7 +61,7 @@ async def test_detection_task_creation(async_session):
     """测试检测任务创建"""
     task_group = TaskGroup(
         task_group_id="tg_001",
-        user_id="user_001",
+        user_id=1,
         model_id="gpt-4"
     )
     async_session.add(task_group)
@@ -62,7 +71,7 @@ async def test_detection_task_creation(async_session):
     task = DetectionTask(
         task_id="task_001",
         task_group_id="tg_001",
-        dataset_id="dataset_001",
+        dataset_id=1,
         task_status="running",
         start_time=start_time
     )
@@ -79,7 +88,7 @@ async def test_detection_report_creation(async_session):
     """测试检测报告创建"""
     task_group = TaskGroup(
         task_group_id="tg_001",
-        user_id="user_001",
+        user_id=1,
         model_id="gpt-4"
     )
     async_session.add(task_group)
@@ -88,7 +97,7 @@ async def test_detection_report_creation(async_session):
     task = DetectionTask(
         task_id="task_001",
         task_group_id="tg_001",
-        dataset_id="dataset_001",
+        dataset_id=1,
         task_status="completed",
         start_time=datetime.now()
     )
@@ -111,7 +120,7 @@ async def test_result_data_creation(async_session):
     """测试结果数据创建"""
     task_group = TaskGroup(
         task_group_id="tg_001",
-        user_id="user_001",
+        user_id=1,
         model_id="gpt-4"
     )
     async_session.add(task_group)
@@ -120,7 +129,7 @@ async def test_result_data_creation(async_session):
     task = DetectionTask(
         task_id="task_001",
         task_group_id="tg_001",
-        dataset_id="dataset_001",
+        dataset_id=1,
         task_status="completed",
         start_time=datetime.now()
     )
@@ -154,7 +163,7 @@ async def test_cascade_delete_task_group(async_session):
     """测试任务组级联删除"""
     task_group = TaskGroup(
         task_group_id="tg_001",
-        user_id="user_001",
+        user_id=1,
         model_id="gpt-4"
     )
     async_session.add(task_group)
@@ -163,7 +172,7 @@ async def test_cascade_delete_task_group(async_session):
     task = DetectionTask(
         task_id="task_001",
         task_group_id="tg_001",
-        dataset_id="dataset_001",
+        dataset_id=1,
         task_status="completed",
         start_time=datetime.now()
     )

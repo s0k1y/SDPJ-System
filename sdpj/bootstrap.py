@@ -27,11 +27,40 @@ def build_scheduler() -> StateSchedulerInterface:
     from sdpj.infrastructure.config.settings import get_settings
     cfg = get_settings()
 
+    from sqlalchemy import event as _event
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy.pool import NullPool, StaticPool
+    _is_memory = ":memory:" in cfg.db_url
+    _engine = create_async_engine(
+        cfg.db_url,
+        poolclass=StaticPool if _is_memory else NullPool,
+        connect_args={"check_same_thread": False},
+    )
+    if "sqlite" in cfg.db_url:
+        @_event.listens_for(_engine.sync_engine, "connect")
+        def _enable_fk(dbapi_conn, connection_record):
+            cursor = dbapi_conn.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.close()
+
     utils = UtilsLib()
     adapter_lib = LLMAdapterLib()
-    sample_db = SampleDB(SampleDBSessionManager(cfg.sample_db_url))
-    result_db = ResultDB(ResultDBSessionManager(cfg.result_db_url))
-    user_db = UserDB(UserDBSessionManager(cfg.user_db_url))
+    sample_sm = SampleDBSessionManager(cfg.db_url, engine=_engine)
+    result_sm = ResultDBSessionManager(cfg.db_url, engine=_engine)
+    user_sm = UserDBSessionManager(cfg.db_url, engine=_engine)
+
+    from sdpj.infrastructure.database.sample_db.builtin_datasets import load_builtin_datasets
+
+    async def _init_db():
+        await user_sm.create_tables()
+        await sample_sm.create_tables()
+        await result_sm.create_tables()
+        await load_builtin_datasets(sample_db)
+
+    sample_db = SampleDB(sample_sm)
+    result_db = ResultDB(result_sm)
+    user_db = UserDB(user_sm)
     uc = UserCenter(user_db)
     dp = DataProcessor(sample_db, result_db, utils)
     llm = LLMService(adapter_lib, utils)
@@ -47,4 +76,5 @@ def build_scheduler() -> StateSchedulerInterface:
         task_queue_manager=TaskQueueManager(),
         secure_comm_manager=SecureCommManager(),
         llm_registry=reg,
+        db_initializer=_init_db,
     )

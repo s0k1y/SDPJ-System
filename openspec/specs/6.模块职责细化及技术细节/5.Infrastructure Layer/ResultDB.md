@@ -119,7 +119,20 @@ ResultDB / 检测结果数据库模块
 依赖模块:无
 应实现接口:ResultDBInterface
 被依赖模块:DataProcessor
-技术细节:(暂定)
+技术细节:
+
+## 逻辑设计问题：跨库外键 → 数据完整性崩溃
+
+原始设计将三个数据库模块分别对应三个独立 SQLite 文件（`sample.db` / `result.db` / `user.db`）。
+ResultDB 的关系模型中存在两条跨库外键：
+
+- `TaskGroup.user_id` → UserDB.用户(用户ID)
+- `DetectionTask.dataset_id` → SampleDB.安全风险检测数据集(数据集ID)
+
+**问题根源**：SQLite 的外键约束（`FOREIGN KEY ... REFERENCES`）仅在同一数据库连接内有效，无法跨越独立文件边界执行。即使通过 `ATTACH DATABASE` 挂载其他文件，SQLAlchemy 的 `create_all` 在执行拓扑排序（`sort_tables_and_constraints`）时也无法解析跨 `MetaData` 的外键引用，导致建表失败。
+
+**后果**：若维持三文件结构，上述两条外键只能作为"软引用"（注释说明，无约束声明），数据完整性完全依赖应用层调用方自行保证。一旦调用方传入不存在的 user_id 或 dataset_id，数据库不会拒绝写入，孤儿记录将静默积累，数据完整性实质上已崩溃。
+
 
 
 实体:
@@ -148,3 +161,19 @@ ResultDB / 检测结果数据库模块
 检测报告(检测报告ID[主键], 任务ID[外键_检测任务(任务ID)])
 检测结果数据(结果数据ID[主键], 检测报告ID[外键_检测报告(检测报告ID)], 风险具体子类, 被测大模型输出内容, 合规判断结果)
 在此基础上进行数据表设计，得到对应的五张数据表，即可实现该模块基本功能。
+
+
+# 物理结构合并决策
+
+将三个模块的全部数据表合并到单一 SQLite 文件 `data/db/sdpj.db`，配置项统一为：
+
+```
+db_url = "sqlite+aiosqlite:///./data/db/sdpj.db"
+```
+
+实现要点：
+- 三个模块的 ORM 模型共用同一个 `Base`（`sdpj/infrastructure/database/base.py`），使所有表注册到同一 `MetaData`，SQLAlchemy 拓扑排序可正确解析跨模块外键
+- 建表顺序：UserDB 表 → SampleDB 表 → ResultDB 表（被引用表先建）
+- 启用 `PRAGMA foreign_keys=ON`，由数据库引擎强制执行所有外键约束（含跨模块引用）
+- 启用 `PRAGMA journal_mode=WAL`，使用 WAL（Write-Ahead Logging）模式，允许读写并发而不互相阻塞，避免检测任务写入结果时前端查询被锁等待
+- 三个模块各自的 `SessionManager` 均连接同一文件，模块间逻辑隔离通过接口层（`SampleDBInterface` / `ResultDBInterface` / `UserDBInterface`）维持，物理上共享同一连接池

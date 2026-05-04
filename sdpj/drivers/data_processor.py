@@ -127,14 +127,10 @@ class DataProcessor:
 
     # ==================== 检测结果的持久化 ====================
 
-    async def create_task_group(
-        self,
-        user_id: str,
-        model_id: str
-    ) -> str:
-        """开设检测任务组"""
+    async def create_task_group(self, user_id: str, model_id: str) -> str:
+        """开设检测任务组（若被测大模型未登记则先行入表）"""
         await self._result_db.register_target_model(model_id)
-        task_group_id = await self._result_db.create_task_group(user_id, model_id)
+        task_group_id = await self._result_db.create_task_group(int(user_id), model_id)
         return task_group_id
 
     async def create_detection_task(
@@ -158,7 +154,7 @@ class DataProcessor:
         # 将 dataset_id 转换为字符串以符合 ResultDB 接口
         task_id = await self._result_db.create_detection_task(
             task_group_id=task_group_id,
-            dataset_id=str(dataset_id),
+            dataset_id=dataset_id,
             task_status=task_status,
             start_time=start_time
         )
@@ -297,7 +293,7 @@ class DataProcessor:
             任务组元信息列表
         """
         return await self._result_db.list_task_groups(
-            user_id=user_id,
+            user_id=int(user_id) if user_id else None,
             model_id=model_id
         )
 
@@ -364,15 +360,21 @@ class DataProcessor:
     async def export_report_file(
         self,
         report_data: dict,
-        target_format: Literal["json", "yaml"]
+        target_format: Literal["json", "yaml", "jsonl"]
     ) -> str:
-        content = (
-            self._utils.serialize_json(report_data)
-            if target_format == "json"
-            else self._utils.serialize_yaml(report_data)
-        )
+        if target_format == "jsonl":
+            lines = [
+                self._utils.serialize_json(r)
+                for task in report_data.get("tasks", [])
+                for r in task.get("results", [])
+            ]
+            content = "\n".join(lines)
+        elif target_format == "json":
+            content = self._utils.serialize_json(report_data)
+        else:
+            content = self._utils.serialize_yaml(report_data)
         task_group_id = report_data.get("task_group_id", "unknown")
-        export_dir = Path("data/reports/exports")
+        export_dir = Path("sdpj/infrastructure/database/reports/exports")
         export_dir.mkdir(parents=True, exist_ok=True)
         path = export_dir / f"{task_group_id}.{target_format}"
         self._utils.write_file(str(path), content)

@@ -110,7 +110,15 @@ UserDB / 用户信息数据库模块
 依赖模块:无
 应实现接口:UserDBInterface
 被依赖模块:UserCenter
-技术细节:(暂定)
+技术细节:
+
+# 物理结构合并
+
+UserDB 的数据表（`User`、`Resource`、`AccessControl`、`PrivateConfig`）与 SampleDB、ResultDB 的数据表合并存储于同一 SQLite 文件 `data/db/sdpj.db`。
+
+原因：ResultDB 的 `TaskGroup.user_id` 引用本模块的 `User.user_id`。若两模块使用独立文件，该外键无法被 SQLite 引擎强制执行（跨文件外键约束不可用），数据完整性将崩溃。合并后由数据库引擎通过 `PRAGMA foreign_keys=ON` 统一执行所有约束。
+
+模块间逻辑隔离通过 `UserDBInterface` 接口层维持，物理合并不影响模块边界。
 
 用户信息数据库模块:存储用户账号信息，并进一步实现自主访问控制列表。
 在自主访问控制列表的基础逻辑上，设计符合数据库规范性3NF标准的关系模型，得：

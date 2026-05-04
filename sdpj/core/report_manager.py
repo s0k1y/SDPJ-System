@@ -127,7 +127,7 @@ class ReportManager:
             return False, str(e)
 
     async def export_report(
-        self, task_group_id: str, target_format: Literal["json", "yaml"] = "json"
+        self, task_group_id: str, target_format: Literal["json", "yaml", "jsonl"] = "json"
     ) -> str:
         aggregated = await self._data_processor.aggregate_task_group_results(task_group_id)
         return await self._data_processor.export_report_file(aggregated, target_format)

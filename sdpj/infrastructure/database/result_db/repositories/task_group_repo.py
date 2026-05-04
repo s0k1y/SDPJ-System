@@ -21,7 +21,7 @@ class TaskGroupRepository:
         """
         self.session = session
 
-    async def create(self, user_id: str, model_id: str) -> TaskGroup:
+    async def create(self, user_id: int, model_id: str) -> TaskGroup:
         """创建检测任务组
 
         Args:
@@ -56,7 +56,7 @@ class TaskGroupRepository:
 
     async def list_all(
         self,
-        user_id: Optional[str] = None,
+        user_id: Optional[int] = None,
         model_id: Optional[str] = None
     ) -> list[TaskGroup]:
         """查询任务组列表

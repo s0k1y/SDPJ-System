@@ -5,7 +5,7 @@
 
 import pytest
 from sdpj.infrastructure.database.result_db.session import SessionManager
-from sdpj.infrastructure.database.result_db.models import Base, TaskGroup
+from sdpj.infrastructure.database.result_db.models import Base, TaskGroup, TargetModel
 
 
 @pytest.fixture
@@ -13,6 +13,10 @@ async def session_manager():
     """创建测试用的会话管理器"""
     manager = SessionManager("sqlite+aiosqlite:///:memory:", echo=False)
     await manager.create_tables()
+    from sdpj.infrastructure.database.user_db.models import User
+    async with manager.session() as session:
+        session.add(User(username="test_user", password="pw"))
+        session.add(TargetModel(model_id="m1"))
     yield manager
     await manager.close()
 
@@ -31,7 +35,7 @@ async def test_session_manager_initialization():
 async def test_create_tables(session_manager):
     """测试创建表"""
     async with session_manager.session() as session:
-        tg = TaskGroup(task_group_id="test-tg", user_id="u1", model_id="m1")
+        tg = TaskGroup(task_group_id="test-tg", user_id=1, model_id="m1")
         session.add(tg)
         await session.commit()
 
@@ -46,7 +50,7 @@ async def test_create_tables(session_manager):
 async def test_session_context_manager(session_manager):
     """测试会话上下文管理器"""
     async with session_manager.session() as session:
-        tg = TaskGroup(task_group_id="context-test", user_id="u1", model_id="m1")
+        tg = TaskGroup(task_group_id="context-test", user_id=1, model_id="m1")
         session.add(tg)
 
     async with session_manager.session() as session:
@@ -61,7 +65,7 @@ async def test_session_rollback_on_exception(session_manager):
     """测试异常时自动回滚"""
     try:
         async with session_manager.session() as session:
-            tg = TaskGroup(task_group_id="rollback-test", user_id="u1", model_id="m1")
+            tg = TaskGroup(task_group_id="rollback-test", user_id=1, model_id="m1")
             session.add(tg)
             await session.flush()
             raise ValueError("Test exception")
@@ -78,11 +82,15 @@ async def test_session_rollback_on_exception(session_manager):
 @pytest.mark.asyncio
 async def test_drop_tables():
     """测试删除表"""
+    from sdpj.infrastructure.database.user_db.models import User
     manager = SessionManager("sqlite+aiosqlite:///:memory:")
     await manager.create_tables()
 
     async with manager.session() as session:
-        tg = TaskGroup(task_group_id="drop-test", user_id="u1", model_id="m1")
+        session.add(User(username="u", password="pw"))
+        session.add(TargetModel(model_id="m1"))
+        await session.flush()
+        tg = TaskGroup(task_group_id="drop-test", user_id=1, model_id="m1")
         session.add(tg)
 
     await manager.drop_tables()

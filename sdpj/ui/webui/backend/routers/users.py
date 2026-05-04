@@ -11,23 +11,27 @@ router = APIRouter(prefix="/api/users", tags=["users"])
 @router.post("/account")
 async def account_operation(
     req: AccountOperationRequest,
+    request: Request,
     scheduler: StateSchedulerInterface = Depends(get_scheduler),
 ):
-    return await scheduler.schedule_account_operation(req.operation, req.params)
+    params = {**req.params, "user_id": request.state.user_id}
+    return await scheduler.schedule_account_operation(req.operation, params)
 
 
 @router.get("/profile")
 async def profile(
+    request: Request,
     scheduler: StateSchedulerInterface = Depends(get_scheduler),
 ):
-    return await scheduler.schedule_account_operation("get_profile", {})
+    return await scheduler.schedule_account_operation("get_profile", {"user_id": request.state.user_id})
 
 
 @router.get("/resources")
 async def resources(
+    request: Request,
     scheduler: StateSchedulerInterface = Depends(get_scheduler),
 ):
-    return await scheduler.schedule_account_operation("list_resources", {})
+    return await scheduler.schedule_account_operation("list_resources", {"user_id": request.state.user_id})
 
 
 @router.post("/dac")

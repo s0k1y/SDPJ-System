@@ -2,7 +2,10 @@
 from enum import Enum
 from typing import Any
 
-from sdpj.drivers.llm_types import LLMError
+
+class LLMError(Exception):
+    """LLM 错误基类"""
+    pass
 
 
 class ErrorCategory(Enum):

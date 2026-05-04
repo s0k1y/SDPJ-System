@@ -37,6 +37,7 @@ class StateScheduler(StateSchedulerInterface):
         task_queue_manager: TaskQueueManagerInterface,
         secure_comm_manager: SecureCommManagerInterface,
         llm_registry: LLMRegistryInterface,
+        db_initializer=None,
     ):
         self._account = account_manager
         self._dac = dac_manager
@@ -48,12 +49,15 @@ class StateScheduler(StateSchedulerInterface):
         self._task_queue = task_queue_manager
         self._secure_comm = secure_comm_manager
         self._registry = llm_registry
+        self._db_initializer = db_initializer
         self._state_callbacks: list = []
         self._error_callbacks: list = []
 
     # ── 内部日志辅助 ──
 
     async def startup(self) -> None:
+        if self._db_initializer is not None:
+            await self._db_initializer()
         await self._registry.initialize()
 
     async def shutdown(self) -> None:
@@ -119,17 +123,19 @@ class StateScheduler(StateSchedulerInterface):
         user_id = str(task_params["user_id"])
         detection_type = task_params.get("detection_type", "static")
         max_iterations = task_params.get("max_iterations", 3)
+        raw_ds_id = task_params.get("dataset_id")
+        dataset_ids = [int(raw_ds_id)] if raw_ds_id is not None else None
 
         try:
             if detection_type == "static":
-                result = await self._detector.run_static_detection(model_id, user_id)
+                result = await self._detector.run_static_detection(model_id, user_id, dataset_ids)
             elif detection_type == "dynamic":
                 static_result = task_params.get("static_result", {})
                 result = await self._detector.run_dynamic_detection(
                     model_id, user_id, static_result, max_iterations
                 )
             else:
-                static_result = await self._detector.run_static_detection(model_id, user_id)
+                static_result = await self._detector.run_static_detection(model_id, user_id, dataset_ids)
                 if static_result["status"] != "completed":
                     result = static_result
                 else:
@@ -161,6 +167,7 @@ class StateScheduler(StateSchedulerInterface):
                 "model_id": task.model_id,
                 "user_id": task.user_id,
                 "detection_type": task.algorithm_type,
+                "dataset_id": task.dataset_id,
                 "max_iterations": task.metadata.get("max_iterations", 3),
             }
             return await self.execute_detection_task(task.task_id, params)
@@ -178,6 +185,7 @@ class StateScheduler(StateSchedulerInterface):
                 self._notify_state()
             except Exception as e:
                 self._log_err("FSMError", f"detection_done 状态转换失败: {e}")
+        return {"success": True, "tasks": results}
 
     async def query_detection_progress(self, task_id: Optional[str] = None) -> dict:
         if task_id is not None:
@@ -374,8 +382,11 @@ class StateScheduler(StateSchedulerInterface):
         return await handler(params)
 
     async def _op_change_password(self, p: dict) -> dict:
-        ok, msg = await self._account.change_password(p["old_password"], p["new_password"])
-        self._log_op(0, "change_password", {})
+        user_id = p.get("user_id")
+        if user_id is None:
+            return {"success": False, "error": "缺少 user_id"}
+        ok, msg = await self._account.change_password_for_user(int(user_id), p["old_password"], p["new_password"])
+        self._log_op(user_id, "change_password", {})
         return {"success": ok, "message": msg}
 
     async def _op_switch_account(self, p: dict) -> dict:
@@ -394,19 +405,26 @@ class StateScheduler(StateSchedulerInterface):
         self._log_op(p["user_id"], "unregister", {})
         return {"success": ok, "message": msg}
 
-    async def _op_get_profile(self, _p: dict) -> dict:
-        profile = await self._account.get_current_user_profile()
+    async def _op_get_profile(self, p: dict) -> dict:
+        user_id = p.get("user_id")
+        if user_id is None:
+            return {"success": False, "error": "缺少 user_id"}
+        profile = await self._account.get_profile_for_user(int(user_id))
         return {"success": profile is not None, "profile": profile}
 
     async def _op_update_profile(self, p: dict) -> dict:
+        user_id = p.get("user_id")
         username = p.get("username")
-        if not username:
-            return {"success": False, "error": "username 不能为空"}
-        ok = await self._account.update_username(username)
+        if not user_id or not username:
+            return {"success": False, "error": "user_id 和 username 不能为空"}
+        ok = await self._account.update_username_for_user(int(user_id), username)
         return {"success": ok}
 
-    async def _op_list_resources(self, _p: dict) -> dict:
-        resources = await self._account.list_user_resources()
+    async def _op_list_resources(self, p: dict) -> dict:
+        user_id = p.get("user_id")
+        if user_id is None:
+            return {"success": False, "error": "缺少 user_id"}
+        resources = await self._account.list_resources_for_user(int(user_id))
         return {"success": True, "resources": resources}
 
     # ── 权限授权调度 (职责 15-16) ──

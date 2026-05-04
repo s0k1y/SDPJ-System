@@ -22,17 +22,13 @@ class SessionManager:
     负责创建和管理异步数据库引擎和会话。
     """
 
-    def __init__(self, database_url: str, echo: bool = False):
-        """初始化会话管理器
-
-        Args:
-            database_url: 数据库连接URL
-            echo: 是否输出SQL语句
-        """
+    def __init__(self, database_url: str, echo: bool = False, engine: Optional[AsyncEngine] = None):
         self.database_url = database_url
         self.echo = echo
-        self.engine: Optional[AsyncEngine] = None
+        self.engine: Optional[AsyncEngine] = engine
         self.async_session_maker = None
+        if engine is not None:
+            self.async_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async def initialize(self) -> None:
         """初始化数据库引擎和会话工厂"""
@@ -61,6 +57,8 @@ class SessionManager:
 
     async def create_tables(self) -> None:
         """创建所有表"""
+        from sdpj.infrastructure.database.user_db.models import User  # noqa
+        from sdpj.infrastructure.database.sample_db.models import Dataset  # noqa
         if self.engine is None:
             await self.initialize()
         async with self.engine.begin() as conn:

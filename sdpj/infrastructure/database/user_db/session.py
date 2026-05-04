@@ -27,33 +27,25 @@ class UserDBSessionManager:
     - 提供会话上下文管理器
     """
 
-    def __init__(self, database_url: str, echo: bool = False):
-        """初始化会话管理器
-
-        Args:
-            database_url: 数据库连接 URL（例如：sqlite+aiosqlite:///path/to/db.sqlite）
-            echo: 是否输出 SQL 日志
-        """
-        is_memory = ":memory:" in database_url
-        self._engine: AsyncEngine = create_async_engine(
-            database_url,
-            echo=echo,
-            poolclass=StaticPool if is_memory else NullPool,
-            connect_args={"check_same_thread": False}
-        )
-
-        if "sqlite" in database_url:
-            @event.listens_for(self._engine.sync_engine, "connect")
-            def _enable_fk(dbapi_conn, connection_record):
-                cursor = dbapi_conn.cursor()
-                cursor.execute("PRAGMA foreign_keys=ON")
-                cursor.close()
+    def __init__(self, database_url: str, echo: bool = False, engine: AsyncEngine = None):
+        if engine is not None:
+            self._engine = engine
+        else:
+            is_memory = ":memory:" in database_url
+            self._engine: AsyncEngine = create_async_engine(
+                database_url,
+                echo=echo,
+                poolclass=StaticPool if is_memory else NullPool,
+                connect_args={"check_same_thread": False}
+            )
+            if "sqlite" in database_url:
+                @event.listens_for(self._engine.sync_engine, "connect")
+                def _enable_fk(dbapi_conn, connection_record):
+                    cursor = dbapi_conn.cursor()
+                    cursor.execute("PRAGMA foreign_keys=ON")
+                    cursor.close()
         self._session_factory = async_sessionmaker(
-            self._engine,
-            class_=AsyncSession,
-            expire_on_commit=False,
-            autoflush=False,
-            autocommit=False
+            self._engine, class_=AsyncSession, expire_on_commit=False, autoflush=False, autocommit=False
         )
 
     async def initialize(self) -> None:
