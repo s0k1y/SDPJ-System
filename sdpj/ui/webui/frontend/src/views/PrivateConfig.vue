@@ -9,16 +9,14 @@
     <el-table :data="configs" v-loading="loading">
       <el-table-column prop="config_id" label="配置ID" width="100" />
       <el-table-column prop="resource_id" label="资源ID" width="100" />
-      <el-table-column label="操作" width="220">
+      <el-table-column label="操作" width="100">
         <template #default="{ row }">
-          <el-button size="small" @click="openEdit(row)">编辑</el-button>
-          <el-button size="small" @click="exportConfig(row.config_id)">导出</el-button>
           <el-button size="small" type="danger" @click="deleteConfig(row.config_id)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑配置' : '新建配置'" width="600px">
+    <el-dialog v-model="dialogVisible" title="新建配置" width="600px">
       <el-form>
         <el-form-item label="配置内容 (JSON)">
           <el-input v-model="configJson" type="textarea" :rows="10" placeholder='{"key": "value"}' />
@@ -48,14 +46,13 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { detectionConfig } from '../api/detection'
-import { encryptPassword, decryptData } from '../utils/crypto'
+import { encryptPassword } from '../utils/crypto'
 import PageLayout from '../components/common/PageLayout.vue'
 
 const configs = ref([])
 const loading = ref(false)
 const dialogVisible = ref(false)
 const importVisible = ref(false)
-const editingId = ref(null)
 const configJson = ref('')
 const importJson = ref('')
 const saving = ref(false)
@@ -81,38 +78,7 @@ const loadList = async () => {
 }
 
 const openCreate = () => {
-  editingId.value = null
   configJson.value = ''
-  dialogVisible.value = true
-}
-
-const openEdit = async (row) => {
-  editingId.value = row.config_id
-  try {
-    const res = await detectionConfig('read', { config_id: row.config_id })
-    if (res.success && res.config_content) {
-      // 服务端已解密，直接解析
-      let content = res.config_content
-      if (typeof content === 'string') {
-        try {
-          content = JSON.parse(content)
-        } catch {
-          // 如果解析失败，直接使用字符串
-        }
-      }
-      // 格式化显示
-      configJson.value = typeof content === 'object'
-        ? JSON.stringify(content, null, 2)
-        : content
-    } else {
-      ElMessage.warning('无法读取配置内容')
-      configJson.value = ''
-    }
-  } catch (error) {
-    console.error('读取配置失败:', error)
-    ElMessage.error('读取配置失败')
-    configJson.value = ''
-  }
   dialogVisible.value = true
 }
 
@@ -126,18 +92,15 @@ const saveConfig = async () => {
   }
   saving.value = true
   try {
-    const op = editingId.value ? 'update' : 'create'
-
     // 加密配置内容
     const encryptedContent = await encryptConfig(content)
 
-    const params = editingId.value
-      ? { config_id: editingId.value, config_content: encryptedContent, is_encrypted: true }
-      : { config_content: encryptedContent, is_encrypted: true }
-
-    const res = await detectionConfig(op, params)
+    const res = await detectionConfig('create', {
+      config_content: encryptedContent,
+      is_encrypted: true
+    })
     if (res.success) {
-      ElMessage.success(editingId.value ? '更新成功' : '创建成功')
+      ElMessage.success('创建成功')
       dialogVisible.value = false
       await loadList()
     } else {
@@ -158,35 +121,6 @@ const deleteConfig = async (configId) => {
     await loadList()
   } else {
     ElMessage.error(res.error || '删除失败')
-  }
-}
-
-const exportConfig = async (configId) => {
-  try {
-    const res = await detectionConfig('export', { config_id: configId, target_format: 'json' })
-    if (res.success) {
-      let content = res.file_content
-
-      // 服务端已解密，直接使用
-      if (typeof content === 'object') {
-        content = JSON.stringify(content, null, 2)
-      }
-
-      // 创建下载
-      const blob = new Blob([content], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `config_${configId}.json`
-      a.click()
-      URL.revokeObjectURL(url)
-      ElMessage.success('导出成功')
-    } else {
-      ElMessage.error(res.error || '导出失败')
-    }
-  } catch (error) {
-    console.error('导出失败:', error)
-    ElMessage.error('导出失败')
   }
 }
 
