@@ -3,12 +3,12 @@ import { encryptPassword } from '../utils/crypto'
 
 export async function login(username, password) {
   const enc = await encryptPassword(password)
-  return api.post('/auth/login', { username, password: enc })
+  return api.post('/auth/login', { username, password: enc, is_encrypted: true })
 }
 
 export async function register(username, password) {
   const enc = await encryptPassword(password)
-  return api.post('/auth/register', { username, password: enc })
+  return api.post('/auth/register', { username, password: enc, is_encrypted: true })
 }
 
 export async function logout() {

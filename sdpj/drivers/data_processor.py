@@ -11,6 +11,8 @@ from typing import Optional, Literal, Any, Union
 from pathlib import Path
 from datetime import datetime
 
+from sdpj.infrastructure.config.settings import get_settings
+
 from sdpj.infrastructure.database.sample_db.interface import SampleDBInterface
 from sdpj.infrastructure.database.result_db.interface import ResultDBInterface
 from sdpj.infrastructure.utils.utils_interface import UtilsInterface
@@ -197,16 +199,20 @@ class DataProcessor:
         self,
         report_id: str,
         risk_subclass: str,
+        poc: str,
         model_output: str,
-        compliance_result: str
+        compliance_result: str,
+        iteration_count: Optional[int] = None
     ) -> str:
         """追加单条检测结果数据
 
         Args:
             report_id: 检测报告 ID
             risk_subclass: 风险具体子类
+            poc: 原始PoC
             model_output: 被测大模型输出内容
             compliance_result: 合规判断结果
+            iteration_count: 动态检测迭代次数（可选）
 
         Returns:
             新创建结果条目的结果数据 ID
@@ -214,8 +220,10 @@ class DataProcessor:
         return await self._result_db.append_result_data(
             report_id=report_id,
             risk_subclass=risk_subclass,
+            poc=poc,
             model_output=model_output,
-            compliance_result=compliance_result
+            compliance_result=compliance_result,
+            iteration_count=iteration_count
         )
 
     # ==================== 检测报告数据的汇总与产出 ====================
@@ -357,6 +365,9 @@ class DataProcessor:
         """
         return await self._result_db.delete_result_data(result_data_id)
 
+    async def count_compliance_results(self) -> dict[str, int]:
+        return await self._result_db.count_compliance_results()
+
     async def export_report_file(
         self,
         report_data: dict,
@@ -374,7 +385,7 @@ class DataProcessor:
         else:
             content = self._utils.serialize_yaml(report_data)
         task_group_id = report_data.get("task_group_id", "unknown")
-        export_dir = Path("sdpj/infrastructure/database/reports/exports")
+        export_dir = Path(get_settings().export_dir)
         export_dir.mkdir(parents=True, exist_ok=True)
         path = export_dir / f"{task_group_id}.{target_format}"
         self._utils.write_file(str(path), content)

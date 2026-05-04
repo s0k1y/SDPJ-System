@@ -125,8 +125,10 @@ class ResultData(Base):
         comment="检测报告ID"
     )
     risk_subclass: Mapped[str] = mapped_column(String(255), nullable=False, comment="风险具体子类")
+    poc: Mapped[str] = mapped_column(Text, nullable=False, server_default="", comment="原始PoC")
     model_output: Mapped[str] = mapped_column(Text, nullable=False, comment="被测大模型输出内容")
     compliance_result: Mapped[str] = mapped_column(String(50), nullable=False, comment="合规判断结果")
+    iteration_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, comment="动态检测迭代次数")
 
     # 关系
     detection_report: Mapped["DetectionReport"] = relationship(back_populates="result_data")

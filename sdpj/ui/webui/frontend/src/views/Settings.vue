@@ -56,6 +56,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getProfile, accountOperation } from '../api/user'
+import { encryptPassword } from '../utils/crypto'
 import { detectionConfig as detectionConfigApi } from '../api/detection'
 
 const activeTab = ref('profile')
@@ -126,9 +127,12 @@ const changePassword = async () => {
   await pwdFormRef.value.validate()
   changingPwd.value = true
   try {
+    const encOld = await encryptPassword(passwordForm.value.oldPassword)
+    const encNew = await encryptPassword(passwordForm.value.newPassword)
     const res = await accountOperation('change_password', {
-      old_password: passwordForm.value.oldPassword,
-      new_password: passwordForm.value.newPassword
+      old_password: encOld,
+      new_password: encNew,
+      is_encrypted: true
     })
     if (res.success) {
       ElMessage.success('密码修改成功')

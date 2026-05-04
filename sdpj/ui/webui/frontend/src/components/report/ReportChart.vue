@@ -13,20 +13,19 @@
     <div v-else class="chart-content">
       <el-row :gutter="20">
         <el-col :span="12">
-          <h4>合规率分布</h4>
+          <h4>合规率概览</h4>
           <div class="chart-bars">
-            <div
-              v-for="item in complianceItems"
-              :key="item.label"
-              class="bar-item"
-            >
-              <span class="bar-label">{{ item.label }}</span>
+            <div class="bar-item">
+              <span class="bar-label">总体合规率</span>
               <el-progress
-                :percentage="item.value"
-                :color="item.color"
+                :percentage="chartData.overall_rate || 0"
+                :color="'#409eff'"
                 :stroke-width="18"
               />
             </div>
+          </div>
+          <div v-if="chartData.avg_iteration_count != null" class="iteration-stat">
+            <el-statistic title="动态检测平均迭代次数" :value="chartData.avg_iteration_count" :precision="2" />
           </div>
         </el-col>
         <el-col :span="12">
@@ -49,13 +48,13 @@
 
       <el-divider />
 
-      <h4>检测详情</h4>
-      <el-table :data="detailItems" style="width: 100%" size="small">
-        <el-table-column prop="category" label="检测类别" />
+      <h4>各子类型合规率</h4>
+      <el-table :data="subtypeItems" style="width: 100%" size="small">
+        <el-table-column prop="category" label="风险子类型" />
         <el-table-column prop="total" label="总数" width="80" />
-        <el-table-column prop="passed" label="通过" width="80" />
-        <el-table-column prop="failed" label="未通过" width="80" />
-        <el-table-column prop="rate" label="合规率" width="100">
+        <el-table-column prop="passed" label="合规" width="80" />
+        <el-table-column prop="failed" label="违规" width="80" />
+        <el-table-column prop="rate" label="合规率" width="120">
           <template #default="{ row }">
             <el-progress
               :percentage="row.rate"
@@ -80,30 +79,28 @@ const props = defineProps({
 const loading = ref(false)
 const chartData = ref(null)
 
-const complianceItems = computed(() => {
-  if (!chartData.value) return []
-  const data = chartData.value
-  return [
-    { label: '总体合规率', value: data.overall_rate || 0, color: '#409eff' },
-    { label: '安全性', value: data.safety_rate || 0, color: '#67c23a' },
-    { label: '公平性', value: data.fairness_rate || 0, color: '#e6a23c' },
-    { label: '隐私保护', value: data.privacy_rate || 0, color: '#f56c6c' }
-  ]
-})
-
 const riskItems = computed(() => {
   if (!chartData.value) return []
-  const risk = chartData.value.risk_distribution || {}
+  const dist = chartData.value.risk_distribution
+  if (!dist || !dist.data) return []
+  const counts = { '低风险': 0, '中风险': 0, '高风险': 0 }
+  const stats = chartData.value.statistics
+  if (stats) {
+    const rate = stats.compliance_rate
+    if (rate >= 90) counts['低风险'] = stats.total
+    else if (rate >= 70) counts['中风险'] = stats.total
+    else counts['高风险'] = stats.total
+  }
   return [
-    { label: '低风险', count: risk.low || 0, type: 'success' },
-    { label: '中风险', count: risk.medium || 0, type: 'warning' },
-    { label: '高风险', count: risk.high || 0, type: 'danger' }
+    { label: '低风险', count: counts['低风险'], type: 'success' },
+    { label: '中风险', count: counts['中风险'], type: 'warning' },
+    { label: '高风险', count: counts['高风险'], type: 'danger' }
   ]
 })
 
-const detailItems = computed(() => {
+const subtypeItems = computed(() => {
   if (!chartData.value) return []
-  return chartData.value.details || []
+  return chartData.value.subtype_compliance || []
 })
 
 const fetchData = async () => {
@@ -148,6 +145,13 @@ watch(() => props.taskGroupId, fetchData, { immediate: true })
   display: flex;
   gap: 24px;
   padding: 10px 0;
+}
+
+.iteration-stat {
+  margin-top: 20px;
+  padding: 12px;
+  background: #f5f7fa;
+  border-radius: 6px;
 }
 
 h4 {

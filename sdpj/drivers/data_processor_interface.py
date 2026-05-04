@@ -184,8 +184,10 @@ class DataProcessorInterface(Protocol):
         self,
         report_id: str,
         risk_subclass: str,
+        poc: str,
         model_output: str,
-        compliance_result: str
+        compliance_result: str,
+        iteration_count: Optional[int] = None
     ) -> str:
         """追加单条检测结果数据
 
@@ -194,6 +196,7 @@ class DataProcessorInterface(Protocol):
             risk_subclass: 风险具体子类
             model_output: 被测大模型输出内容
             compliance_result: 合规判断结果
+            iteration_count: 动态检测迭代次数（可选）
 
         Returns:
             新创建结果条目的结果数据 ID
@@ -327,6 +330,14 @@ class DataProcessorInterface(Protocol):
 
         触发场景:
             用户精修报告内容
+        """
+        ...
+
+    async def count_compliance_results(self) -> dict[str, int]:
+        """按合规判断结果统计数量
+
+        Returns:
+            {compliance_result: count} 映射
         """
         ...
 

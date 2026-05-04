@@ -88,6 +88,34 @@ class UserDBInterface(Protocol):
         """
         ...
 
+    async def get_user_by_id(self, user_id: int) -> Optional[dict]:
+        """按 ID 查询用户
+
+        Args:
+            user_id: 用户 ID
+
+        Returns:
+            用户信息字典，包含：
+            - user_id: 用户 ID
+            - username: 账号
+            - password: 已存储密码
+            - created_at: 创建时间
+            不存在时返回 None
+        """
+        ...
+
+    async def update_username(self, user_id: int, new_username: str) -> bool:
+        """更新用户名
+
+        Args:
+            user_id: 用户 ID
+            new_username: 新用户名
+
+        Returns:
+            更新结果（True 表示成功）
+        """
+        ...
+
     # ==================== 资源级能力 ====================
 
     async def register_resource(self, resource_type: str, owner_user_id: int) -> int:
@@ -191,6 +219,22 @@ class UserDBInterface(Protocol):
             - resource_id: 资源 ID
             - grantee_user_id: 被授权用户 ID
             - created_at: 创建时间
+        """
+        ...
+
+    async def get_access_control_by_id(self, acl_id: int) -> Optional[dict]:
+        """按 ID 查询单条访问控制项
+
+        Args:
+            acl_id: 访问控制项 ID
+
+        Returns:
+            访问控制项字典，包含：
+            - acl_id: 访问控制项 ID
+            - resource_id: 资源 ID
+            - grantee_user_id: 被授权用户 ID
+            - created_at: 创建时间
+            不存在时返回 None
         """
         ...
 

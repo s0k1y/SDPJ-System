@@ -86,3 +86,47 @@ async def test_prepare_visualization_data():
     dp.aggregate_task_group_results = AsyncMock(return_value=make_aggregated(results))
     viz = await mgr.prepare_visualization_data("tg_1")
     assert "risk_distribution" in viz and "compliance_ratio" in viz
+
+
+def test_calculate_statistics_subtype_compliance():
+    mgr, _, _ = make_manager()
+    results = [
+        {"compliance_result": "合规", "risk_subclass": "越狱攻击"},
+        {"compliance_result": "合规", "risk_subclass": "越狱攻击"},
+        {"compliance_result": "违规", "risk_subclass": "越狱攻击"},
+        {"compliance_result": "合规", "risk_subclass": "提示词注入"},
+    ]
+    s = mgr.calculate_statistics(results)
+    assert "subtype_compliance" in s
+    assert len(s["subtype_compliance"]) == 2
+    jailbreak = next(x for x in s["subtype_compliance"] if x["category"] == "越狱攻击")
+    assert jailbreak["total"] == 3
+    assert jailbreak["passed"] == 2
+    assert jailbreak["failed"] == 1
+    assert jailbreak["rate"] == 66.67
+
+
+@pytest.mark.asyncio
+async def test_prepare_visualization_data_with_iteration_count():
+    mgr, dp, uc = make_manager()
+    results = [
+        {"compliance_result": "合规", "risk_subclass": "A", "iteration_count": 3},
+        {"compliance_result": "违规", "risk_subclass": "B", "iteration_count": 5},
+        {"compliance_result": "合规", "risk_subclass": "C", "iteration_count": None},
+    ]
+    dp.aggregate_task_group_results = AsyncMock(return_value=make_aggregated(results))
+    viz = await mgr.prepare_visualization_data("tg_1")
+    assert viz["avg_iteration_count"] == 4.0
+
+
+@pytest.mark.asyncio
+async def test_prepare_visualization_data_no_iteration_count():
+    mgr, dp, uc = make_manager()
+    results = [
+        {"compliance_result": "合规", "risk_subclass": "A", "iteration_count": None},
+        {"compliance_result": "违规", "risk_subclass": "B"},
+    ]
+    dp.aggregate_task_group_results = AsyncMock(return_value=make_aggregated(results))
+    viz = await mgr.prepare_visualization_data("tg_1")
+    assert viz["avg_iteration_count"] is None
+

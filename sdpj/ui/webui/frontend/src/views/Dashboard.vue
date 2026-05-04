@@ -5,22 +5,27 @@
     <el-row :gutter="20">
       <el-col :span="6">
         <el-card>
-          <el-statistic title="总检测任务" :value="stats.totalTasks" />
+          <el-statistic title="检测样本总数" :value="stats.totalSamples" />
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card>
-          <el-statistic title="合规任务" :value="stats.compliantTasks" />
+          <el-statistic title="合规样本" :value="stats.compliantSamples" />
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card>
-          <el-statistic title="违规任务" :value="stats.nonCompliantTasks" />
+          <el-statistic title="违规样本" :value="stats.nonCompliantSamples" />
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card>
           <el-statistic title="合规率" :value="stats.complianceRate" suffix="%" />
+        </el-card>
+      </el-col>
+      <el-col v-if="stats.avgIterationCount != null" :span="6">
+        <el-card>
+          <el-statistic title="动态检测平均迭代次数" :value="stats.avgIterationCount" :precision="2" />
         </el-card>
       </el-col>
     </el-row>
@@ -67,16 +72,18 @@
 import { ref, onMounted } from 'vue'
 import api from '../api'
 import { getProgress } from '../api/detection'
+import { getComplianceStatistics } from '../api/report'
 
 const loading = ref(false)
 const systemOnline = ref(false)
 const runningCount = ref(0)
 
 const stats = ref({
-  totalTasks: 0,
-  compliantTasks: 0,
-  nonCompliantTasks: 0,
-  complianceRate: 0
+  totalSamples: 0,
+  compliantSamples: 0,
+  nonCompliantSamples: 0,
+  complianceRate: 0,
+  avgIterationCount: null
 })
 
 const recentTasks = ref([])
@@ -105,16 +112,21 @@ onMounted(async () => {
     if (progressRes.success && progressRes.queue) {
       const queue = progressRes.queue
       recentTasks.value = queue.slice(0, 10)
-      const completed = queue.filter(t => t.status === 'completed')
-      const failed = queue.filter(t => t.status === 'failed')
       runningCount.value = queue.filter(t => t.status === 'running').length
+    }
+  } catch {
+    // 使用默认值
+  }
+
+  try {
+    const statsRes = await getComplianceStatistics()
+    if (statsRes.success) {
       stats.value = {
-        totalTasks: queue.length,
-        compliantTasks: completed.length,
-        nonCompliantTasks: failed.length,
-        complianceRate: queue.length > 0
-          ? Math.round((completed.length / queue.length) * 100)
-          : 0
+        totalSamples: statsRes.total,
+        compliantSamples: statsRes.compliant,
+        nonCompliantSamples: statsRes.non_compliant,
+        complianceRate: statsRes.compliance_rate,
+        avgIterationCount: statsRes.avg_iteration_count ?? null
       }
     }
   } catch {

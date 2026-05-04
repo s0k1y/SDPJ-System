@@ -59,6 +59,10 @@ class StateSchedulerInterface(Protocol):
         """准备可视化图表数据"""
         ...
 
+    async def query_compliance_statistics(self) -> dict:
+        """查询全局合规统计（样本级）"""
+        ...
+
     # ── 系统状态与日志 (职责 9-12) ──
 
     async def startup(self) -> None:

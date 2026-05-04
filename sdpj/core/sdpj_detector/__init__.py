@@ -6,7 +6,7 @@
 from sdpj.drivers.data_processor_interface import DataProcessorInterface
 from sdpj.drivers.llm_service_interface import LLMServiceInterface, LLMError
 
-from .static_detector import run_static_detection, select_best_poc, _call_llm
+from .static_detector import run_static_detection, select_poc_pool, _call_llm
 from .dynamic_detector import run_dynamic_detection
 from . import prompt_builder, result_parser
 
@@ -19,7 +19,6 @@ from .prompt_builder import (
 from .result_parser import (
     parse_compliance_judgment,
     extract_model_output,
-    is_jailbreak_success,
 )
 
 
@@ -59,8 +58,8 @@ class SDPJDetector:
             return "违规"
 
     async def write_result(
-        self, report_id: str, risk_subclass: str, model_output: str, compliance_result: str
+        self, report_id: str, risk_subclass: str, poc: str, model_output: str, compliance_result: str
     ) -> str:
         return await self._data_processor.append_result_data(
-            report_id, risk_subclass, model_output, compliance_result
+            report_id, risk_subclass, poc, model_output, compliance_result
         )

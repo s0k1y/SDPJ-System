@@ -6,10 +6,12 @@ APP_VERSION = "1.0.0"
 
 DEFAULT_LOG_DIR = "sdpj/infrastructure/database/logs"
 DEFAULT_REPORT_DIR = "sdpj/infrastructure/database/reports"
+DEFAULT_EXPORT_DIR = "sdpj/infrastructure/database/reports/exports"
 DEFAULT_UPLOAD_DIR = "sdpj/infrastructure/database/uploads"
 
 USER_CONFIG_DIR_NAME = ".sdpj"
 SECRET_KEY_FILENAME = "secret.key"
+RSA_KEY_FILENAME = "rsa_private.pem"
 TOKEN_FILENAME = "token"
 USER_ADAPTERS_DIR = "adapters"
 

@@ -4,7 +4,7 @@
 """
 
 from typing import Optional
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..models import ResultData
 
@@ -25,8 +25,10 @@ class ResultDataRepository:
         result_data_id: str,
         report_id: str,
         risk_subclass: str,
+        poc: str,
         model_output: str,
-        compliance_result: str
+        compliance_result: str,
+        iteration_count: Optional[int] = None
     ) -> ResultData:
         """创建结果数据条目
 
@@ -36,6 +38,7 @@ class ResultDataRepository:
             risk_subclass: 风险具体子类
             model_output: 被测大模型输出内容
             compliance_result: 合规判断结果
+            iteration_count: 动态检测迭代次数（可选）
 
         Returns:
             创建的结果数据对象
@@ -44,8 +47,10 @@ class ResultDataRepository:
             result_data_id=result_data_id,
             report_id=report_id,
             risk_subclass=risk_subclass,
+            poc=poc,
             model_output=model_output,
-            compliance_result=compliance_result
+            compliance_result=compliance_result,
+            iteration_count=iteration_count
         )
         self.session.add(result_data)
         await self.session.flush()
@@ -76,6 +81,14 @@ class ResultDataRepository:
         stmt = select(ResultData).where(ResultData.report_id == report_id)
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
+
+    async def count_by_compliance(self) -> dict[str, int]:
+        stmt = select(
+            ResultData.compliance_result,
+            func.count(),
+        ).group_by(ResultData.compliance_result)
+        result = await self.session.execute(stmt)
+        return {row[0]: row[1] for row in result.all()}
 
     async def delete(self, result_data_id: str) -> bool:
         """删除结果数据

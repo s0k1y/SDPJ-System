@@ -13,6 +13,13 @@ from sdpj.ui.webui.backend.schemas.report import (
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
 
+@router.get("/statistics")
+async def compliance_statistics(
+    scheduler: StateSchedulerInterface = Depends(get_scheduler),
+):
+    return await scheduler.query_compliance_statistics()
+
+
 @router.post("/generate")
 async def generate(
     req: ReportGenerateRequest,

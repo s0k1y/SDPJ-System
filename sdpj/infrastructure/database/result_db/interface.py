@@ -273,8 +273,10 @@ class ResultDBInterface(Protocol):
         self,
         report_id: str,
         risk_subclass: str,
+        poc: str,
         model_output: str,
-        compliance_result: str
+        compliance_result: str,
+        iteration_count: Optional[int] = None
     ) -> str:
         """追加检测结果数据条目
 
@@ -283,6 +285,7 @@ class ResultDBInterface(Protocol):
             risk_subclass: 风险具体子类
             model_output: 被测大模型输出内容
             compliance_result: 合规判断结果
+            iteration_count: 动态检测迭代次数（可选）
 
         Returns:
             新创建条目的结果数据ID
@@ -300,6 +303,14 @@ class ResultDBInterface(Protocol):
 
         Returns:
             该报告下全部结果数据明细
+        """
+        ...
+
+    async def count_compliance_results(self) -> dict[str, int]:
+        """按合规判断结果统计数量
+
+        Returns:
+            {compliance_result: count} 映射，如 {"合规": 800, "违规": 200}
         """
         ...
 

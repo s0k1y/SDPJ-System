@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from sdpj.infrastructure.config.constants import (
+    DEFAULT_EXPORT_DIR,
     DEFAULT_LOG_DIR,
     SECRET_KEY_BYTES,
     SECRET_KEY_FILENAME,
@@ -41,6 +42,7 @@ class Settings(BaseSettings):
     adapters_dir: str = "~/.sdpj/adapters/"
     log_level: str = "INFO"
     log_dir: str = f"./{DEFAULT_LOG_DIR}"
+    export_dir: str = f"./{DEFAULT_EXPORT_DIR}"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     frontend_url: str = "http://localhost:5173"

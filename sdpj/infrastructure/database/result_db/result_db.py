@@ -365,14 +365,17 @@ class ResultDB:
         self,
         report_id: str,
         risk_subclass: str,
+        poc: str,
         model_output: str,
-        compliance_result: str
+        compliance_result: str,
+        iteration_count: Optional[int] = None
     ) -> str:
         """追加检测结果数据条目
 
         Args:
             report_id: 检测报告ID
             risk_subclass: 风险具体子类
+            poc: 原始PoC
             model_output: 被测大模型输出内容
             compliance_result: 合规判断结果
 
@@ -398,8 +401,10 @@ class ResultDB:
                 result_data_id,
                 report_id,
                 risk_subclass,
+                poc,
                 model_output,
-                compliance_result
+                compliance_result,
+                iteration_count
             )
 
             return result_data_id
@@ -422,11 +427,18 @@ class ResultDB:
                     "result_data_id": rd.result_data_id,
                     "report_id": rd.report_id,
                     "risk_subclass": rd.risk_subclass,
+                    "poc": rd.poc,
                     "model_output": rd.model_output,
                     "compliance_result": rd.compliance_result,
+                    "iteration_count": rd.iteration_count,
                 }
                 for rd in result_data_list
             ]
+
+    async def count_compliance_results(self) -> dict[str, int]:
+        async with self.session_manager.session() as session:
+            repo = ResultDataRepository(session)
+            return await repo.count_by_compliance()
 
     async def delete_result_data(self, result_data_id: str) -> bool:
         """删除检测结果数据条目

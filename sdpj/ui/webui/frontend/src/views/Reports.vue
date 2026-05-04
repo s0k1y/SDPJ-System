@@ -33,7 +33,7 @@ const handleView = (row) => {
 
 const handleExport = async (row) => {
   try {
-    const res = await exportReport(row.task_group_id, 'pdf')
+    const res = await exportReport(row.task_group_id)
     if (res.success) {
       ElMessage.success('报告导出成功')
     }
@@ -48,7 +48,7 @@ const handleDelete = async (row) => {
       type: 'warning'
     })
     const res = await deleteReport(row.task_group_id, 'report')
-    if (res || res?.success) {
+    if (res?.success) {
       ElMessage.success('删除成功')
       tableRef.value?.refresh()
     }

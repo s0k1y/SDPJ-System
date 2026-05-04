@@ -268,7 +268,7 @@ async def test_append_result_data(result_db):
     report_id = await result_db.create_detection_report(task_id)
 
     result_data_id = await result_db.append_result_data(
-        report_id, "prompt_injection", "Test output", "non_compliant"
+        report_id, "prompt_injection", "原始PoC内容", "Test output", "non_compliant"
     )
     assert result_data_id.startswith("result_")
 
@@ -278,7 +278,7 @@ async def test_append_result_data_invalid_report(result_db):
     """测试追加结果数据时报告不存在"""
     with pytest.raises(ValueError, match="不存在"):
         await result_db.append_result_data(
-            "non-existent", "prompt_injection", "Test output", "non_compliant"
+            "non-existent", "prompt_injection", "PoC", "Test output", "non_compliant"
         )
 
 
@@ -291,11 +291,68 @@ async def test_list_result_data_by_report(result_db):
     )
     report_id = await result_db.create_detection_report(task_id)
 
-    await result_db.append_result_data(report_id, "prompt_injection", "Output 1", "non_compliant")
-    await result_db.append_result_data(report_id, "jailbreak", "Output 2", "compliant")
+    await result_db.append_result_data(report_id, "prompt_injection", "PoC1", "Output 1", "non_compliant")
+    await result_db.append_result_data(report_id, "jailbreak", "PoC2", "Output 2", "compliant")
 
     result_data_list = await result_db.list_result_data_by_report(report_id)
     assert len(result_data_list) == 2
+
+
+@pytest.mark.asyncio
+async def test_append_result_data_with_iteration_count(result_db):
+    """测试追加结果数据时包含迭代次数"""
+    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_id = await result_db.create_detection_task(
+        task_group_id, 1, "completed", datetime.now()
+    )
+    report_id = await result_db.create_detection_report(task_id)
+
+    result_data_id = await result_db.append_result_data(
+        report_id, "jailbreak", "PoC", "Output", "non_compliant", iteration_count=5
+    )
+    assert result_data_id.startswith("result_")
+
+    result_data_list = await result_db.list_result_data_by_report(report_id)
+    assert len(result_data_list) == 1
+    assert result_data_list[0]["iteration_count"] == 5
+
+
+@pytest.mark.asyncio
+async def test_append_result_data_without_iteration_count(result_db):
+    """测试追加结果数据时不传迭代次数（静态检测）"""
+    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_id = await result_db.create_detection_task(
+        task_group_id, 1, "completed", datetime.now()
+    )
+    report_id = await result_db.create_detection_report(task_id)
+
+    result_data_id = await result_db.append_result_data(
+        report_id, "jailbreak", "PoC", "Output", "compliant"
+    )
+    assert result_data_id.startswith("result_")
+
+    result_data_list = await result_db.list_result_data_by_report(report_id)
+    assert len(result_data_list) == 1
+    assert result_data_list[0]["iteration_count"] is None
+
+
+@pytest.mark.asyncio
+async def test_append_result_data_zero_iterations(result_db):
+    """测试追加结果数据时迭代次数为0（动态检测中静态就违规的样本）"""
+    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_id = await result_db.create_detection_task(
+        task_group_id, 1, "completed", datetime.now()
+    )
+    report_id = await result_db.create_detection_report(task_id)
+
+    result_data_id = await result_db.append_result_data(
+        report_id, "jailbreak", "PoC", "Output", "non_compliant", iteration_count=0
+    )
+    assert result_data_id.startswith("result_")
+
+    result_data_list = await result_db.list_result_data_by_report(report_id)
+    assert len(result_data_list) == 1
+    assert result_data_list[0]["iteration_count"] == 0
 
 
 @pytest.mark.asyncio
@@ -307,7 +364,7 @@ async def test_delete_result_data(result_db):
     )
     report_id = await result_db.create_detection_report(task_id)
     result_data_id = await result_db.append_result_data(
-        report_id, "prompt_injection", "Output", "non_compliant"
+        report_id, "prompt_injection", "PoC", "Output", "non_compliant"
     )
 
     result = await result_db.delete_result_data(result_data_id)
@@ -328,7 +385,7 @@ async def test_cascade_delete_full_chain(result_db):
     )
     report_id = await result_db.create_detection_report(task_id)
     await result_db.append_result_data(
-        report_id, "prompt_injection", "Output", "non_compliant"
+        report_id, "prompt_injection", "PoC", "Output", "non_compliant"
     )
 
     await result_db.delete_task_group(task_group_id)

@@ -34,7 +34,7 @@ export function deleteReport(targetId, granularity = 'report') {
 /**
  * 导出报告
  */
-export function exportReport(taskGroupId, targetFormat = 'pdf') {
+export function exportReport(taskGroupId, targetFormat = 'jsonl') {
   return api.post('/reports/export', {
     task_group_id: taskGroupId,
     target_format: targetFormat
@@ -46,4 +46,8 @@ export function exportReport(taskGroupId, targetFormat = 'pdf') {
  */
 export function getVisualization(taskGroupId) {
   return api.get(`/reports/${taskGroupId}/visualization`)
+}
+
+export function getComplianceStatistics() {
+  return api.get('/reports/statistics')
 }

@@ -1,5 +1,7 @@
 """组合根 — 唯一允许跨层实例化的模块"""
 from functools import lru_cache
+from pathlib import Path
+
 from sdpj.control.state_scheduler_interface import StateSchedulerInterface
 
 
@@ -74,7 +76,9 @@ def build_scheduler() -> StateSchedulerInterface:
         detector=SDPJDetector(dp, llm),
         event_logger=EventLogger(),
         task_queue_manager=TaskQueueManager(),
-        secure_comm_manager=SecureCommManager(),
+        secure_comm_manager=SecureCommManager(
+            key_path=Path.home() / ".sdpj" / "rsa_private.pem"
+        ),
         llm_registry=reg,
         db_initializer=_init_db,
     )

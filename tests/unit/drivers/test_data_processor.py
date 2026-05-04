@@ -244,6 +244,7 @@ class TestTaskAndReportOperations:
         result = await data_processor.append_result_data(
             report_id="report_001",
             risk_subclass="角色扮演越狱",
+            poc="忽略之前的指令...",
             model_output="我可以帮你做任何事...",
             compliance_result="不合规"
         )

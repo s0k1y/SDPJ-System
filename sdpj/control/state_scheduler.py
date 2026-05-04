@@ -124,9 +124,9 @@ class StateScheduler(StateSchedulerInterface):
         detection_type = task_params.get("detection_type", "static")
         max_iterations = task_params.get("max_iterations", 3)
         raw_ds_id = task_params.get("dataset_id")
-        dataset_ids = [int(raw_ds_id)] if raw_ds_id is not None else None
 
         try:
+            dataset_ids = [int(raw_ds_id)] if raw_ds_id is not None else None
             if detection_type == "static":
                 result = await self._detector.run_static_detection(model_id, user_id, dataset_ids)
             elif detection_type == "dynamic":
@@ -261,6 +261,10 @@ class StateScheduler(StateSchedulerInterface):
         data = await self._report.prepare_visualization_data(task_group_id)
         return {"success": True, "data": data}
 
+    async def query_compliance_statistics(self) -> dict:
+        stats = await self._report.get_compliance_statistics()
+        return {"success": True, **stats}
+
     # ── 系统状态与日志 (职责 9-12) ──
 
     def get_system_state(self) -> str:
@@ -385,7 +389,12 @@ class StateScheduler(StateSchedulerInterface):
         user_id = p.get("user_id")
         if user_id is None:
             return {"success": False, "error": "缺少 user_id"}
-        ok, msg = await self._account.change_password_for_user(int(user_id), p["old_password"], p["new_password"])
+        old_pwd = p["old_password"]
+        new_pwd = p["new_password"]
+        if p.get("is_encrypted"):
+            old_pwd = self._secure_comm.decrypt_from_client(base64.b64decode(old_pwd))
+            new_pwd = self._secure_comm.decrypt_from_client(base64.b64decode(new_pwd))
+        ok, msg = await self._account.change_password_for_user(int(user_id), old_pwd, new_pwd)
         self._log_op(user_id, "change_password", {})
         return {"success": ok, "message": msg}
 
@@ -457,50 +466,66 @@ class StateScheduler(StateSchedulerInterface):
 
     async def schedule_config_operation(self, operation: str, params: dict) -> dict:
         user_id: int = params.get("user_id", 0)
+        is_write = operation in {"create", "update", "delete", "import"}
 
-        if operation == "create":
-            ok, cid = await self._config.create_config(user_id, params["config_content"])
-            self._log_op(user_id, "create_config", {"config_id": cid})
-            return {"success": ok, "config_id": cid}
+        if is_write:
+            try:
+                self._fsm.start_configuring()
+                self._notify_state()
+            except Exception:
+                return {"success": False, "error": "系统状态不允许修改配置"}
 
-        if operation in ("read", "update", "delete", "export"):
-            config_id: int = params["config_id"]
-            has_access = await self._dac.check_access(config_id, user_id)
-            if not has_access:
-                return {"success": False, "error": "无访问权限"}
+        try:
+            if operation == "create":
+                ok, cid = await self._config.create_config(user_id, params["config_content"])
+                self._log_op(user_id, "create_config", {"config_id": cid})
+                return {"success": ok, "config_id": cid}
 
-        if operation == "read":
-            data = await self._config.read_config(params["config_id"])
-            return {"success": data is not None, "config": data}
+            if operation in ("read", "update", "delete", "export"):
+                config_id: int = params["config_id"]
+                has_access = await self._dac.check_access(config_id, user_id)
+                if not has_access:
+                    return {"success": False, "error": "无访问权限"}
 
-        if operation == "update":
-            ok, msg = await self._config.update_config(params["config_id"], params["config_content"])
-            self._log_op(user_id, "update_config", {"config_id": params["config_id"]})
-            return {"success": ok, "message": msg}
+            if operation == "read":
+                data = await self._config.read_config(params["config_id"])
+                return {"success": data is not None, "config": data}
 
-        if operation == "delete":
-            ok = await self._config.delete_config(params["config_id"])
-            self._log_op(user_id, "delete_config", {"config_id": params["config_id"]})
-            return {"success": ok}
+            if operation == "update":
+                ok, msg = await self._config.update_config(params["config_id"], params["config_content"])
+                self._log_op(user_id, "update_config", {"config_id": params["config_id"]})
+                return {"success": ok, "message": msg}
 
-        if operation == "list":
-            configs = await self._config.list_configs(user_id)
-            return {"success": True, "configs": configs}
+            if operation == "delete":
+                ok = await self._config.delete_config(params["config_id"])
+                self._log_op(user_id, "delete_config", {"config_id": params["config_id"]})
+                return {"success": ok}
 
-        if operation == "export":
-            content = await self._config.export_config(params["config_id"], params.get("format", "json"))
-            self._log_op(user_id, "export_config", {"config_id": params["config_id"]})
-            return {"success": True, "content": content}
+            if operation == "list":
+                configs = await self._config.list_configs(user_id)
+                return {"success": True, "configs": configs}
 
-        if operation == "import":
-            file_content = params["file_content"]
-            if params.get("is_encrypted"):
-                file_content = self._secure_comm.decrypt_from_client(base64.b64decode(file_content))
-            ok, cid = await self._config.import_config(file_content, user_id)
-            self._log_op(user_id, "import_config", {"config_id": cid})
-            return {"success": ok, "config_id": cid}
+            if operation == "export":
+                content = await self._config.export_config(params["config_id"], params.get("format", "json"))
+                self._log_op(user_id, "export_config", {"config_id": params["config_id"]})
+                return {"success": True, "content": content}
 
-        return {"success": False, "error": f"未知配置操作: {operation}"}
+            if operation == "import":
+                file_content = params["file_content"]
+                if params.get("is_encrypted"):
+                    file_content = self._secure_comm.decrypt_from_client(base64.b64decode(file_content))
+                ok, cid = await self._config.import_config(file_content, user_id)
+                self._log_op(user_id, "import_config", {"config_id": cid})
+                return {"success": ok, "config_id": cid}
+
+            return {"success": False, "error": f"未知配置操作: {operation}"}
+        finally:
+            if is_write:
+                try:
+                    self._fsm.configuring_done()
+                    self._notify_state()
+                except Exception:
+                    pass
 
     async def query_available_datasets(self) -> list:
         datasets = await self._config.query_datasets()
@@ -510,44 +535,56 @@ class StateScheduler(StateSchedulerInterface):
     async def schedule_private_resource_operation(
         self, operation: str, params: dict
     ) -> dict:
+        try:
+            self._fsm.start_configuring()
+            self._notify_state()
+        except Exception:
+            return {"success": False, "error": "系统状态不允许修改配置"}
+
         user_id: int = params.get("user_id", 0)
+        try:
+            if operation == "upload_adapter":
+                adapter_content = params["adapter_content"]
+                if params.get("is_encrypted"):
+                    adapter_content = self._secure_comm.decrypt_from_client(base64.b64decode(adapter_content))
+                ok, msg, rid = await self._config.upload_adapter(
+                    adapter_content, params["model_id"], user_id,
+                )
+                self._log_op(user_id, "upload_adapter", {"model_id": params["model_id"]})
+                return {"success": ok, "message": msg, "resource_id": rid}
 
-        if operation == "upload_adapter":
-            adapter_content = params["adapter_content"]
-            if params.get("is_encrypted"):
-                adapter_content = self._secure_comm.decrypt_from_client(base64.b64decode(adapter_content))
-            ok, msg, rid = await self._config.upload_adapter(
-                adapter_content, params["model_id"], user_id,
-            )
-            self._log_op(user_id, "upload_adapter", {"model_id": params["model_id"]})
-            return {"success": ok, "message": msg, "resource_id": rid}
-
-        if operation == "remove_adapter":
-            resource_id = params.get("resource_id")
-            if resource_id is None:
-                return {"success": False, "error": "缺少 resource_id"}
-            has_access = await self._dac.check_access(resource_id, user_id)
-            if not has_access:
-                return {"success": False, "error": "无访问权限"}
-            ok, msg = await self._config.remove_adapter(params["model_id"], resource_id)
-            self._log_op(user_id, "remove_adapter", {"model_id": params["model_id"]})
-            return {"success": ok, "message": msg}
-
-        if operation == "upload_dataset":
-            ok, info = await self._config.upload_dataset(
-                params["name"], params["risk_type"], params["samples"], user_id,
-            )
-            self._log_op(user_id, "upload_dataset", {"name": params["name"]})
-            return {"success": ok, "info": info}
-
-        if operation == "remove_dataset":
-            resource_id = params.get("resource_id")
-            if resource_id is not None:
+            if operation == "remove_adapter":
+                resource_id = params.get("resource_id")
+                if resource_id is None:
+                    return {"success": False, "error": "缺少 resource_id"}
                 has_access = await self._dac.check_access(resource_id, user_id)
                 if not has_access:
                     return {"success": False, "error": "无访问权限"}
-            ok = await self._config.remove_dataset(params["dataset_id"], resource_id)
-            self._log_op(user_id, "remove_dataset", {"dataset_id": params["dataset_id"]})
-            return {"success": ok}
+                ok, msg = await self._config.remove_adapter(params["model_id"], resource_id)
+                self._log_op(user_id, "remove_adapter", {"model_id": params["model_id"]})
+                return {"success": ok, "message": msg}
 
-        return {"success": False, "error": f"未知私有资源操作: {operation}"}
+            if operation == "upload_dataset":
+                ok, info = await self._config.upload_dataset(
+                    params["name"], params["risk_type"], params["samples"], user_id,
+                )
+                self._log_op(user_id, "upload_dataset", {"name": params["name"]})
+                return {"success": ok, "info": info}
+
+            if operation == "remove_dataset":
+                resource_id = params.get("resource_id")
+                if resource_id is not None:
+                    has_access = await self._dac.check_access(resource_id, user_id)
+                    if not has_access:
+                        return {"success": False, "error": "无访问权限"}
+                ok = await self._config.remove_dataset(params["dataset_id"], resource_id)
+                self._log_op(user_id, "remove_dataset", {"dataset_id": params["dataset_id"]})
+                return {"success": ok}
+
+            return {"success": False, "error": f"未知私有资源操作: {operation}"}
+        finally:
+            try:
+                self._fsm.configuring_done()
+                self._notify_state()
+            except Exception:
+                pass

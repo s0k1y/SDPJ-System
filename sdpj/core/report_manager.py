@@ -61,6 +61,7 @@ class ReportManager:
                 "compliance_rate": 0.0,
                 "risk_level": "N/A",
                 "risk_distribution": {},
+                "subtype_compliance": [],
             }
 
         total = len(results)
@@ -78,9 +79,27 @@ class ReportManager:
             risk_level = "高风险"
 
         distribution: dict[str, int] = {}
+        subtype_stats: dict[str, dict] = {}
         for r in results:
             subclass = r.get("risk_subclass", "未知")
             distribution[subclass] = distribution.get(subclass, 0) + 1
+            if subclass not in subtype_stats:
+                subtype_stats[subclass] = {"total": 0, "passed": 0}
+            subtype_stats[subclass]["total"] += 1
+            if r.get("compliance_result", "").startswith("合规"):
+                subtype_stats[subclass]["passed"] += 1
+
+        subtype_compliance = []
+        for cat, st in subtype_stats.items():
+            failed = st["total"] - st["passed"]
+            st_rate = round(st["passed"] / st["total"] * 100, 2) if st["total"] else 0.0
+            subtype_compliance.append({
+                "category": cat,
+                "total": st["total"],
+                "passed": st["passed"],
+                "failed": failed,
+                "rate": st_rate,
+            })
 
         return {
             "total": total,
@@ -89,6 +108,7 @@ class ReportManager:
             "compliance_rate": round(rate * 100, 2),
             "risk_level": risk_level,
             "risk_distribution": distribution,
+            "subtype_compliance": subtype_compliance,
         }
 
     async def list_reports(
@@ -132,6 +152,18 @@ class ReportManager:
         aggregated = await self._data_processor.aggregate_task_group_results(task_group_id)
         return await self._data_processor.export_report_file(aggregated, target_format)
 
+    async def get_compliance_statistics(self) -> dict:
+        counts = await self._data_processor.count_compliance_results()
+        compliant = sum(v for k, v in counts.items() if k.startswith("合规"))
+        non_compliant = sum(v for k, v in counts.items() if not k.startswith("合规"))
+        total = compliant + non_compliant
+        return {
+            "total": total,
+            "compliant": compliant,
+            "non_compliant": non_compliant,
+            "compliance_rate": round(compliant / total * 100, 2) if total else 0.0,
+        }
+
     async def prepare_visualization_data(self, task_group_id: str) -> dict:
         aggregated = await self._data_processor.aggregate_task_group_results(task_group_id)
 
@@ -160,6 +192,15 @@ class ReportManager:
         total = statistics["total"]
         attack_success_rate = round(statistics["non_compliant"] / total * 100, 2) if total else 0.0
 
+        iteration_counts = [
+            r["iteration_count"] for r in all_results
+            if r.get("iteration_count") is not None
+        ]
+        avg_iteration_count = (
+            round(sum(iteration_counts) / len(iteration_counts), 2)
+            if iteration_counts else None
+        )
+
         return {
             "risk_distribution": {
                 "type": "pie",
@@ -178,4 +219,7 @@ class ReportManager:
             },
             "attack_success_rate": attack_success_rate,
             "statistics": statistics,
+            "overall_rate": statistics["compliance_rate"],
+            "subtype_compliance": statistics["subtype_compliance"],
+            "avg_iteration_count": avg_iteration_count,
         }

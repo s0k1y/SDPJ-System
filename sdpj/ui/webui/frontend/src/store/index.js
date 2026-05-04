@@ -3,12 +3,15 @@ import { getUser, setUser as saveUser, clearAll } from '../utils/storage'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
-    isAuthenticated: false,
+    isAuthenticated: !!getUser(),
     user: getUser()
   }),
   actions: {
     setLoggedIn(userId) {
+      const user = { user_id: userId }
+      this.user = user
       this.isAuthenticated = true
+      saveUser(user)
     },
     setUser(user) {
       this.user = user

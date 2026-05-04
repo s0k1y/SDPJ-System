@@ -49,3 +49,7 @@ class ReportManagerInterface(Protocol):
     async def prepare_visualization_data(self, task_group_id: str) -> dict:
         """准备可视化图表数据"""
         ...
+
+    async def get_compliance_statistics(self) -> dict:
+        """获取全局合规统计"""
+        ...

@@ -31,6 +31,7 @@ dependencies = [
     "pydantic-settings>=2.6.0",
     "python-multipart>=0.0.20",
     "pyjwt>=2.8.0",
+    "itsdangerous>=2.1.0",
     "bcrypt>=4.1.0",
     "cryptography>=42.0.0",
     "aiohttp>=3.9.0",
