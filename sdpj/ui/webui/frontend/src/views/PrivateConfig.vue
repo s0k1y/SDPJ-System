@@ -1,8 +1,10 @@
 <template>
-  <div>
-    <h2>私有检测配置</h2>
-    <el-button type="primary" @click="openCreate" style="margin-bottom:16px">新建配置</el-button>
-    <el-button @click="loadList" style="margin-bottom:16px">刷新</el-button>
+  <PageLayout title="私有配置" description="管理用户私有的大模型适配器和检测配置">
+    <div class="action-bar">
+      <el-button type="primary" @click="openCreate">新建配置</el-button>
+      <el-button @click="loadList">刷新</el-button>
+      <el-button @click="importVisible = true">导入配置</el-button>
+    </div>
 
     <el-table :data="configs" v-loading="loading">
       <el-table-column prop="config_id" label="配置ID" width="100" />
@@ -39,15 +41,15 @@
         <el-button type="primary" @click="doImport" :loading="importing">导入</el-button>
       </template>
     </el-dialog>
-
-    <el-button @click="importVisible = true" style="margin-top:16px">导入配置</el-button>
-  </div>
+  </PageLayout>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { detectionConfig } from '../api/detection'
+import { encryptPassword, decryptData } from '../utils/crypto'
+import PageLayout from '../components/common/PageLayout.vue'
 
 const configs = ref([])
 const loading = ref(false)
@@ -58,6 +60,13 @@ const configJson = ref('')
 const importJson = ref('')
 const saving = ref(false)
 const importing = ref(false)
+
+// 加密配置内容
+const encryptConfig = async (configContent) => {
+  const jsonStr = JSON.stringify(configContent)
+  // 使用 RSA 加密
+  return await encryptPassword(jsonStr)
+}
 
 const loadList = async () => {
   loading.value = true
@@ -81,8 +90,27 @@ const openEdit = async (row) => {
   editingId.value = row.config_id
   try {
     const res = await detectionConfig('read', { config_id: row.config_id })
-    configJson.value = res.success ? JSON.stringify(res.config_content, null, 2) : ''
-  } catch {
+    if (res.success && res.config_content) {
+      // 服务端已解密，直接解析
+      let content = res.config_content
+      if (typeof content === 'string') {
+        try {
+          content = JSON.parse(content)
+        } catch {
+          // 如果解析失败，直接使用字符串
+        }
+      }
+      // 格式化显示
+      configJson.value = typeof content === 'object'
+        ? JSON.stringify(content, null, 2)
+        : content
+    } else {
+      ElMessage.warning('无法读取配置内容')
+      configJson.value = ''
+    }
+  } catch (error) {
+    console.error('读取配置失败:', error)
+    ElMessage.error('读取配置失败')
     configJson.value = ''
   }
   dialogVisible.value = true
@@ -99,9 +127,14 @@ const saveConfig = async () => {
   saving.value = true
   try {
     const op = editingId.value ? 'update' : 'create'
+
+    // 加密配置内容
+    const encryptedContent = await encryptConfig(content)
+
     const params = editingId.value
-      ? { config_id: editingId.value, config_content: content }
-      : { config_content: content }
+      ? { config_id: editingId.value, config_content: encryptedContent, is_encrypted: true }
+      : { config_content: encryptedContent, is_encrypted: true }
+
     const res = await detectionConfig(op, params)
     if (res.success) {
       ElMessage.success(editingId.value ? '更新成功' : '创建成功')
@@ -129,17 +162,31 @@ const deleteConfig = async (configId) => {
 }
 
 const exportConfig = async (configId) => {
-  const res = await detectionConfig('export', { config_id: configId, target_format: 'json' })
-  if (res.success) {
-    const blob = new Blob([res.file_content], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `config_${configId}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-  } else {
-    ElMessage.error(res.error || '导出失败')
+  try {
+    const res = await detectionConfig('export', { config_id: configId, target_format: 'json' })
+    if (res.success) {
+      let content = res.file_content
+
+      // 服务端已解密，直接使用
+      if (typeof content === 'object') {
+        content = JSON.stringify(content, null, 2)
+      }
+
+      // 创建下载
+      const blob = new Blob([content], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `config_${configId}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      ElMessage.success('导出成功')
+    } else {
+      ElMessage.error(res.error || '导出失败')
+    }
+  } catch (error) {
+    console.error('导出失败:', error)
+    ElMessage.error('导出失败')
   }
 }
 
@@ -153,7 +200,13 @@ const doImport = async () => {
   }
   importing.value = true
   try {
-    const res = await detectionConfig('import', { file_content: content })
+    // 加密配置内容
+    const encryptedContent = await encryptConfig(content)
+
+    const res = await detectionConfig('import', {
+      file_content: encryptedContent,
+      is_encrypted: true
+    })
     if (res.success) {
       ElMessage.success('导入成功')
       importVisible.value = false
@@ -170,3 +223,11 @@ const doImport = async () => {
 
 onMounted(loadList)
 </script>
+
+<style scoped>
+.action-bar {
+  display: flex;
+  gap: var(--spacing-3);
+  margin-bottom: var(--spacing-6);
+}
+</style>

@@ -1,7 +1,5 @@
 <template>
-  <div class="settings">
-    <h2>系统设置</h2>
-
+  <PageLayout title="系统设置" description="管理个人信息、密码和检测配置">
     <el-card>
       <el-tabs v-model="activeTab">
         <el-tab-pane label="个人信息" name="profile">
@@ -49,7 +47,7 @@
         </el-tab-pane>
       </el-tabs>
     </el-card>
-  </div>
+  </PageLayout>
 </template>
 
 <script setup>
@@ -58,6 +56,7 @@ import { ElMessage } from 'element-plus'
 import { getProfile, accountOperation } from '../api/user'
 import { encryptPassword } from '../utils/crypto'
 import { detectionConfig as detectionConfigApi } from '../api/detection'
+import PageLayout from '../components/common/PageLayout.vue'
 
 const activeTab = ref('profile')
 const profileLoading = ref(false)
@@ -164,7 +163,5 @@ onMounted(fetchProfile)
 </script>
 
 <style scoped>
-.settings h2 {
-  margin-bottom: 20px;
-}
+/* 无需额外样式，由 PageLayout 统一管理 */
 </style>

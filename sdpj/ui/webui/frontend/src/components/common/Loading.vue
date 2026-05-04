@@ -21,18 +21,18 @@ defineProps({
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 0;
+  padding: var(--spacing-10) 0;
 }
 
 .loading-icon {
   animation: rotate 1.5s linear infinite;
-  color: #409eff;
+  color: var(--color-primary);
 }
 
 .loading-text {
-  margin-top: 12px;
-  color: #909399;
-  font-size: 14px;
+  margin-top: var(--spacing-3);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 @keyframes rotate {

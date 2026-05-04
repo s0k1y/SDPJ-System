@@ -15,10 +15,11 @@ const routes = [
       { path: 'dashboard', name: 'Dashboard', component: () => import('../views/Dashboard.vue') },
       { path: 'detection', name: 'Detection', component: () => import('../views/Detection.vue') },
       { path: 'reports', name: 'Reports', component: () => import('../views/Reports.vue') },
-      { path: 'settings', name: 'Settings', component: () => import('../views/Settings.vue') },
-      { path: 'dac', name: 'DacManager', component: () => import('../views/DacManager.vue') },
       { path: 'datasets', name: 'Datasets', component: () => import('../views/Datasets.vue') },
-      { path: 'private-config', name: 'PrivateConfig', component: () => import('../views/PrivateConfig.vue') }
+      { path: 'private-config', name: 'PrivateConfig', component: () => import('../views/PrivateConfig.vue') },
+      { path: 'logs', name: 'Logs', component: () => import('../views/Logs.vue') },
+      { path: 'dac', name: 'DacManager', component: () => import('../views/DacManager.vue') },
+      { path: 'settings', name: 'Settings', component: () => import('../views/Settings.vue') }
     ]
   }
 ]

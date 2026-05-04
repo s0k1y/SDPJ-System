@@ -32,12 +32,14 @@ export function deleteReport(targetId, granularity = 'report') {
 }
 
 /**
- * 导出报告
+ * 导出报告（返回文件流）
  */
 export function exportReport(taskGroupId, targetFormat = 'jsonl') {
   return api.post('/reports/export', {
     task_group_id: taskGroupId,
     target_format: targetFormat
+  }, {
+    responseType: 'blob'
   })
 }
 

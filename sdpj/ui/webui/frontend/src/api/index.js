@@ -11,8 +11,11 @@ api.interceptors.response.use(
   response => response.data,
   error => {
     if (error.response?.status === 401) {
-      clearAll()
-      window.location.href = '/login'
+      // 只在非登录页面时才清除存储并重定向
+      if (window.location.pathname !== '/login') {
+        clearAll()
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }

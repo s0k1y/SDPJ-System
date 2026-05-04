@@ -5,20 +5,23 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { onMounted } from 'vue'
 import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
+import { useThemeStore } from './store/theme'
+
+// 初始化主题
+const themeStore = useThemeStore()
+
+onMounted(() => {
+  // 确保主题在应用启动时正确应用
+  document.documentElement.setAttribute('data-theme', themeStore.theme)
+})
 </script>
 
 <style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+/* 引入设计令牌 */
+@import './styles/design-tokens.css';
 
-#app {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+/* 引入全局样式 */
+@import './styles/global.scss';
 </style>

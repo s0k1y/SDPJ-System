@@ -105,7 +105,7 @@ class UserCenter:
 
     # ==================== 凭据校验 ====================
 
-    async def verify_credentials(self, username: str, password: str) -> Optional[int]:
+    async def verify_credentials(self, username: str, password: str) -> tuple[bool, Optional[int], str]:
         """登录凭据校验
 
         Args:
@@ -113,18 +113,18 @@ class UserCenter:
             password: 明文密码
 
         Returns:
-            校验通过时返回用户 ID，失败时返回 None
+            (是否成功, 用户ID, 错误消息)
         """
         # 查询用户信息（含存储密码）
         user = await self._user_db.get_user_by_username(username)
 
         if user is None:
-            return None
+            return False, None, "账号未注册，请先注册"
 
         if user["password"] == password:
-            return user["user_id"]
+            return True, user["user_id"], ""
 
-        return None
+        return False, None, "密码错误"
 
     # ==================== 资源登记与查询 ====================
 

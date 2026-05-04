@@ -1,8 +1,6 @@
 <template>
-  <div class="dac-manager">
-    <h2>权限管理</h2>
-
-    <el-card style="margin-bottom: 16px">
+  <PageLayout title="权限管理" description="管理用户对私有资源的访问控制">
+    <el-card class="grant-card">
       <template #header>授予访问权限</template>
       <el-form :model="grantForm" inline>
         <el-form-item label="资源ID">
@@ -19,9 +17,13 @@
 
     <el-card>
       <template #header>
-        <span>访问控制列表</span>
-        <el-input-number v-model="queryResourceId" :min="1" size="small" style="margin-left:12px" />
-        <el-button size="small" @click="loadAcl" style="margin-left:8px">查询</el-button>
+        <div class="acl-header">
+          <span>访问控制列表</span>
+          <div class="query-controls">
+            <el-input-number v-model="queryResourceId" :min="1" size="small" />
+            <el-button size="small" @click="loadAcl">查询</el-button>
+          </div>
+        </div>
       </template>
       <el-table :data="aclList" v-loading="loading">
         <el-table-column prop="acl_id" label="ACL ID" width="100" />
@@ -34,13 +36,14 @@
         </el-table-column>
       </el-table>
     </el-card>
-  </div>
+  </PageLayout>
 </template>
 
 <script setup>
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { dacOperation } from '../api/user'
+import PageLayout from '../components/common/PageLayout.vue'
 
 const granting = ref(false)
 const loading = ref(false)
@@ -95,6 +98,24 @@ const revokeAccess = async (aclId) => {
   }
 }
 </script>
+
+<style scoped>
+.grant-card {
+  margin-bottom: var(--spacing-6);
+}
+
+.acl-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.query-controls {
+  display: flex;
+  gap: var(--spacing-2);
+  align-items: center;
+}
+</style>
 
 <style scoped>
 .dac-manager h2 { margin-bottom: 20px; }

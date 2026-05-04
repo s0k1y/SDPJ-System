@@ -35,12 +35,12 @@ class AccountManager:
         except Exception as e:
             return False, str(e)
 
-    async def login(self, username: str, password: str) -> tuple[bool, Optional[int]]:
-        user_id = await self._user_center.verify_credentials(username, password)
-        if user_id is not None:
+    async def login(self, username: str, password: str) -> tuple[bool, Optional[int], str]:
+        success, user_id, error_msg = await self._user_center.verify_credentials(username, password)
+        if success:
             self._current_user_id = user_id
-            return True, user_id
-        return False, None
+            return True, user_id, ""
+        return False, None, error_msg
 
     def get_current_session(self) -> Optional[int]:
         return self._current_user_id

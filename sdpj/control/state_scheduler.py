@@ -363,10 +363,11 @@ class StateScheduler(StateSchedulerInterface):
             return {"success": ok, "message": msg}
 
         if action == "login":
-            ok, user_id = await self._account.login(username, pwd)
+            ok, user_id, error_msg = await self._account.login(username, pwd)
             if ok:
                 self._log_op(user_id or 0, "login", {"username": username})
-            return {"success": ok, "user_id": user_id}
+                return {"success": True, "user_id": user_id}
+            return {"success": False, "message": error_msg}
 
         return {"success": False, "error": f"未知操作: {action}"}
 

@@ -36,7 +36,8 @@ async def login(
         req.username, req.password, "login", is_encrypted=req.is_encrypted,
     )
     if not result["success"]:
-        raise HTTPException(status_code=401, detail="登录失败")
+        error_msg = result.get("message", "登录失败")
+        raise HTTPException(status_code=401, detail=error_msg)
     request.session["user_id"] = result.get("user_id", 0)
     return {"success": True, "user_id": result.get("user_id")}
 

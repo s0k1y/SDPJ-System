@@ -17,37 +17,42 @@ router = APIRouter(prefix="/api/reports", tags=["reports"])
 async def compliance_statistics(
     scheduler: StateSchedulerInterface = Depends(get_scheduler),
 ):
+    """查询全局合规统计"""
     return await scheduler.query_compliance_statistics()
 
 
 @router.post("/generate")
 async def generate(
     req: ReportGenerateRequest,
+    request: Request,
     scheduler: StateSchedulerInterface = Depends(get_scheduler),
 ):
-    return await scheduler.generate_report(req.task_group_id, req.detection_type)
+    user_id: int = request.state.user_id
+    return await scheduler.generate_report(req.task_group_id, req.detection_type, user_id=user_id)
 
 
 @router.get("/list")
 async def list_reports(
-    user_id: Optional[str] = None,
+    request: Request,
     model_id: Optional[str] = None,
     scheduler: StateSchedulerInterface = Depends(get_scheduler),
 ):
-    filters = {}
-    if user_id:
-        filters["user_id"] = user_id
+    # 强制使用认证用户的 ID，不允许查询参数覆盖
+    user_id: int = request.state.user_id
+    filters = {"user_id": user_id}
     if model_id:
         filters["model_id"] = model_id
-    return await scheduler.list_reports(filters or None)
+    return await scheduler.list_reports(filters)
 
 
 @router.get("/{task_group_id}")
 async def view_report(
     task_group_id: str,
+    request: Request,
     scheduler: StateSchedulerInterface = Depends(get_scheduler),
 ):
-    return await scheduler.view_report(task_group_id)
+    user_id: int = request.state.user_id
+    return await scheduler.view_report(task_group_id, user_id=user_id)
 
 
 @router.delete("/{target_id}")
@@ -64,14 +69,18 @@ async def delete_report(
 @router.post("/export")
 async def export_report(
     req: ReportExportRequest,
+    request: Request,
     scheduler: StateSchedulerInterface = Depends(get_scheduler),
 ):
-    return await scheduler.export_report(req.task_group_id, req.target_format)
+    user_id: int = request.state.user_id
+    return await scheduler.export_report(req.task_group_id, req.target_format, user_id=user_id)
 
 
 @router.get("/{task_group_id}/visualization")
 async def visualization(
     task_group_id: str,
+    request: Request,
     scheduler: StateSchedulerInterface = Depends(get_scheduler),
 ):
-    return await scheduler.prepare_visualization_data(task_group_id)
+    user_id: int = request.state.user_id
+    return await scheduler.prepare_visualization_data(task_group_id, user_id=user_id)
