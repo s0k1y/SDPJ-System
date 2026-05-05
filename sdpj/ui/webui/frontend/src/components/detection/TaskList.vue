@@ -1,13 +1,9 @@
 <template>
-  <el-card class="task-list">
-    <template #header>
-      <div class="card-header">
-        <span>任务队列</span>
-        <el-button size="small" @click="refresh" :loading="loading">
-          刷新
-        </el-button>
-      </div>
-    </template>
+  <div class="task-list">
+    <div class="section-header">
+      <h2 class="section-title">任务队列</h2>
+      <el-button class="btn-refresh" size="small" @click="refresh" :loading="loading">刷新</el-button>
+    </div>
 
     <div v-if="loading && tasks.length === 0">
       <el-skeleton :rows="3" animated />
@@ -25,7 +21,7 @@
         :detail="task.detail || ''"
       />
     </div>
-  </el-card>
+  </div>
 </template>
 
 <script setup>
@@ -41,14 +37,9 @@ const refresh = async () => {
   loading.value = true
   try {
     const res = await getProgress()
-    if (res.success) {
-      tasks.value = res.queue || []
-    }
-  } catch {
-    // 静默处理
-  } finally {
-    loading.value = false
-  }
+    if (res.success) tasks.value = res.queue || []
+  } catch { /* 静默处理 */ }
+  finally { loading.value = false }
 }
 
 onMounted(() => {
@@ -62,9 +53,35 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.card-header {
+.task-list {
+  margin-top: 42px;
+}
+
+.section-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 12px;
+  margin-bottom: 21px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #404040;
+  margin: 0;
+}
+
+.btn-refresh {
+  height: 30px;
+  padding: 0 14px;
+  font-size: 12px;
+  border-radius: 10px;
+  border: 1px solid #d0d0d0;
+  color: #404040;
+  background: #fff;
+}
+
+.btn-refresh:hover {
+  background: #f5f5f5;
 }
 </style>

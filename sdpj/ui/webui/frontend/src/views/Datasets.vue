@@ -1,355 +1,283 @@
 <template>
-  <PageLayout title="检测数据集" description="查看系统内置和用户私有的检测数据集">
-    <el-card>
-      <!-- 操作栏 -->
+  <div class="page-container">
+    <div class="page-inner">
+      <h1 class="page-title">检测数据集</h1>
+      <p class="page-info">管理用于安全检测的提示词数据集</p>
+
       <div class="action-bar">
-        <el-button type="primary" @click="openUploadDialog">上传数据集</el-button>
-        <el-button @click="loadDatasets">刷新</el-button>
-        <div class="search-wrapper">
-          <el-input
-            v-model="searchText"
-            placeholder="搜索数据集名称或风险类型"
-            clearable
-            style="width: 300px"
-          >
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
-        </div>
+        <el-button class="btn-create" @click="openCreate" :icon="null">新建数据集</el-button>
+        <el-button class="btn-import" @click="importVisible = true" :icon="null">导入数据集</el-button>
       </div>
 
-      <!-- 数据表格 -->
-      <el-table
-        :data="filteredDatasets"
-        v-loading="loading"
-        style="width: 100%"
-        :empty-text="searchText ? '未找到匹配的数据集' : '暂无数据集'"
-      >
-        <el-table-column prop="dataset_id" label="ID" width="80" />
-        <el-table-column prop="name" label="名称" min-width="200" />
-        <el-table-column prop="risk_type" label="风险类型" width="150">
-          <template #default="{ row }">
-            <el-tag :type="getRiskTypeTag(row.risk_type)" size="small">
-              {{ row.risk_type }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="sample_count" label="样本数" width="100" align="right" />
-        <el-table-column prop="is_builtin" label="类型" width="100">
-          <template #default="{ row }">
-            <el-tag :type="row.is_builtin ? 'info' : 'success'" size="small">
-              {{ row.is_builtin ? '系统内置' : '用户私有' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
-          <template #default="{ row }">
-            <el-button size="small" @click="viewDataset(row)">查看</el-button>
-            <template v-if="!row.is_builtin">
-              <el-button size="small" @click="openEditDialog(row)">编辑</el-button>
-              <el-button size="small" type="danger" @click="deleteDataset(row)">删除</el-button>
-            </template>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <!-- 空状态 -->
-      <div v-if="!loading && datasets.length === 0" class="empty-state">
-        <el-empty description="暂无数据集" />
+      <div class="table-wrapper" v-loading="loading">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 20%">数据集ID</th>
+              <th style="width: 30%">名称</th>
+              <th style="width: 20%">样本数</th>
+              <th style="width: 15%">创建时间</th>
+              <th style="width: 15%">操作</th>
+            </tr>
+          </thead>
+          <tbody v-if="datasets.length > 0">
+            <tr v-for="ds in datasets" :key="ds.dataset_id || ds.id">
+              <td><span class="cell-mono">{{ ds.dataset_id || ds.id }}</span></td>
+              <td>{{ ds.name || '-' }}</td>
+              <td>{{ ds.sample_count ?? '-' }}</td>
+              <td>{{ ds.created_at || '-' }}</td>
+              <td>
+                <div class="action-btns">
+                  <el-button class="action-btn" size="small" @click="viewDetail(ds)">查看</el-button>
+                  <el-button class="action-btn action-btn-danger" size="small" @click="deleteDataset(ds)">删除</el-button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+          <tbody v-else>
+            <tr>
+              <td colspan="99" class="empty-row">暂无数据集</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-    </el-card>
 
-    <!-- 上传数据集对话框 -->
-    <el-dialog v-model="uploadVisible" title="上传数据集" width="600px">
-      <el-form :model="uploadForm" label-width="100px">
-        <el-form-item label="数据集名称" required>
-          <el-input v-model="uploadForm.name" placeholder="请输入数据集名称" />
-        </el-form-item>
-        <el-form-item label="风险类型" required>
-          <el-select v-model="uploadForm.risk_type" placeholder="请选择风险类型">
-            <el-option label="越狱" value="越狱" />
-            <el-option label="隐私" value="隐私" />
-            <el-option label="毒性" value="毒性" />
-            <el-option label="偏见" value="偏见" />
-            <el-option label="幻觉" value="幻觉" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="数据集文件" required>
-          <el-upload
-            ref="uploadRef"
-            :auto-upload="false"
-            :limit="1"
-            accept=".csv,.json,.jsonl"
-            :on-change="handleFileChange"
-          >
-            <el-button>选择文件</el-button>
-            <template #tip>
-              <div class="el-upload__tip">支持 CSV、JSON、JSONL 格式</div>
-            </template>
-          </el-upload>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="uploadVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleUpload" :loading="uploading">上传</el-button>
-      </template>
-    </el-dialog>
+      <el-dialog v-model="dialogVisible" title="新建数据集" width="500px">
+        <el-form :model="formData" label-width="100px">
+          <el-form-item label="数据集名称">
+            <el-input v-model="formData.name" placeholder="请输入数据集名称" />
+          </el-form-item>
+          <el-form-item label="描述">
+            <el-input v-model="formData.description" type="textarea" :rows="3" placeholder="请输入描述" />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="dialogVisible = false" :icon="null">取消</el-button>
+          <el-button type="primary" @click="saveDataset" :loading="saving">创建</el-button>
+        </template>
+      </el-dialog>
 
-    <!-- 编辑数据集对话框 -->
-    <el-dialog v-model="editVisible" title="编辑数据集" width="600px">
-      <el-form :model="editForm" label-width="100px">
-        <el-form-item label="数据集名称" required>
-          <el-input v-model="editForm.name" placeholder="请输入数据集名称" />
-        </el-form-item>
-        <el-form-item label="风险类型" required>
-          <el-select v-model="editForm.risk_type" placeholder="请选择风险类型">
-            <el-option label="越狱" value="越狱" />
-            <el-option label="隐私" value="隐私" />
-            <el-option label="毒性" value="毒性" />
-            <el-option label="偏见" value="偏见" />
-            <el-option label="幻觉" value="幻觉" />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="editVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleEdit" :loading="editing">保存</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 查看数据集详情对话框 -->
-    <el-dialog v-model="viewVisible" title="数据集详情" width="70%">
-      <el-descriptions :column="2" border v-if="currentDataset">
-        <el-descriptions-item label="数据集ID">{{ currentDataset.dataset_id }}</el-descriptions-item>
-        <el-descriptions-item label="名称">{{ currentDataset.name }}</el-descriptions-item>
-        <el-descriptions-item label="风险类型">
-          <el-tag :type="getRiskTypeTag(currentDataset.risk_type)" size="small">
-            {{ currentDataset.risk_type }}
-          </el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="样本数">{{ currentDataset.sample_count }}</el-descriptions-item>
-        <el-descriptions-item label="类型">
-          <el-tag :type="currentDataset.is_builtin ? 'info' : 'success'" size="small">
-            {{ currentDataset.is_builtin ? '系统内置' : '用户私有' }}
-          </el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="创建时间">{{ currentDataset.created_at || '-' }}</el-descriptions-item>
-      </el-descriptions>
-    </el-dialog>
-  </PageLayout>
+      <el-dialog v-model="importVisible" title="导入数据集" width="500px">
+        <el-upload
+          drag
+          :auto-upload="false"
+          :on-change="handleFileChange"
+          accept=".json,.csv"
+        >
+          <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+          <div class="el-upload__text">拖拽文件到此处或<em>点击上传</em></div>
+          <template #tip>
+            <div class="el-upload__tip">支持 JSON / CSV 格式</div>
+          </template>
+        </el-upload>
+        <template #footer>
+          <el-button @click="importVisible = false" :icon="null">取消</el-button>
+          <el-button type="primary" @click="doImport" :loading="importing">导入</el-button>
+        </template>
+      </el-dialog>
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { Search } from '@element-plus/icons-vue'
+import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getDatasets, detectionResource } from '../api/detection'
-import PageLayout from '../components/common/PageLayout.vue'
+import { UploadFilled } from '@element-plus/icons-vue'
+import api from '../api'
 
-const loading = ref(false)
 const datasets = ref([])
-const searchText = ref('')
+const loading = ref(false)
+const dialogVisible = ref(false)
+const importVisible = ref(false)
+const saving = ref(false)
+const importing = ref(false)
+const file = ref(null)
 
-const uploadVisible = ref(false)
-const editVisible = ref(false)
-const viewVisible = ref(false)
-const uploading = ref(false)
-const editing = ref(false)
+const formData = ref({ name: '', description: '' })
 
-const uploadForm = ref({
-  name: '',
-  risk_type: '',
-  file: null
-})
-
-const editForm = ref({
-  dataset_id: '',
-  name: '',
-  risk_type: ''
-})
-
-const currentDataset = ref(null)
-
-// 过滤数据集
-const filteredDatasets = computed(() => {
-  if (!searchText.value) return datasets.value
-  const keyword = searchText.value.toLowerCase()
-  return datasets.value.filter(item =>
-    item.name?.toLowerCase().includes(keyword) ||
-    item.risk_type?.toLowerCase().includes(keyword)
-  )
-})
-
-// 风险类型标签颜色
-const getRiskTypeTag = (riskType) => {
-  const typeMap = {
-    '越狱': 'danger',
-    '隐私': 'warning',
-    '毒性': 'danger',
-    '偏见': 'warning',
-    '幻觉': 'info'
-  }
-  return typeMap[riskType] || 'info'
-}
-
-const loadDatasets = async () => {
+const fetchDatasets = async () => {
   loading.value = true
   try {
-    const res = await getDatasets()
-    datasets.value = Array.isArray(res) ? res : (res.datasets || [])
-  } catch (error) {
-    console.error('加载数据集失败:', error)
-    ElMessage.error('加载数据集失败')
-  } finally {
-    loading.value = false
-  }
+    const res = await api.get('/datasets')
+    datasets.value = res?.datasets || res?.data || []
+  } catch { datasets.value = [] }
+  finally { loading.value = false }
 }
 
-const openUploadDialog = () => {
-  uploadForm.value = {
-    name: '',
-    risk_type: '',
-    file: null
-  }
-  uploadVisible.value = true
+const openCreate = () => {
+  formData.value = { name: '', description: '' }
+  dialogVisible.value = true
 }
 
-const handleFileChange = (file) => {
-  uploadForm.value.file = file.raw
-}
-
-const handleUpload = async () => {
-  if (!uploadForm.value.name) {
-    ElMessage.warning('请输入数据集名称')
-    return
-  }
-  if (!uploadForm.value.risk_type) {
-    ElMessage.warning('请选择风险类型')
-    return
-  }
-  if (!uploadForm.value.file) {
-    ElMessage.warning('请选择文件')
-    return
-  }
-
-  uploading.value = true
+const saveDataset = async () => {
+  saving.value = true
   try {
-    const formData = new FormData()
-    formData.append('file', uploadForm.value.file)
-    formData.append('name', uploadForm.value.name)
-    formData.append('risk_type', uploadForm.value.risk_type)
-
-    const res = await detectionResource('upload_dataset', {
-      name: uploadForm.value.name,
-      risk_type: uploadForm.value.risk_type,
-      file_content: await uploadForm.value.file.text()
-    })
-
-    if (res.success) {
-      ElMessage.success('上传成功')
-      uploadVisible.value = false
-      await loadDatasets()
-    } else {
-      ElMessage.error(res.error || '上传失败')
-    }
-  } catch (error) {
-    console.error('上传失败:', error)
-    ElMessage.error('上传失败')
-  } finally {
-    uploading.value = false
-  }
+    await api.post('/datasets', formData.value)
+    ElMessage.success('创建成功')
+    dialogVisible.value = false
+    fetchDatasets()
+  } catch { ElMessage.error('创建失败') }
+  finally { saving.value = false }
 }
 
-const openEditDialog = (row) => {
-  editForm.value = {
-    dataset_id: row.dataset_id,
-    name: row.name,
-    risk_type: row.risk_type
-  }
-  editVisible.value = true
+const viewDetail = (ds) => {
+  ElMessage.info(`查看数据集: ${ds.name || ds.dataset_id || ds.id}`)
 }
 
-const handleEdit = async () => {
-  if (!editForm.value.name) {
-    ElMessage.warning('请输入数据集名称')
-    return
-  }
-  if (!editForm.value.risk_type) {
-    ElMessage.warning('请选择风险类型')
-    return
-  }
-
-  editing.value = true
+const deleteDataset = async (ds) => {
+  await ElMessageBox.confirm('确认删除该数据集？', '提示', { type: 'warning' })
   try {
-    const res = await detectionResource('update_dataset', {
-      dataset_id: editForm.value.dataset_id,
-      name: editForm.value.name,
-      risk_type: editForm.value.risk_type
-    })
-
-    if (res.success) {
-      ElMessage.success('更新成功')
-      editVisible.value = false
-      await loadDatasets()
-    } else {
-      ElMessage.error(res.error || '更新失败')
-    }
-  } catch (error) {
-    console.error('更新失败:', error)
-    ElMessage.error('更新失败')
-  } finally {
-    editing.value = false
-  }
+    await api.delete(`/datasets/${ds.dataset_id || ds.id}`)
+    ElMessage.success('已删除')
+    fetchDatasets()
+  } catch { ElMessage.error('删除失败') }
 }
 
-const deleteDataset = async (row) => {
+const handleFileChange = (uploadFile) => {
+  file.value = uploadFile.raw
+}
+
+const doImport = async () => {
+  if (!file.value) return ElMessage.warning('请选择文件')
+  importing.value = true
   try {
-    await ElMessageBox.confirm(`确定要删除数据集"${row.name}"吗？`, '确认删除', {
-      type: 'warning'
+    const formPayload = new FormData()
+    formPayload.append('file', file.value)
+    await api.post('/datasets/import', formPayload, {
+      headers: { 'Content-Type': 'multipart/form-data' }
     })
-
-    const res = await detectionResource('delete_dataset', {
-      dataset_id: row.dataset_id
-    })
-
-    if (res.success) {
-      ElMessage.success('删除成功')
-      await loadDatasets()
-    } else {
-      ElMessage.error(res.error || '删除失败')
-    }
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('删除失败:', error)
-      ElMessage.error('删除失败')
-    }
-  }
+    ElMessage.success('导入成功')
+    importVisible.value = false
+    fetchDatasets()
+  } catch { ElMessage.error('导入失败') }
+  finally { importing.value = false }
 }
 
-const viewDataset = (row) => {
-  currentDataset.value = row
-  viewVisible.value = true
-}
-
-onMounted(() => {
-  loadDatasets()
-})
+onMounted(fetchDatasets)
 </script>
 
 <style scoped>
+.page-container {
+  width: 100%;
+}
+
+.page-inner {
+  max-width: 936px;
+  margin: 0;
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #404040;
+  line-height: 32px;
+  margin: 0 0 32px;
+}
+
+.page-info {
+  font-size: 14px;
+  color: #404040;
+  line-height: 25px;
+  margin: 0 0 22px;
+}
+
 .action-bar {
   display: flex;
-  gap: var(--spacing-3);
-  margin-bottom: var(--spacing-4);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.btn-create {
+  height: 34px;
+  padding: 0 14px;
+  font-size: 14px;
+  border-radius: 10px;
+  background: #000;
+  color: #fff;
+  border: none;
+}
+
+.btn-create:hover {
+  background: #333;
+}
+
+.btn-import {
+  height: 34px;
+  padding: 0 14px;
+  font-size: 14px;
+  border-radius: 10px;
+  border: 1px solid #d0d0d0;
+  color: #404040;
+  background: #fff;
+}
+
+.btn-import:hover {
+  background: #f5f5f5;
+}
+
+.table-wrapper {
+  background: #fafafa;
+  border-radius: 10px;
+  padding: 2px 14px 4px;
+  margin-bottom: 24px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th {
+  color: #8b8b8b;
+  font-weight: 600;
+  font-size: 14px;
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+td {
+  color: #404040;
+  font-size: 14px;
+  padding: 10px 8px;
+  vertical-align: middle;
+}
+
+.cell-mono {
+  font-family: var(--font-family-mono);
+  letter-spacing: 0.3px;
+}
+
+.action-btns {
+  display: flex;
   align-items: center;
+  gap: 8px;
 }
 
-.search-wrapper {
-  margin-left: auto;
+.action-btn {
+  height: 30px;
+  padding: 0 14px;
+  font-size: 12px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: #404040;
 }
 
-.empty-state {
-  padding: var(--spacing-8) 0;
+.action-btn:hover {
+  background: #e5e5e5;
+}
+
+.action-btn-danger:hover {
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.empty-row {
+  padding: 24px 8px;
+  text-align: center;
+  color: #8b8b8b;
+  font-size: 13px;
 }
 </style>

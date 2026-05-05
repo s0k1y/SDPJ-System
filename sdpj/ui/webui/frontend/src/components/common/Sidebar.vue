@@ -7,7 +7,6 @@
     </div>
 
     <nav class="sidebar-nav">
-      <!-- 业务组 -->
       <div class="nav-group">
         <router-link
           v-for="item in businessItems"
@@ -20,10 +19,6 @@
         </router-link>
       </div>
 
-      <!-- 分隔线 -->
-      <div class="nav-divider"></div>
-
-      <!-- 管理组 -->
       <div class="nav-group nav-group-management">
         <router-link
           v-for="item in managementItems"
@@ -37,21 +32,56 @@
       </div>
     </nav>
 
-    <div class="sidebar-footer">
-      <div class="footer-divider"></div>
-      <div class="footer-content">
-        <span v-if="!collapsed" class="footer-text">v1.0.0</span>
-      </div>
+    <div class="sidebar-user">
+      <div class="user-divider"></div>
+      <el-dropdown @command="handleCommand" trigger="click">
+        <div class="user-info">
+          <div class="user-avatar">{{ userInitial }}</div>
+          <span v-if="!collapsed" class="username">{{ username }}</span>
+          <svg v-if="!collapsed" class="dropdown-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </div>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="profile">
+              <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+              个人信息
+            </el-dropdown-item>
+            <el-dropdown-item command="logout" divided>
+              <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
+              退出登录
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
     </div>
   </aside>
 </template>
 
 <script setup>
+import { computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '../../store'
+import { logout as apiLogout } from '../../api/auth'
+
 defineProps({
   collapsed: { type: Boolean, default: false }
 })
 
-// 业务组导航
+const router = useRouter()
+const authStore = useAuthStore()
+
+const username = computed(() => authStore.user?.username || '用户')
+const userInitial = computed(() => username.value.charAt(0).toUpperCase())
+
 const businessItems = [
   { path: '/dashboard', label: '仪表盘' },
   { path: '/detection', label: '安全检测' },
@@ -60,20 +90,28 @@ const businessItems = [
   { path: '/private-config', label: '私有配置' }
 ]
 
-// 管理组导航
 const managementItems = [
   { path: '/logs', label: '系统日志' },
   { path: '/dac', label: '权限管理' },
   { path: '/settings', label: '系统设置' }
 ]
+
+const handleCommand = async (command) => {
+  if (command === 'logout') {
+    await apiLogout().catch(() => {})
+    authStore.logout()
+    router.push('/login')
+  } else if (command === 'profile') {
+    router.push('/settings')
+  }
+}
 </script>
 
 <style scoped>
 .sidebar {
   width: var(--sidebar-width);
   height: 100vh;
-  background: var(--color-surface);
-  border-right: 1px solid var(--color-border);
+  background: var(--sidebar-bg);
   display: flex;
   flex-direction: column;
   transition: width var(--transition-base);
@@ -84,13 +122,11 @@ const managementItems = [
   width: var(--sidebar-collapsed-width);
 }
 
-/* 侧边栏头部 */
 .sidebar-header {
   height: var(--header-height);
   display: flex;
   align-items: center;
-  padding: 0 var(--spacing-5);
-  border-bottom: 1px solid var(--color-border);
+  padding: 0 16px;
 }
 
 .logo {
@@ -101,31 +137,13 @@ const managementItems = [
   width: 100%;
 }
 
-.logo-icon {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-primary);
-  border-radius: var(--radius-base);
-  color: white;
-  flex-shrink: 0;
-}
-
-.logo-icon svg {
-  width: 20px;
-  height: 20px;
-}
-
 .logo-text {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
-  color: var(--color-text);
+  color: #404040;
   white-space: nowrap;
 }
 
-/* 导航 */
 .sidebar-nav {
   flex: 1;
   padding: var(--spacing-4) var(--spacing-3);
@@ -133,17 +151,9 @@ const managementItems = [
   overflow-x: hidden;
 }
 
-/* 导航分组 */
 .nav-group {
   display: flex;
   flex-direction: column;
-}
-
-/* 分隔线 */
-.nav-divider {
-  height: 1px;
-  background: var(--color-border);
-  margin: var(--spacing-4) var(--spacing-4);
 }
 
 .nav-item {
@@ -152,99 +162,118 @@ const managementItems = [
   justify-content: center;
   gap: var(--spacing-3);
   padding: var(--spacing-3) var(--spacing-4);
-  margin-bottom: var(--spacing-2);
-  border-radius: var(--radius-base);
-  color: var(--color-text-secondary);
+  margin-bottom: 2px;
+  color: #404040;
   text-decoration: none;
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   transition: all var(--transition-fast);
   position: relative;
-  overflow: hidden;
 }
 
 .nav-item:hover {
   background: var(--color-surface-hover);
-  color: var(--color-text);
 }
 
 .nav-item.active {
-  background: var(--color-primary-lighter);
-  color: var(--color-primary-dark);
+  background: rgba(59, 130, 246, 0.12);
+  color: rgb(59, 130, 246);
 }
 
-/* 管理组导航项 - 降低视觉权重 */
 .nav-item-management {
-  color: var(--color-text-tertiary);
-}
-
-.nav-item-management:hover {
-  color: var(--color-text-secondary);
+  color: #404040;
 }
 
 .nav-item-management.active {
-  color: var(--color-primary-dark);
-}
-
-.nav-item.active::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 60%;
-  background: var(--color-primary);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-}
-
-.nav-icon {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
+  color: rgb(59, 130, 246);
 }
 
 .nav-text {
   white-space: nowrap;
 }
 
-/* 底部 */
-.sidebar-footer {
-  padding: var(--spacing-4) var(--spacing-3);
+.sidebar-user {
+  padding: 0 var(--spacing-3) var(--spacing-4);
 }
 
-.footer-divider {
+.sidebar-user :deep(.el-dropdown) {
+  display: block;
+}
+
+.sidebar-user :deep(.el-tooltip__trigger) {
+  display: flex;
+  justify-content: center;
+}
+
+.user-divider {
   height: 1px;
-  background: var(--color-border);
+  background: var(--color-gray-200);
   margin-bottom: var(--spacing-3);
 }
 
-.footer-content {
-  padding: 0 var(--spacing-4);
+.user-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-4);
+  cursor: pointer;
+  transition: all var(--transition-fast);
 }
 
-.footer-text {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
+.user-info:hover {
+  background: var(--color-surface-hover);
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  flex-shrink: 0;
+}
+
+.username {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: #404040;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* 动画 */
-.logo-fade-enter-active,
-.logo-fade-leave-active,
-.text-fade-enter-active,
-.text-fade-leave-active {
-  transition: opacity var(--transition-fast);
+.dropdown-icon {
+  width: 16px;
+  height: 16px;
+  color: #404040;
+  transition: transform var(--transition-fast);
+  flex-shrink: 0;
 }
 
-.logo-fade-enter-from,
-.logo-fade-leave-to,
-.text-fade-enter-from,
-.text-fade-leave-to {
-  opacity: 0;
+.user-info:hover .dropdown-icon {
+  transform: translateY(2px);
 }
 
-/* 滚动条 */
+.menu-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--color-text-secondary);
+}
+
+:deep(.el-dropdown-menu__item) {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-4);
+  font-size: var(--font-size-sm);
+}
+
 .sidebar-nav::-webkit-scrollbar {
   width: 4px;
 }
@@ -258,7 +287,6 @@ const managementItems = [
   border-radius: var(--radius-full);
 }
 
-/* 响应式 */
 @media (max-width: 768px) {
   .sidebar {
     position: fixed;

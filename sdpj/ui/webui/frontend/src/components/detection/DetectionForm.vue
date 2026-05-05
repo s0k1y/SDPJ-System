@@ -1,9 +1,9 @@
 <template>
-  <el-card class="detection-form">
-    <template #header>
-      <span>新建检测任务</span>
-    </template>
-    <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
+  <div class="detection-form">
+    <div class="section-header">
+      <h2 class="section-title">新建检测任务</h2>
+    </div>
+    <el-form :model="form" :rules="rules" ref="formRef" label-width="120px" class="form-content">
       <el-form-item label="模型ID" prop="model_id">
         <el-input v-model="form.model_id" placeholder="请输入模型ID" />
       </el-form-item>
@@ -37,13 +37,11 @@
         />
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" @click="handleSubmit" :loading="submitting">
-          启动检测
-        </el-button>
-        <el-button @click="handleReset">重置</el-button>
+        <el-button class="btn-submit" @click="handleSubmit" :loading="submitting">启动检测</el-button>
+        <el-button class="btn-reset" @click="handleReset">重置</el-button>
       </el-form-item>
     </el-form>
-  </el-card>
+  </div>
 </template>
 
 <script setup>
@@ -72,7 +70,6 @@ const rules = {
   dataset_ids: [{ required: true, type: 'array', min: 1, message: '请选择至少一个数据集', trigger: 'change' }]
 }
 
-// 将扁平的数据集列表转换为树形结构
 const buildDatasetTree = (datasets) => {
   const tree = []
   const pathMap = new Map()
@@ -87,22 +84,11 @@ const buildDatasetTree = (datasets) => {
       const isLeaf = index === parts.length - 1
 
       if (isLeaf) {
-        // 叶子节点（实际的数据集）
-        currentLevel.push({
-          id: ds.dataset_id,
-          label: part,
-          isLeaf: true
-        })
+        currentLevel.push({ id: ds.dataset_id, label: part, isLeaf: true })
       } else {
-        // 目录节点
         let node = pathMap.get(currentPath)
         if (!node) {
-          node = {
-            id: currentPath,
-            label: part,
-            children: [],
-            disabled: true // 目录节点不可选
-          }
+          node = { id: currentPath, label: part, children: [], disabled: true }
           currentLevel.push(node)
           pathMap.set(currentPath, node)
         }
@@ -111,15 +97,9 @@ const buildDatasetTree = (datasets) => {
     })
   })
 
-  // 确保 user_datasets 节点始终存在（即使为空）
   const hasUserDatasets = tree.some(node => node.label === 'user_datasets')
   if (!hasUserDatasets) {
-    tree.push({
-      id: 'user_datasets',
-      label: 'user_datasets',
-      children: [],
-      disabled: true
-    })
+    tree.push({ id: 'user_datasets', label: 'user_datasets', children: [], disabled: true })
   }
 
   return tree
@@ -162,3 +142,52 @@ const handleReset = () => {
 
 onMounted(fetchDatasets)
 </script>
+
+<style scoped>
+.detection-form {
+  margin-bottom: 42px;
+}
+
+.section-header {
+  margin-bottom: 21px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #404040;
+  margin: 0;
+}
+
+.form-content {
+  max-width: 520px;
+}
+
+.btn-submit {
+  height: 34px;
+  padding: 0 14px;
+  font-size: 14px;
+  border-radius: 10px;
+  background: #000;
+  color: #fff;
+  border: none;
+}
+
+.btn-submit:hover {
+  background: #333;
+}
+
+.btn-reset {
+  height: 34px;
+  padding: 0 14px;
+  font-size: 14px;
+  border-radius: 10px;
+  border: 1px solid #d0d0d0;
+  color: #404040;
+  background: #fff;
+}
+
+.btn-reset:hover {
+  background: #f5f5f5;
+}
+</style>

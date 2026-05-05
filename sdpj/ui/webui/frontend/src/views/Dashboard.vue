@@ -1,108 +1,87 @@
 <template>
-  <PageLayout title="仪表盘" max-width="1400px">
-    <!-- 统计卡片 -->
-    <div class="stats-grid">
-      <template v-if="loading">
-        <div class="stat-card" v-for="i in 4" :key="i">
-          <el-skeleton animated>
-            <template #template>
-              <div class="stat-content">
-                <el-skeleton-item variant="text" style="width: 60%; margin-bottom: 8px;" />
-                <el-skeleton-item variant="h1" style="width: 40%;" />
-              </div>
-            </template>
-          </el-skeleton>
-        </div>
-      </template>
-      <template v-else>
-        <div class="stat-card" v-for="stat in statsCards" :key="stat.key">
-          <div class="stat-content">
+  <div class="dashboard">
+    <div class="dashboard-inner">
+      <h1 class="page-title">仪表盘</h1>
+
+      <p class="info-hint">数据实时更新，可能有短暂延迟</p>
+
+      <div class="stats-section">
+        <div class="stats-grid">
+          <div class="stat-item" v-for="stat in statsCards" :key="stat.key">
             <div class="stat-label">{{ stat.label }}</div>
-            <div class="stat-value">
-              {{ stat.value }}
-              <span v-if="stat.suffix" class="stat-suffix">{{ stat.suffix }}</span>
+            <div class="stat-value-row">
+              <span class="stat-number">{{ stat.value }}</span>
+              <span v-if="stat.suffix" class="stat-unit">{{ stat.suffix }}</span>
             </div>
           </div>
         </div>
-      </template>
-    </div>
-
-    <!-- 主要内容区 -->
-    <div class="content-grid">
-      <!-- 最近任务 -->
-      <div class="content-card tasks-card">
-        <div class="card-header">
-          <h3 class="card-title">最近任务</h3>
-          <router-link to="/detection" class="card-action">查看全部</router-link>
-        </div>
-        <div class="card-body">
-          <template v-if="loading">
-            <el-skeleton :rows="5" animated />
-          </template>
-          <template v-else>
-            <div v-if="recentTasks.length === 0" class="empty-state">
-              <p>暂无任务</p>
-            </div>
-            <div v-else class="task-list">
-              <div v-for="task in recentTasks.slice(0, 5)" :key="task.task_id" class="task-item">
-                <div class="task-info">
-                  <div class="task-title">{{ task.task_id }}</div>
-                  <div class="task-meta">
-                    <span class="task-model">{{ task.model_id }}</span>
-                    <span class="task-separator">·</span>
-                    <span class="task-dataset">{{ task.dataset_id }}</span>
-                  </div>
-                </div>
-                <div class="task-status">
-                  <span class="status-badge" :class="`status-${task.status}`">
-                    {{ getTaskStatusText(task.status) }}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </template>
-        </div>
       </div>
 
-      <!-- 系统状态 -->
-      <div class="content-card status-card">
-        <div class="card-header">
-          <h3 class="card-title">系统状态</h3>
+      <div class="section">
+        <div class="section-header">
+          <h2 class="section-title">最近任务</h2>
+          <router-link to="/detection" class="section-action">查看全部</router-link>
         </div>
-        <div class="card-body">
-          <template v-if="loading">
-            <el-skeleton :rows="4" animated />
-          </template>
-          <template v-else>
-            <div class="status-item">
-              <div class="status-label">系统状态</div>
-              <div class="status-value">
-                <span class="status-indicator" :class="getStatusClass(systemStatus)"></span>
-                {{ getSystemStatusText(systemStatus) }}
+
+        <template v-if="loading">
+          <el-skeleton :rows="5" animated />
+        </template>
+        <template v-else>
+          <div v-if="recentTasks.length === 0" class="empty-hint">暂无任务</div>
+          <div v-else class="task-list">
+            <div v-for="task in recentTasks.slice(0, 5)" :key="task.task_id" class="task-row">
+              <div class="task-info">
+                <span class="task-id">{{ task.task_id }}</span>
+                <span class="task-meta">
+                  <span>{{ task.model_id }}</span>
+                  <span class="meta-sep">·</span>
+                  <span>{{ task.dataset_id }}</span>
+                </span>
               </div>
+              <span class="task-status-tag" :class="`tag-${task.status}`">
+                {{ getTaskStatusText(task.status) }}
+              </span>
             </div>
-            <div class="status-item">
-              <div class="status-label">运行任务</div>
-              <div class="status-value">{{ runningCount }} 个</div>
-            </div>
-            <div class="status-item">
-              <div class="status-label">待处理任务</div>
-              <div class="status-value">{{ pendingCount }} 个</div>
-            </div>
-            <div class="status-item">
-              <div class="status-label">今日完成</div>
-              <div class="status-value">{{ completedToday }} 个</div>
-            </div>
-          </template>
+          </div>
+        </template>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          <h2 class="section-title">系统状态</h2>
         </div>
+
+        <template v-if="loading">
+          <el-skeleton :rows="4" animated />
+        </template>
+        <template v-else>
+          <div class="status-list">
+            <div class="status-row">
+              <span class="status-label">运行状态</span>
+              <span class="status-dot" :class="getStatusClass(systemStatus)"></span>
+              <span class="status-text">{{ getSystemStatusText(systemStatus) }}</span>
+            </div>
+            <div class="status-row">
+              <span class="status-label">运行任务</span>
+              <span class="status-value">{{ runningCount }} 个</span>
+            </div>
+            <div class="status-row">
+              <span class="status-label">等待任务</span>
+              <span class="status-value">{{ pendingCount }} 个</span>
+            </div>
+            <div class="status-row">
+              <span class="status-label">今日完成</span>
+              <span class="status-value">{{ completedToday }} 个</span>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
-  </PageLayout>
+  </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import PageLayout from '../components/common/PageLayout.vue'
 import api from '../api'
 import { getProgress } from '../api/detection'
 import { getComplianceStatistics } from '../api/report'
@@ -123,46 +102,23 @@ const stats = ref({
 
 const recentTasks = ref([])
 
-// 统计卡片数据
 const statsCards = computed(() => [
-  {
-    key: 'total',
-    label: '检测样本总数',
-    value: stats.value.totalSamples
-  },
-  {
-    key: 'compliant',
-    label: '合规样本',
-    value: stats.value.compliantSamples
-  },
-  {
-    key: 'non-compliant',
-    label: '违规样本',
-    value: stats.value.nonCompliantSamples
-  },
-  {
-    key: 'rate',
-    label: '合规率',
-    value: stats.value.complianceRate.toFixed(1),
-    suffix: '%'
-  }
+  { key: 'total', label: '检测样本总数', value: stats.value.totalSamples },
+  { key: 'compliant', label: '合规样本', value: stats.value.compliantSamples },
+  { key: 'non-compliant', label: '违规样本', value: stats.value.nonCompliantSamples },
+  { key: 'rate', label: '合规率', value: stats.value.complianceRate.toFixed(1), suffix: '%' }
 ])
 
 const getSystemStatusText = (status) => {
   const map = {
-    idle: '空闲',
-    detecting: '检测中',
-    generating_report: '生成报告中',
-    configuring: '配置管理中',
-    error: '异常',
-    unknown: '未知'
+    idle: '空闲', detecting: '检测中', generating_report: '生成报告中',
+    configuring: '配置管理中', error: '异常', unknown: '未知'
   }
   return map[status] || status
 }
 
 const getStatusClass = (status) => {
-  if (status === 'error' || status === 'unknown') return ''
-  return 'online'
+  return (status !== 'error' && status !== 'unknown') ? 'dot-online' : ''
 }
 
 const getTaskStatusText = (status) => {
@@ -175,9 +131,7 @@ onMounted(async () => {
   try {
     const statusRes = await api.get('/status')
     systemStatus.value = statusRes?.status || 'unknown'
-  } catch {
-    systemStatus.value = 'unknown'
-  }
+  } catch { systemStatus.value = 'unknown' }
 
   try {
     const progressRes = await getProgress()
@@ -188,9 +142,7 @@ onMounted(async () => {
       pendingCount.value = queue.filter(t => t.status === 'pending').length
       completedToday.value = queue.filter(t => t.status === 'completed').length
     }
-  } catch {
-    // 使用默认值
-  }
+  } catch { /* default */ }
 
   try {
     const statsRes = await getComplianceStatistics()
@@ -203,297 +155,239 @@ onMounted(async () => {
         avgIterationCount: statsRes.avg_iteration_count ?? null
       }
     }
-  } catch {
-    // 使用默认值
-  } finally {
-    loading.value = false
-  }
+  } catch { /* default */ }
+  finally { loading.value = false }
 })
 </script>
 
 <style scoped>
-/* 统计卡片网格 */
+.dashboard {
+  width: 100%;
+}
+
+.dashboard-inner {
+  max-width: 936px;
+  margin: 0;
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #404040;
+  line-height: 32px;
+  margin: 0 0 32px;
+}
+
+.info-hint {
+  font-size: 14px;
+  color: #404040;
+  line-height: 25px;
+  margin: 0 0 22px;
+}
+
+.stats-section {
+  margin-bottom: 42px;
+}
+
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: var(--spacing-5);
-  margin-bottom: var(--spacing-6);
+  grid-template-columns: 304px 304px 304px 304px;
+  gap: 12px 32px;
 }
 
-.stat-card {
-  background: var(--color-surface);
-  border-radius: var(--radius-md);
-  padding: var(--spacing-5);
+.stat-item {
   display: flex;
-  gap: var(--spacing-4);
-  box-shadow: var(--shadow-sm);
-  transition: all var(--transition-base);
-  border: 1px solid var(--color-border);
-}
-
-.stat-card:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
-}
-
-.stat-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  flex-shrink: 0;
-}
-
-.stat-icon svg {
-  width: 28px;
-  height: 28px;
-}
-
-.stat-content {
-  flex: 1;
-  min-width: 0;
+  flex-direction: column;
 }
 
 .stat-label {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  margin-bottom: var(--spacing-1);
+  font-size: 13px;
+  color: #8b8b8b;
+  line-height: 25px;
 }
 
-.stat-value {
-  font-size: var(--font-size-3xl);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text);
-  line-height: 1.2;
-  margin-bottom: var(--spacing-1);
+.stat-value-row {
+  display: flex;
+  align-items: baseline;
 }
 
-.stat-suffix {
-  font-size: var(--font-size-xl);
-  color: var(--color-text-secondary);
-  margin-left: var(--spacing-1);
+.stat-number {
+  font-size: 28px;
+  color: #404040;
+  line-height: 36px;
 }
 
-.stat-trend {
+.stat-unit {
+  font-size: 18px;
+  color: #8b8b8b;
+  margin-left: 4px;
+}
+
+.section {
+  margin-bottom: 42px;
+}
+
+.section-header {
   display: flex;
   align-items: center;
-  gap: var(--spacing-1);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  gap: 12px;
+  margin-bottom: 21px;
 }
 
-.stat-trend.up {
-  color: var(--color-success);
-}
-
-.stat-trend.down {
-  color: var(--color-danger);
-}
-
-.stat-trend svg {
-  width: 14px;
-  height: 14px;
-}
-
-/* 内容网格 */
-.content-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: var(--spacing-5);
-}
-
-.content-card {
-  background: var(--color-surface);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--color-border);
-  overflow: hidden;
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--spacing-5);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.card-title {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #404040;
   margin: 0;
 }
 
-.card-action {
-  font-size: var(--font-size-sm);
-  color: var(--color-primary);
+.section-action {
+  font-size: 14px;
+  color: #404040;
   text-decoration: none;
-  font-weight: var(--font-weight-medium);
-  transition: color var(--transition-fast);
+  line-height: 22px;
 }
 
-.card-action:hover {
-  color: var(--color-primary-light);
+.section-action:hover {
+  opacity: 0.7;
 }
 
-.card-body {
-  padding: var(--spacing-5);
+.empty-hint {
+  font-size: 14px;
+  color: #8b8b8b;
+  line-height: 25px;
 }
 
-/* 空状态 */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--spacing-10) var(--spacing-5);
-  color: var(--color-text-tertiary);
-}
-
-.empty-state svg {
-  width: 64px;
-  height: 64px;
-  margin-bottom: var(--spacing-4);
-  opacity: 0.5;
-}
-
-.empty-state p {
-  font-size: var(--font-size-sm);
-  margin: 0;
-}
-
-/* 任务列表 */
 .task-list {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-3);
 }
 
-.task-item {
+.task-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--spacing-3);
-  border-radius: var(--radius-base);
-  background: var(--color-bg);
-  transition: all var(--transition-fast);
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
 }
 
-.task-item:hover {
-  background: var(--color-surface-hover);
+.task-row:last-child {
+  border-bottom: none;
 }
 
 .task-info {
-  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   min-width: 0;
 }
 
-.task-title {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text);
-  margin-bottom: var(--spacing-1);
+.task-id {
+  font-size: 14px;
+  color: #404040;
   font-family: var(--font-family-mono);
 }
 
 .task-meta {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
+  font-size: 13px;
+  color: #8b8b8b;
   display: flex;
   align-items: center;
-  gap: var(--spacing-2);
+  gap: 6px;
 }
 
-.task-separator {
-  color: var(--color-text-tertiary);
+.meta-sep {
+  color: #d0d0d0;
 }
 
-.task-status {
+.task-status-tag {
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 10px;
   flex-shrink: 0;
 }
 
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.25rem 0.75rem;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-  border-radius: var(--radius-full);
+.tag-completed {
+  background: rgba(34, 197, 94, 0.12);
+  color: #16a34a;
 }
 
-.status-badge.status-completed {
-  background: var(--color-success-light);
-  color: var(--color-success-dark);
+.tag-running {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
 }
 
-.status-badge.status-running {
-  background: var(--color-info-light);
-  color: var(--color-info-dark);
+.tag-pending {
+  background: #f5f5f5;
+  color: #8b8b8b;
 }
 
-.status-badge.status-pending {
-  background: var(--color-gray-200);
-  color: var(--color-gray-700);
+.tag-failed {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
 }
 
-.status-badge.status-failed {
-  background: var(--color-danger-light);
-  color: var(--color-danger-dark);
+.status-list {
+  display: flex;
+  flex-direction: column;
 }
 
-/* 系统状态 */
-.status-item {
+.status-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: var(--spacing-3) 0;
-  border-bottom: 1px solid var(--color-border);
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
 }
 
-.status-item:last-child {
+.status-row:last-child {
   border-bottom: none;
 }
 
 .status-label {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
+  font-size: 14px;
+  color: #8b8b8b;
+  width: 100px;
+  flex-shrink: 0;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d0d0d0;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.status-dot.dot-online {
+  background: #22c55e;
+}
+
+.status-text {
+  font-size: 14px;
+  color: #404040;
+  margin-right: 16px;
 }
 
 .status-value {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-2);
+  font-size: 14px;
+  color: #404040;
+  font-weight: 500;
 }
 
-.status-indicator {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-full);
-  background: var(--color-gray-400);
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-.status-indicator.online {
-  background: var(--color-success);
-}
-
-/* 响应式 */
 @media (max-width: 1024px) {
-  .content-grid {
-    grid-template-columns: 1fr;
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
   }
 }
 
 @media (max-width: 640px) {
   .stats-grid {
     grid-template-columns: 1fr;
+  }
+
+  .status-label {
+    width: 80px;
   }
 }
 </style>

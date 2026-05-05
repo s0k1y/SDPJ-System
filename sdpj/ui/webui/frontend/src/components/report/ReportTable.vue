@@ -1,128 +1,168 @@
 <template>
-  <el-card class="report-table">
-    <template #header>
-      <div class="card-header">
-        <span>报告列表</span>
-        <div>
-          <el-button size="small" @click="refresh" :loading="loading">刷新</el-button>
-        </div>
-      </div>
-    </template>
-
-    <el-table :data="paginatedReports" style="width: 100%" v-loading="loading">
-      <el-table-column prop="task_group_id" label="任务组ID" width="180" />
-      <el-table-column prop="model_id" label="模型" width="140" />
-      <el-table-column prop="detection_type" label="检测类型" width="120">
-        <template #default="{ row }">
-          <el-tag size="small">{{ row.detection_type || '-' }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="risk_level" label="风险等级" width="100">
-        <template #default="{ row }">
-          <el-tag :type="getRiskType(row.risk_level)" size="small">
-            {{ row.risk_level || '-' }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="compliance_rate" label="合规率" width="100" />
-      <el-table-column prop="created_at" label="生成时间" />
-      <el-table-column label="操作" width="220" fixed="right">
-        <template #default="{ row }">
-          <el-button size="small" @click="$emit('view', row)">查看</el-button>
-          <el-button size="small" type="primary" @click="$emit('export', row)">
-            导出
-          </el-button>
-          <el-button size="small" type="danger" @click="$emit('delete', row)">
-            删除
-          </el-button>
-        </template>
-      </el-table-column>
-      <template #empty>
-        <el-empty v-if="!loading" description="暂无报告数据" />
-      </template>
-    </el-table>
-
-    <div class="pagination-wrapper" v-if="reports.length > 0">
-      <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
-        :page-sizes="[10, 20, 50, 100]"
-        :total="reports.length"
-        layout="total, sizes, prev, pager, next, jumper"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
-      />
+  <div class="report-table">
+    <div class="table-wrapper" v-loading="loading">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 25%">报告ID</th>
+            <th style="width: 15%">任务ID</th>
+            <th style="width: 10%">合规率</th>
+            <th style="width: 20%">生成时间</th>
+            <th style="width: 15%">状态</th>
+            <th style="width: 15%">操作</th>
+          </tr>
+        </thead>
+        <tbody v-if="reports.length > 0">
+          <tr v-for="report in reports" :key="report.report_id">
+            <td><span class="cell-mono">{{ report.report_id }}</span></td>
+            <td><span class="cell-mono">{{ report.task_id || '-' }}</span></td>
+            <td>{{ report.compliance_rate != null ? (report.compliance_rate * 100).toFixed(1) + '%' : '-' }}</td>
+            <td>{{ report.generated_at || '-' }}</td>
+            <td>
+              <span class="status-tag" :class="`tag-${report.status || 'unknown'}`">
+                {{ statusText(report.status) }}
+              </span>
+            </td>
+            <td>
+              <div class="action-btns">
+                <el-button class="action-btn" size="small" @click="$emit('view', report)" v-if="report.report_id">查看</el-button>
+                <el-button class="action-btn" size="small" @click="$emit('download', report)" v-if="report.report_id">下载</el-button>
+                <el-button class="action-btn action-btn-danger" size="small" @click="$emit('delete', report)" v-if="report.report_id">删除</el-button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+        <tbody v-else>
+          <tr>
+            <td colspan="99" class="empty-row">暂无检测报告</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
-  </el-card>
+  </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted, defineEmits } from 'vue'
 import { getReportList } from '../../api/report'
 
-const props = defineProps({
-  userId: { type: String, default: '' },
-  modelId: { type: String, default: '' }
-})
-
-defineEmits(['view', 'export', 'delete'])
+defineEmits(['view', 'download', 'delete'])
 
 const reports = ref([])
 const loading = ref(false)
-const currentPage = ref(1)
-const pageSize = ref(10)
 
-const paginatedReports = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-  return reports.value.slice(start, end)
-})
-
-const getRiskType = (level) => {
-  const map = { '低': 'success', '中': 'warning', '高': 'danger' }
-  return map[level] || 'info'
+const statusText = (status) => {
+  const map = { completed: '已完成', generating: '生成中', failed: '失败' }
+  return map[status] || status || '未知'
 }
 
-const handleSizeChange = () => {
-  currentPage.value = 1
-}
-
-const handleCurrentChange = () => {
-  // 页码变化时自动滚动到表格顶部
-  document.querySelector('.report-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
-
-const refresh = async () => {
+const fetchReports = async () => {
   loading.value = true
   try {
-    const params = {}
-    if (props.userId) params.user_id = props.userId
-    if (props.modelId) params.model_id = props.modelId
-    const res = await getReportList(params)
-    reports.value = Array.isArray(res) ? res : (res.reports || [])
-    currentPage.value = 1
-  } catch {
-    reports.value = []
-  } finally {
-    loading.value = false
-  }
+    const res = await getReportList()
+    if (res.success) {
+      reports.value = res.reports || []
+    }
+  } catch { /* keep defaults */ }
+  finally { loading.value = false }
 }
 
-onMounted(refresh)
-
-defineExpose({ refresh })
+onMounted(fetchReports)
 </script>
 
 <style scoped>
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.report-table {
+  width: 100%;
 }
 
-.pagination-wrapper {
-  margin-top: var(--spacing-4);
+.table-wrapper {
+  background: #fafafa;
+  border-radius: 10px;
+  padding: 2px 14px 4px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th {
+  color: #8b8b8b;
+  font-weight: 600;
+  font-size: 14px;
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+td {
+  color: #404040;
+  font-size: 14px;
+  padding: 10px 8px;
+  vertical-align: middle;
+}
+
+.cell-mono {
+  font-family: var(--font-family-mono);
+  letter-spacing: 0.3px;
+}
+
+.status-tag {
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 10px;
+}
+
+.tag-completed {
+  background: rgba(34, 197, 94, 0.12);
+  color: #16a34a;
+}
+
+.tag-generating {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+
+.tag-failed {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+}
+
+.tag-unknown {
+  background: #f5f5f5;
+  color: #8b8b8b;
+}
+
+.action-btns {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-btn {
+  height: 30px;
+  padding: 0 14px;
+  font-size: 12px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: #404040;
+}
+
+.action-btn:hover {
+  background: #e5e5e5;
+}
+
+.action-btn-danger:hover {
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.empty-row {
+  padding: 24px 8px;
+  text-align: center;
+  color: #8b8b8b;
+  font-size: 13px;
 }
 </style>

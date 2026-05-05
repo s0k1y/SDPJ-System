@@ -1,6 +1,5 @@
 <template>
   <div class="layout-container">
-    <!-- 移动端遮罩层 -->
     <transition name="backdrop-fade">
       <div
         v-if="!sidebarCollapsed && isMobile"
@@ -11,24 +10,19 @@
 
     <Sidebar :collapsed="sidebarCollapsed" @close="sidebarCollapsed = true" />
 
-    <div class="layout-main">
-      <AppHeader />
-
-      <main class="content-area">
-        <router-view v-slot="{ Component }">
-          <transition name="page-fade" mode="out-in">
-            <component :is="Component" />
-          </transition>
-        </router-view>
-      </main>
-    </div>
+    <main class="content-area">
+      <router-view v-slot="{ Component }">
+        <transition name="page-fade" mode="out-in">
+          <component :is="Component" />
+        </transition>
+      </router-view>
+    </main>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import Sidebar from '../components/common/Sidebar.vue'
-import AppHeader from '../components/common/Header.vue'
 import { useSystemNotifications } from '../composables/useSystemNotifications'
 
 const sidebarCollapsed = ref(false)
@@ -64,22 +58,13 @@ useSystemNotifications()
   position: relative;
 }
 
-.layout-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  min-width: 0;
-}
-
 .content-area {
   flex: 1;
   overflow-y: auto;
-  padding: var(--spacing-6);
-  background-color: var(--color-bg);
+  padding: 32px 40px;
+  background-color: #ffffff;
 }
 
-/* 移动端遮罩层 */
 .sidebar-backdrop {
   position: fixed;
   top: 0;
@@ -101,7 +86,6 @@ useSystemNotifications()
   opacity: 0;
 }
 
-/* 页面切换动画 */
 .page-fade-enter-active,
 .page-fade-leave-active {
   transition: opacity var(--transition-base), transform var(--transition-base);
@@ -117,10 +101,9 @@ useSystemNotifications()
   transform: translateY(-10px);
 }
 
-/* 响应式 */
 @media (max-width: 768px) {
   .content-area {
-    padding: var(--spacing-4);
+    padding: 20px;
   }
 }
 </style>

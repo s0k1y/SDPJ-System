@@ -131,8 +131,9 @@
 
   /* ========== 布局系统 ========== */
 
-  --sidebar-width: 180px;
+  --sidebar-width: 240px;
   --sidebar-collapsed-width: 64px;
+  --sidebar-bg: #fafafa;
   --header-height: 64px;
   --container-max-width: 1400px;
 

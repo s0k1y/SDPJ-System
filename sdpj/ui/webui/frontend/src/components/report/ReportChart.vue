@@ -1,9 +1,5 @@
 <template>
-  <el-card class="report-chart">
-    <template #header>
-      <span>检测结果可视化</span>
-    </template>
-
+  <div class="report-chart">
     <div v-if="loading" class="chart-loading">
       <el-skeleton :rows="5" animated />
     </div>
@@ -11,56 +7,74 @@
     <el-empty v-else-if="!chartData" description="暂无可视化数据" />
 
     <div v-else class="chart-content">
-      <!-- 统计概览 -->
-      <el-row :gutter="20" class="stats-row">
-        <el-col :span="6">
-          <el-statistic title="总体合规率" :value="chartData.overall_rate || 0" suffix="%" :precision="1" />
-        </el-col>
-        <el-col :span="6">
-          <el-statistic title="合规样本" :value="chartData.compliant_count || 0" />
-        </el-col>
-        <el-col :span="6">
-          <el-statistic title="违规样本" :value="chartData.non_compliant_count || 0" />
-        </el-col>
-        <el-col :span="6" v-if="chartData.avg_iteration_count != null">
-          <el-statistic title="平均迭代次数" :value="chartData.avg_iteration_count" :precision="2" />
-        </el-col>
-      </el-row>
+      <div class="stats-row">
+        <div class="stat-item">
+          <span class="stat-label">总体合规率</span>
+          <span class="stat-number">{{ (chartData.overall_rate || 0).toFixed(1) }}<span class="stat-unit">%</span></span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">合规样本</span>
+          <span class="stat-number">{{ chartData.compliant_count || 0 }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">违规样本</span>
+          <span class="stat-number">{{ chartData.non_compliant_count || 0 }}</span>
+        </div>
+        <div class="stat-item" v-if="chartData.avg_iteration_count != null">
+          <span class="stat-label">平均迭代次数</span>
+          <span class="stat-number">{{ chartData.avg_iteration_count.toFixed(2) }}</span>
+        </div>
+      </div>
 
-      <el-divider />
+      <div class="section">
+        <div class="chart-row">
+          <div class="chart-col">
+            <h3 class="section-title">风险等级分布</h3>
+            <div ref="riskPieChart" class="chart-box"></div>
+          </div>
+          <div class="chart-col chart-col-wide">
+            <h3 class="section-title">各子类型合规率对比</h3>
+            <div ref="subtypeBarChart" class="chart-box"></div>
+          </div>
+        </div>
+      </div>
 
-      <!-- 图表区域 -->
-      <el-row :gutter="20">
-        <!-- 风险等级分布饼图 -->
-        <el-col :xs="24" :sm="12" :md="8">
-          <div class="chart-title">风险等级分布</div>
-          <div ref="riskPieChart" class="chart-container"></div>
-        </el-col>
-
-        <!-- 各子类型合规率条形图 -->
-        <el-col :xs="24" :sm="12" :md="16">
-          <div class="chart-title">各子类型合规率对比</div>
-          <div ref="subtypeBarChart" class="chart-container"></div>
-        </el-col>
-      </el-row>
-
-      <el-divider />
-
-      <!-- 详细数据表格 -->
-      <div class="chart-title">详细数据</div>
-      <el-table :data="subtypeItems" style="width: 100%" size="small">
-        <el-table-column prop="category" label="风险子类型" />
-        <el-table-column prop="total" label="总数" width="80" align="right" />
-        <el-table-column prop="passed" label="合规" width="80" align="right" />
-        <el-table-column prop="failed" label="违规" width="80" align="right" />
-        <el-table-column prop="rate" label="合规率" width="120">
-          <template #default="{ row }">
-            <span :style="{ color: getProgressColor(row.rate) }">{{ row.rate.toFixed(1) }}%</span>
-          </template>
-        </el-table-column>
-      </el-table>
+      <div class="section">
+        <h3 class="section-title">详细数据</h3>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 35%">风险子类型</th>
+                <th style="width: 15%">总数</th>
+                <th style="width: 15%">合规</th>
+                <th style="width: 15%">违规</th>
+                <th style="width: 20%">合规率</th>
+              </tr>
+            </thead>
+            <tbody v-if="subtypeItems.length > 0">
+              <tr v-for="item in subtypeItems" :key="item.category">
+                <td>{{ item.category }}</td>
+                <td>{{ item.total }}</td>
+                <td>{{ item.passed }}</td>
+                <td>{{ item.failed }}</td>
+                <td>
+                  <span :style="{ color: getProgressColor(item.rate) }">
+                    {{ item.rate.toFixed(1) }}%
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+            <tbody v-else>
+              <tr>
+                <td colspan="99" class="empty-row">暂无详细数据</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
-  </el-card>
+  </div>
 </template>
 
 <script setup>
@@ -81,9 +95,9 @@ let riskPieInstance = null
 let subtypeBarInstance = null
 
 const getProgressColor = (rate) => {
-  if (rate >= 80) return '#67c23a'
-  if (rate >= 60) return '#e6a23c'
-  return '#f56c6c'
+  if (rate >= 80) return '#22c55e'
+  if (rate >= 60) return '#f59e0b'
+  return '#ef4444'
 }
 
 const subtypeItems = computed(() => {
@@ -91,135 +105,57 @@ const subtypeItems = computed(() => {
   return chartData.value.subtype_compliance || []
 })
 
-// 初始化风险等级分布饼图
 const initRiskPieChart = () => {
   if (!riskPieChart.value || !chartData.value?.risk_distribution?.data) return
-
-  if (riskPieInstance) {
-    riskPieInstance.dispose()
-  }
-
+  if (riskPieInstance) riskPieInstance.dispose()
   riskPieInstance = echarts.init(riskPieChart.value)
 
   const dist = chartData.value.risk_distribution.data
   const pieData = [
-    { value: dist.low || 0, name: '低风险', itemStyle: { color: '#67c23a' } },
-    { value: dist.medium || 0, name: '中风险', itemStyle: { color: '#e6a23c' } },
-    { value: dist.high || 0, name: '高风险', itemStyle: { color: '#f56c6c' } }
+    { value: dist.low || 0, name: '低风险', itemStyle: { color: '#22c55e' } },
+    { value: dist.medium || 0, name: '中风险', itemStyle: { color: '#f59e0b' } },
+    { value: dist.high || 0, name: '高风险', itemStyle: { color: '#ef4444' } }
   ]
 
-  const option = {
-    tooltip: {
-      trigger: 'item',
-      formatter: '{b}: {c} ({d}%)'
-    },
-    legend: {
-      orient: 'vertical',
-      left: 'left',
-      top: 'center'
-    },
-    series: [
-      {
-        name: '风险等级',
-        type: 'pie',
-        radius: ['40%', '70%'],
-        center: ['60%', '50%'],
-        avoidLabelOverlap: false,
-        itemStyle: {
-          borderRadius: 10,
-          borderColor: '#fff',
-          borderWidth: 2
-        },
-        label: {
-          show: true,
-          formatter: '{b}\n{d}%'
-        },
-        emphasis: {
-          label: {
-            show: true,
-            fontSize: 16,
-            fontWeight: 'bold'
-          }
-        },
-        data: pieData
-      }
-    ]
-  }
-
-  riskPieInstance.setOption(option)
+  riskPieInstance.setOption({
+    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+    legend: { orient: 'vertical', left: 'left', top: 'center' },
+    series: [{
+      name: '风险等级', type: 'pie', radius: ['40%', '70%'], center: ['60%', '50%'],
+      avoidLabelOverlap: false,
+      itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
+      label: { show: true, formatter: '{b}\n{d}%' },
+      emphasis: { label: { show: true, fontSize: 16, fontWeight: 'bold' } },
+      data: pieData
+    }]
+  })
 }
 
-// 初始化子类型合规率条形图
 const initSubtypeBarChart = () => {
   if (!subtypeBarChart.value || !subtypeItems.value.length) return
-
-  if (subtypeBarInstance) {
-    subtypeBarInstance.dispose()
-  }
-
+  if (subtypeBarInstance) subtypeBarInstance.dispose()
   subtypeBarInstance = echarts.init(subtypeBarChart.value)
 
   const categories = subtypeItems.value.map(item => item.category)
   const rates = subtypeItems.value.map(item => item.rate)
 
-  const option = {
+  subtypeBarInstance.setOption({
     tooltip: {
-      trigger: 'axis',
-      axisPointer: {
-        type: 'shadow'
-      },
-      formatter: (params) => {
-        const item = params[0]
-        return `${item.name}<br/>合规率: ${item.value.toFixed(1)}%`
-      }
+      trigger: 'axis', axisPointer: { type: 'shadow' },
+      formatter: (params) => `${params[0].name}<br/>合规率: ${params[0].value.toFixed(1)}%`
     },
-    grid: {
-      left: '3%',
-      right: '4%',
-      bottom: '3%',
-      top: '10%',
-      containLabel: true
-    },
-    xAxis: {
-      type: 'value',
-      max: 100,
-      axisLabel: {
-        formatter: '{value}%'
-      }
-    },
-    yAxis: {
-      type: 'category',
-      data: categories,
-      axisLabel: {
-        interval: 0,
-        fontSize: 12
-      }
-    },
-    series: [
-      {
-        name: '合规率',
-        type: 'bar',
-        data: rates.map(rate => ({
-          value: rate,
-          itemStyle: {
-            color: getProgressColor(rate)
-          }
-        })),
-        barWidth: '60%',
-        label: {
-          show: true,
-          position: 'right',
-          formatter: '{c}%',
-          fontSize: 12
-        }
-      }
-    ]
-  }
-
-  subtypeBarInstance.setOption(option)
+    grid: { left: '3%', right: '4%', bottom: '3%', top: '10%', containLabel: true },
+    xAxis: { type: 'value', max: 100, axisLabel: { formatter: '{value}%' } },
+    yAxis: { type: 'category', data: categories, axisLabel: { interval: 0, fontSize: 12 } },
+    series: [{
+      name: '合规率', type: 'bar',
+      data: rates.map(rate => ({ value: rate, itemStyle: { color: getProgressColor(rate) } })),
+      barWidth: '60%',
+      label: { show: true, position: 'right', formatter: '{c}%', fontSize: 12 }
+    }]
+  })
 }
 
-// 响应式调整图表大小
 const handleResize = () => {
   riskPieInstance?.resize()
   subtypeBarInstance?.resize()
@@ -236,8 +172,7 @@ const fetchData = async () => {
       initRiskPieChart()
       initSubtypeBarChart()
     }
-  } catch (error) {
-    console.error('获取可视化数据失败:', error)
+  } catch {
     chartData.value = null
   } finally {
     loading.value = false
@@ -246,10 +181,7 @@ const fetchData = async () => {
 
 watch(() => props.taskGroupId, fetchData, { immediate: true })
 
-onMounted(() => {
-  window.addEventListener('resize', handleResize)
-})
-
+onMounted(() => window.addEventListener('resize', handleResize))
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
   riskPieInstance?.dispose()
@@ -259,30 +191,98 @@ onUnmounted(() => {
 
 <style scoped>
 .chart-loading {
-  padding: var(--spacing-5);
+  padding: 16px 0;
 }
 
 .stats-row {
-  margin-bottom: var(--spacing-4);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px 32px;
+  margin-bottom: 42px;
 }
 
-.chart-title {
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-  margin-bottom: var(--spacing-3);
+.stat-item {
+  display: flex;
+  flex-direction: column;
 }
 
-.chart-container {
+.stat-label {
+  font-size: 13px;
+  color: #8b8b8b;
+  line-height: 25px;
+}
+
+.stat-number {
+  font-size: 28px;
+  color: #404040;
+  line-height: 36px;
+}
+
+.stat-unit {
+  font-size: 18px;
+  color: #8b8b8b;
+}
+
+.section {
+  margin-bottom: 42px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #404040;
+  margin: 0 0 21px;
+}
+
+.chart-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 32px;
+}
+
+.chart-box {
   width: 100%;
   height: 300px;
-  margin-bottom: var(--spacing-4);
 }
 
-/* 响应式 */
+.table-wrapper {
+  background: #fafafa;
+  border-radius: 10px;
+  padding: 2px 14px 4px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th {
+  color: #8b8b8b;
+  font-weight: 600;
+  font-size: 14px;
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+td {
+  color: #404040;
+  font-size: 14px;
+  padding: 10px 8px;
+  vertical-align: middle;
+}
+
+.empty-row {
+  padding: 24px 8px;
+  text-align: center;
+  color: #8b8b8b;
+  font-size: 13px;
+}
+
 @media (max-width: 768px) {
-  .chart-container {
-    height: 250px;
-  }
+  .stats-row { grid-template-columns: 1fr 1fr; }
+  .chart-row { grid-template-columns: 1fr; }
+  .chart-box { height: 250px; }
 }
 </style>
