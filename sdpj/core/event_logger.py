@@ -38,15 +38,16 @@ class EventLogger(EventLoggerInterface):
         LogLevel.ERROR: 3,
     }
 
-    def __init__(self, result_db=None):
+    def __init__(self, result_db=None, output_targets: set[str] | None = None):
         """初始化事件与日志管理器
 
         Args:
             result_db: ResultDB 实例，用于持久化日志
+            output_targets: 输出目标集合，默认 {"memory", "database"}，可加 "console"
         """
         self._logs: deque[LogEntry] = deque(maxlen=_MAX_MEMORY_LOGS)
         self._current_level: LogLevel = LogLevel.INFO
-        self._output_targets: set[str] = {"memory", "database"}
+        self._output_targets: set[str] = output_targets or {"memory", "database"}
         self._result_db = result_db
         self._log_subscribers: list[Callable[[dict], None]] = []
         self._log_queue: asyncio.Queue | None = None

@@ -1,11 +1,13 @@
 """动态检测器 - SDPJ Algorithm 2 实现"""
 from datetime import datetime, timezone
+from typing import Callable
 
 from sdpj.drivers.data_processor_interface import DataProcessorInterface
 from sdpj.drivers.llm_service_interface import LLMServiceInterface, LLMError
+from sdpj.infrastructure.utils.rate_limiter import RateLimiter
 
 from . import prompt_builder, result_parser
-from .static_detector import _call_llm
+from .static_detector import _call_llm, LLMCallCallback
 
 
 async def run_dynamic_detection(
@@ -15,6 +17,7 @@ async def run_dynamic_detection(
     user_id: str,
     static_result: dict,
     max_iterations: int = 3,
+    llm_callback: LLMCallCallback | None = None,
 ) -> dict:
     """执行动态检测算法 (Algorithm 2)
 
@@ -32,6 +35,7 @@ async def run_dynamic_detection(
     attack_template = prompt_builder.build_attack_template(poc_pool[0])
     task_group_id = await data_processor.create_task_group(user_id, model_id)
     instance = await llm.get_service_instance(model_id)
+    limiter = RateLimiter(max_rps=0.5)
 
     static_agg = await data_processor.aggregate_task_group_results(static_tg_id)
 
@@ -74,14 +78,14 @@ async def run_dynamic_detection(
                     sample_iterations += 1
                     try:
                         mut_input = prompt_builder.build_mutation_input(attack_template, iter_poc, iter_output)
-                        mut_resp = await _call_llm(llm, instance, "", mut_input)
+                        mut_resp = await _call_llm(llm, instance, "", mut_input, limiter, llm_callback)
                         mutated_poc = result_parser.extract_model_output(mut_resp)
 
-                        resp = await _call_llm(llm, instance, "", mutated_poc)
+                        resp = await _call_llm(llm, instance, "", mutated_poc, limiter, llm_callback)
                         output_text = result_parser.extract_model_output(resp)
 
                         judge_input = prompt_builder.build_judge_input(judge_template, output_text)
-                        judge_resp = await _call_llm(llm, instance, "", judge_input)
+                        judge_resp = await _call_llm(llm, instance, "", judge_input, limiter, llm_callback)
                         judgment = result_parser.parse_compliance_judgment(judge_resp)
 
                         iter_output = output_text

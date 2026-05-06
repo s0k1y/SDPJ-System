@@ -148,6 +148,14 @@ class StateSchedulerInterface(Protocol):
         """取消日志订阅"""
         ...
 
+    def subscribe_llm_calls(self, callback: Callable[[dict, dict], None]) -> None:
+        """订阅 LLM 调用事件，callback 接收 (request_info, response_info)"""
+        ...
+
+    def unsubscribe_llm_calls(self, callback: Callable[[dict, dict], None]) -> None:
+        """取消 LLM 调用订阅"""
+        ...
+
     async def query_logs(self, filters: Optional[dict] = None) -> dict:
         """查询系统日志，返回 {"logs": [...], "total": int}"""
         ...
@@ -177,18 +185,30 @@ class StateSchedulerInterface(Protocol):
     # ── 私有资源调度 (职责 17, 17-1, 18) ──
 
     async def schedule_config_operation(self, operation: str, params: dict) -> dict:
-        """调度用户私有检测配置的全生命周期管理"""
+        """调度用户私有检测配置的全生命周期管理
+
+        支持的操作:
+        - create: 创建配置 (params: config_content)
+        - read: 读取配置 (params: config_id)
+        - update: 更新配置 (params: config_id, config_content)
+        - delete: 删除配置 (params: config_id)
+        - list: 列出配置 (params: user_id)
+        - export: 导出配置 (params: config_id, format)
+        - import: 导入配置 (params: file_content)
+        - verify: 验证配置可用性 (params: config_id)
+          返回 {"success": bool, "result": {"status": "ok"|"auth_failed"|"unreachable"|"format_mismatch"|"timeout"|"config_error"|"unknown_error", ...}}
+        """
         ...
 
     async def query_available_datasets(self, user_id: int) -> list:
         """查询可用检测数据集清单"""
         ...
 
-    async def query_dataset_detail(self, dataset_id: int) -> dict | None:
+    async def query_dataset_detail(self, dataset_id: int, user_id: int | None = None) -> dict | None:
         """查询数据集详情"""
         ...
 
-    async def export_dataset_file(self, dataset_id: int) -> dict | None:
+    async def export_dataset_file(self, dataset_id: int, user_id: int | None = None) -> dict | None:
         """导出数据集文件"""
         ...
 

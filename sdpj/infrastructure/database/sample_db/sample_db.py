@@ -74,6 +74,26 @@ class SampleDB:
             repo = DatasetRepository(session)
             return await repo.get_all_with_sample_count()
 
+    async def get_dataset_by_name(self, name: str) -> Optional[dict]:
+        async with self.session_manager.get_session() as session:
+            repo = DatasetRepository(session)
+            dataset = await repo.get_by_name(name)
+            if dataset is None:
+                return None
+            return {
+                "dataset_id": dataset.dataset_id,
+                "name": dataset.name,
+                "risk_type": dataset.risk_type,
+                "resource_id": dataset.resource_id,
+                "created_at": dataset.created_at,
+            }
+
+    async def get_sample_count_by_dataset(self, dataset_id: int) -> int:
+        async with self.session_manager.get_session() as session:
+            repo = SampleRepository(session)
+            samples = await repo.get_by_dataset(dataset_id)
+            return len(samples)
+
     async def get_dataset_by_id(self, dataset_id: int) -> Optional[dict]:
         """按 ID 查询单个数据集
 

@@ -109,8 +109,10 @@ def status(ctx):
 @click.option("--category", default=None, type=click.Choice(["operation", "runtime", "error"]))
 @click.option("--module", "source_module", default=None, help="来源模块")
 @click.option("--user-id", default=None, help="用户ID")
+@click.option("--page", default=None, type=int, help="页码")
+@click.option("--page-size", default=None, type=int, help="每页条数")
 @click.pass_context
-def logs(ctx, category, source_module, user_id):
+def logs(ctx, category, source_module, user_id, page, page_size):
     """查询系统日志 (职责 9)"""
     import asyncio
     from sdpj.ui.cli.utils import output
@@ -121,13 +123,20 @@ def logs(ctx, category, source_module, user_id):
         filters["source_module"] = source_module
     if user_id:
         filters["user_id"] = user_id
+    if page is not None:
+        filters["page"] = page
+    if page_size is not None:
+        filters["page_size"] = page_size
     entries = asyncio.run(ctx.obj.scheduler.query_logs(filters or None))
     logs_list = entries.get("logs", []) if isinstance(entries, dict) else entries
+    total = entries.get("total", len(logs_list)) if isinstance(entries, dict) else len(logs_list)
     if not logs_list:
         output.info("暂无日志")
         return
+    if total != len(logs_list):
+        output.info(f"共 {total} 条，当前显示 {len(logs_list)} 条")
     for e in logs_list:
-        ts = getattr(e, "timestamp", "")
-        cat = getattr(e, "category", "")
-        desc = getattr(e, "description", str(e))
+        ts = getattr(e, "timestamp", "") if not isinstance(e, dict) else e.get("timestamp", "")
+        cat = getattr(e, "category", "") if not isinstance(e, dict) else e.get("category", "")
+        desc = getattr(e, "description", str(e)) if not isinstance(e, dict) else e.get("description", str(e))
         click.echo(f"  [{ts}] [{cat}] {desc}")

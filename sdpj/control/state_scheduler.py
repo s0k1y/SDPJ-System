@@ -50,6 +50,7 @@ class StateScheduler(StateSchedulerInterface):
         self._state_callbacks: list = []
         self._error_callbacks: list = []
         self._log_callbacks: list = []
+        self._llm_call_callbacks: list = []
         self._consumer_task: asyncio.Task | None = None
 
     # ── 内部日志辅助 ──
@@ -155,6 +156,9 @@ class StateScheduler(StateSchedulerInterface):
             else:
                 return {"success": False, "error": f"模型适配器 '{model_id}' 未注册且无配置信息可用"}
 
+        if not dataset_ids:
+            return {"success": False, "error": "必须指定至少一个检测数据集 (dataset_ids)"}
+
         try:
             old_state = self.get_system_state()
             self._fsm.start_detection()
@@ -211,6 +215,9 @@ class StateScheduler(StateSchedulerInterface):
                 task_group_id, {"processed": processed, "total": total, "found": found}
             ))
 
+        def _llm_call_cb(request_info: dict, response_info: dict) -> None:
+            self._notify_llm_call(request_info, response_info)
+
         cancel_event = asyncio.Event()
 
         async def _check_cancelled():
@@ -228,14 +235,14 @@ class StateScheduler(StateSchedulerInterface):
             if cancel_event.is_set():
                 raise asyncio.CancelledError()
             if detection_type == "static":
-                result = await self._detector.run_static_detection(model_id, user_id, dataset_ids, task_group_id=task_group_id, jailbreak_dataset_ids=jailbreak_dataset_ids, poc_progress_callback=_poc_progress_cb, force_refresh=force_refresh)
+                result = await self._detector.run_static_detection(model_id, user_id, dataset_ids, task_group_id=task_group_id, jailbreak_dataset_ids=jailbreak_dataset_ids, poc_progress_callback=_poc_progress_cb, force_refresh=force_refresh, llm_callback=_llm_call_cb)
             elif detection_type == "dynamic":
-                static_result = await self._detector.run_static_detection(model_id, user_id, dataset_ids, task_group_id=task_group_id, jailbreak_dataset_ids=jailbreak_dataset_ids, poc_progress_callback=_poc_progress_cb, force_refresh=force_refresh)
+                static_result = await self._detector.run_static_detection(model_id, user_id, dataset_ids, task_group_id=task_group_id, jailbreak_dataset_ids=jailbreak_dataset_ids, poc_progress_callback=_poc_progress_cb, force_refresh=force_refresh, llm_callback=_llm_call_cb)
                 if static_result["status"] != "completed":
                     result = static_result
                 else:
                     dynamic_result = await self._detector.run_dynamic_detection(
-                        model_id, user_id, static_result, max_iterations
+                        model_id, user_id, static_result, max_iterations, llm_callback=_llm_call_cb
                     )
                     result = {
                         "status": "completed",
@@ -243,12 +250,12 @@ class StateScheduler(StateSchedulerInterface):
                         "dynamic_task_group_id": dynamic_result.get("task_group_id"),
                     }
             else:
-                static_result = await self._detector.run_static_detection(model_id, user_id, dataset_ids, task_group_id=task_group_id, jailbreak_dataset_ids=jailbreak_dataset_ids, poc_progress_callback=_poc_progress_cb, force_refresh=force_refresh)
+                static_result = await self._detector.run_static_detection(model_id, user_id, dataset_ids, task_group_id=task_group_id, jailbreak_dataset_ids=jailbreak_dataset_ids, poc_progress_callback=_poc_progress_cb, force_refresh=force_refresh, llm_callback=_llm_call_cb)
                 if static_result["status"] != "completed":
                     result = static_result
                 else:
                     dynamic_result = await self._detector.run_dynamic_detection(
-                        model_id, user_id, static_result, max_iterations
+                        model_id, user_id, static_result, max_iterations, llm_callback=_llm_call_cb
                     )
                     result = {
                         "status": "completed",
@@ -593,6 +600,23 @@ class StateScheduler(StateSchedulerInterface):
         if callback in self._log_callbacks:
             self._log_callbacks.remove(callback)
 
+    def subscribe_llm_calls(self, callback: Callable[[dict, dict], None]) -> None:
+        """订阅 LLM 调用事件，callback 接收 (request_info, response_info)"""
+        if callback not in self._llm_call_callbacks:
+            self._llm_call_callbacks.append(callback)
+
+    def unsubscribe_llm_calls(self, callback: Callable[[dict, dict], None]) -> None:
+        """取消 LLM 调用订阅"""
+        if callback in self._llm_call_callbacks:
+            self._llm_call_callbacks.remove(callback)
+
+    def _notify_llm_call(self, request_info: dict, response_info: dict) -> None:
+        for cb in list(self._llm_call_callbacks):
+            try:
+                cb(request_info, response_info)
+            except Exception:
+                pass
+
     def _notify_state(self) -> None:
         state = self.get_system_state()
         for cb in list(self._state_callbacks):
@@ -847,6 +871,16 @@ class StateScheduler(StateSchedulerInterface):
                 if not has_access:
                     return {"success": False, "error": "无访问权限"}
 
+            if operation == "verify":
+                config_id: int = params["config_id"]
+                config = await self._config.read_config(config_id)
+                if config is None:
+                    return {"success": False, "error": "配置不存在"}
+                has_access = await self._dac.check_access(config_id, user_id)
+                if not has_access:
+                    return {"success": False, "error": "无访问权限"}
+                return await self._verify_config_availability(config_id, user_id, config)
+
             if operation == "read":
                 data = await self._config.read_config(params["config_id"])
                 return {"success": data is not None, "config": data}
@@ -888,6 +922,77 @@ class StateScheduler(StateSchedulerInterface):
                     self._notify_state()
                 except Exception:
                     pass
+
+    async def _verify_config_availability(self, config_id: int, user_id: int, config: dict) -> dict:
+        import asyncio
+        import uuid
+        import time
+
+        adapter_content = json.dumps(config)
+        temp_model_id = f"__verify_{uuid.uuid4().hex[:8]}"
+
+        try:
+            ok, _, err = await self._registry.register_private_model(adapter_content, temp_model_id)
+            if not ok:
+                return {"success": False, "result": {"status": "config_error", "error": f"适配器注册失败: {err}"}}
+
+            _, instance = await self._registry.is_model_available(temp_model_id)
+            if instance is None:
+                return {"success": False, "result": {"status": "config_error", "error": "适配器实例创建失败"}}
+
+            req = self._detector._llm.assemble_request("", "Hello, respond with exactly: OK")
+            start = time.monotonic()
+            try:
+                resp = await asyncio.wait_for(
+                    self._detector._llm.invoke_llm(instance, req),
+                    timeout=30.0,
+                )
+                latency_ms = int((time.monotonic() - start) * 1000)
+                content = resp.get("content", "")
+                model = resp.get("model", "")
+                self._log_op(user_id, "verify_config", {"config_id": config_id, "status": "ok"})
+                return {
+                    "success": True,
+                    "result": {
+                        "status": "ok",
+                        "model": model,
+                        "latency_ms": latency_ms,
+                        "response_preview": content[:200],
+                    },
+                }
+            except asyncio.TimeoutError:
+                latency_ms = int((time.monotonic() - start) * 1000)
+                self._log_op(user_id, "verify_config", {"config_id": config_id, "status": "timeout"})
+                return {
+                    "success": False,
+                    "result": {"status": "timeout", "error": f"验证超时(30s)", "latency_ms": latency_ms},
+                }
+            except Exception as e:
+                latency_ms = int((time.monotonic() - start) * 1000)
+                err_msg = str(e)
+                status = "unknown_error"
+                if "401" in err_msg or "auth" in err_msg.lower() or "api_key" in err_msg.lower() or "Unauthorized" in err_msg:
+                    status = "auth_failed"
+                elif "404" in err_msg:
+                    status = "format_mismatch"
+                elif "connect" in err_msg.lower() or "unreachable" in err_msg.lower() or "refused" in err_msg.lower():
+                    status = "unreachable"
+                self._log_op(user_id, "verify_config", {"config_id": config_id, "status": status})
+                return {
+                    "success": False,
+                    "result": {"status": status, "error": err_msg, "latency_ms": latency_ms},
+                }
+        finally:
+            try:
+                _, inst = await self._registry.is_model_available(temp_model_id)
+                if inst and hasattr(inst, 'adapter') and inst.adapter and hasattr(inst.adapter, 'close'):
+                    await inst.adapter.close()
+            except Exception:
+                pass
+            try:
+                await self._registry.unregister_private_model(temp_model_id)
+            except Exception:
+                pass
 
     async def query_available_datasets(self, user_id: int) -> list:
         datasets = await self._config.query_datasets()

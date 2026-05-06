@@ -15,6 +15,16 @@ def test_get_metadata():
     assert m["base_url"] == "https://api.openai.com"
 
 
+def test_url_construction_openai():
+    a = OpenAICompatibleAdapter("gpt-4", "https://api.openai.com/v1", "sk-test")
+    assert a._base_url == "https://api.openai.com/v1"
+
+
+def test_url_construction_zhipu():
+    a = OpenAICompatibleAdapter("glm-4-flash", "https://open.bigmodel.cn/api/paas/v4", "test-key")
+    assert a._base_url == "https://open.bigmodel.cn/api/paas/v4"
+
+
 @pytest.mark.asyncio
 async def test_call_success():
     a = make_adapter()

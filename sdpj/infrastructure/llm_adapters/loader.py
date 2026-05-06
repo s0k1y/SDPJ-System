@@ -83,7 +83,7 @@ def load_adapter_from_config(model_id: str, config: Union[dict, str, Path]) -> L
     from sdpj.infrastructure.llm_adapters.openai_adapter import OpenAIAdapter
     return OpenAIAdapter(
         model_id=model_id,
-        base_url=api_url.rstrip("/").removesuffix("/v1/chat/completions"),
+        base_url=api_url.rstrip("/").removesuffix("/chat/completions"),
         api_key=api_key,
         model_name=model_name,
         timeout=timeout,

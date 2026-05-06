@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import (
     AsyncSession,
     AsyncEngine
 )
-from sqlalchemy.pool import NullPool, QueuePool, StaticPool
+from sqlalchemy.pool import NullPool, StaticPool
 from .models import Base
 
 
@@ -38,7 +38,7 @@ class SessionManager:
             if is_memory:
                 pool_kwargs = {"poolclass": StaticPool}
             else:
-                pool_kwargs = {"poolclass": QueuePool, "pool_size": 5, "max_overflow": 0}
+                pool_kwargs = {"pool_size": 5, "max_overflow": 0}
             self.engine = create_async_engine(
                 self.database_url,
                 echo=self.echo,

@@ -39,3 +39,31 @@ def test_load_from_json_string():
 def test_invalid_config_type_raises():
     with pytest.raises(AdapterValidationError):
         load_adapter_from_config("m", 123)
+
+
+def test_zhipu_glm_url_construction():
+    adapter = load_adapter_from_config("glm-4-flash", {
+        "base_url": "https://open.bigmodel.cn/api/paas/v4",
+        "api_key": "test-key",
+        "request_format": "openai",
+        "model": "glm-4-flash",
+    })
+    assert adapter._base_url == "https://open.bigmodel.cn/api/paas/v4"
+
+
+def test_openai_url_construction():
+    adapter = load_adapter_from_config("gpt-4", {
+        "base_url": "https://api.openai.com/v1",
+        "api_key": "sk-test",
+        "request_format": "openai",
+    })
+    assert adapter._base_url == "https://api.openai.com/v1"
+
+
+def test_full_url_strips_chat_completions():
+    adapter = load_adapter_from_config("gpt-4", {
+        "api_url": "https://api.openai.com/v1/chat/completions",
+        "api_key": "sk-test",
+        "request_format": "openai",
+    })
+    assert adapter._base_url == "https://api.openai.com/v1"

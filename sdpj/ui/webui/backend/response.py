@@ -16,7 +16,8 @@ def wrap_scheduler_result(result: Any) -> dict:
     if isinstance(result, dict):
         if result.get("success") is False:
             msg = result.get("error") or result.get("message") or "操作失败"
-            return error_response(message=msg)
+            data = {k: v for k, v in result.items() if k not in ("success", "error", "message")}
+            return error_response(message=msg, data=data if data else None)
         data = {k: v for k, v in result.items() if k not in ("success", "error", "message")}
         msg = result.get("message", "")
         return success_response(data=data, message=msg)

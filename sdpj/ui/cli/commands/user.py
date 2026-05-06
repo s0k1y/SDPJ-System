@@ -59,8 +59,9 @@ def logout(ctx):
 @click.pass_context
 def profile(ctx):
     """查询当前用户资料"""
+    user_id = ctx.obj.require_login()
     result = asyncio.run(
-        ctx.obj.scheduler.schedule_account_operation("get_profile", {})
+        ctx.obj.scheduler.schedule_account_operation("get_profile", {"user_id": user_id})
     )
     if result["success"] and result.get("profile"):
         output.kv(result["profile"])
@@ -74,10 +75,10 @@ def profile(ctx):
 @click.pass_context
 def change_password(ctx, old_password, new_password):
     """修改当前用户密码"""
-    ctx.obj.require_login()
+    user_id = ctx.obj.require_login()
     result = asyncio.run(
         ctx.obj.scheduler.schedule_account_operation(
-            "change_password", {"old_password": old_password, "new_password": new_password}
+            "change_password", {"user_id": user_id, "old_password": old_password, "new_password": new_password}
         )
     )
     if result["success"]:
@@ -124,16 +125,65 @@ def unregister(ctx):
 @click.pass_context
 def resources(ctx):
     """列出当前用户拥有的受控资源"""
-    ctx.obj.require_login()
+    user_id = ctx.obj.require_login()
     result = asyncio.run(
-        ctx.obj.scheduler.schedule_account_operation("list_resources", {})
+        ctx.obj.scheduler.schedule_account_operation("list_resources", {"user_id": user_id})
     )
     res_list = result.get("resources", [])
-    if not res_list:
+    shared_list = result.get("shared_resources", [])
+    if not res_list and not shared_list:
         output.info("暂无受控资源")
         return
-    rows = [[str(r.get("id", "")), r.get("type", ""), r.get("name", "")] for r in res_list]
-    output.table(["ID", "类型", "名称"], rows)
+    if res_list:
+        output.info("自有资源:")
+        rows = [[str(r.get("id", "")), r.get("type", ""), r.get("name", "")] for r in res_list]
+        output.table(["ID", "类型", "名称"], rows)
+    if shared_list:
+        output.info("共享资源:")
+        rows = [[str(r.get("id", "")), r.get("type", ""), r.get("name", "")] for r in shared_list]
+        output.table(["ID", "类型", "名称"], rows)
+
+
+@user_group.command("list")
+@click.pass_context
+def list_users(ctx):
+    """列出所有用户"""
+    users = asyncio.run(ctx.obj.scheduler.list_all_users())
+    if not users:
+        output.info("暂无用户")
+        return
+    rows = [[str(u.get("user_id", "")), u.get("username", ""), u.get("created_at", "-")] for u in users]
+    output.table(["用户ID", "用户名", "创建时间"], rows)
+
+
+@user_group.command("delete-user")
+@click.option("--user-id", required=True, type=int, help="目标用户ID")
+@click.confirmation_option(prompt="确认删除该用户?")
+@click.pass_context
+def delete_user(ctx, user_id):
+    """管理员删除用户"""
+    result = asyncio.run(
+        ctx.obj.scheduler.schedule_account_operation("admin_delete_user", {"user_id": user_id})
+    )
+    if result["success"]:
+        output.success(result.get("message", "用户已删除"))
+    else:
+        output.error(result.get("message", "删除失败"))
+
+
+@user_group.command("update-profile")
+@click.option("--username", required=True, help="新用户名")
+@click.pass_context
+def update_profile(ctx, username):
+    """更新当前用户资料"""
+    user_id = ctx.obj.require_login()
+    result = asyncio.run(
+        ctx.obj.scheduler.schedule_account_operation("update_profile", {"user_id": user_id, "username": username})
+    )
+    if result["success"]:
+        output.success("资料已更新")
+    else:
+        output.error(result.get("message", result.get("error", "更新失败")))
 
 
 # ── 权限授权子命令 (职责 13) ──
@@ -146,13 +196,13 @@ def auth_group():
 
 @auth_group.command("grant")
 @click.option("--resource-id", required=True, type=int, help="资源ID")
-@click.option("--target-user", required=True, type=int, help="被授权用户ID")
+@click.option("--target-username", required=True, help="被授权用户名")
 @click.pass_context
-def grant(ctx, resource_id, target_user):
+def grant(ctx, resource_id, target_username):
     """授予其他用户对私有资源的读权限"""
     caller = ctx.obj.require_login()
     result = asyncio.run(ctx.obj.scheduler.schedule_dac_operation("grant", {
-        "resource_id": resource_id, "target_user_id": target_user, "caller_user_id": caller,
+        "resource_id": resource_id, "target_username": target_username, "caller_user_id": caller,
     }))
     if result["success"]:
         output.success(result.get("message", "已授权"))

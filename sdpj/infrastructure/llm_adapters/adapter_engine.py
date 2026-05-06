@@ -49,7 +49,7 @@ class OpenAICompatibleAdapter(LLMAdapter):
         使用构造时配置的 base_url、api_key、model_name，
         不允许运行时覆盖配置参数。
         """
-        url = f"{self._base_url}/v1/chat/completions"
+        url = f"{self._base_url}/chat/completions"
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",

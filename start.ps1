@@ -1,4 +1,6 @@
 ﻿$ErrorActionPreference = "SilentlyContinue"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  SDPJ-System 启动脚本" -ForegroundColor Cyan
@@ -19,19 +21,19 @@ if (-not (Test-Path $dbPath)) {
 
 Write-Host "[1/3] 正在停止占用端口 8000 和 5173 的进程..." -ForegroundColor Yellow
 
-# 停止所有 uvicorn 和 node 进程
-Get-Process | Where-Object { $_.ProcessName -match "python|node" } | ForEach-Object {
-    $cmdLine = (Get-WmiObject Win32_Process -Filter "ProcessId = $($_.Id)").CommandLine
-    if ($cmdLine -match "uvicorn.*app:app|npm run dev|vite") {
-        Write-Host "  停止进程: $($_.ProcessName) (PID: $($_.Id))" -ForegroundColor Gray
-        Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
-    }
-}
-
-# 再次检查端口占用
-Get-NetTCPConnection -LocalPort 8000,5173 -ErrorAction SilentlyContinue | ForEach-Object {
-    Write-Host "  强制停止端口占用进程 (PID: $($_.OwningProcess))" -ForegroundColor Gray
-    Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue
+$killed = @()
+foreach ($port in @(8000, 5173)) {
+    try {
+        $pids = (netstat -ano 2>$null).Split("`n") | Where-Object { $_ -match ":$port\s.*LISTENING" } | ForEach-Object { ($_ -split '\s+')[-1] } | Where-Object { $_ -match '^\d+$' }
+        foreach ($pid in $pids) {
+            $pidInt = [int]$pid
+            if ($pidInt -gt 0 -and $pidInt -notin $killed) {
+                Write-Host "  停止端口 $port 占用进程 (PID: $pidInt)" -ForegroundColor Gray
+                Stop-Process -Id $pidInt -Force -ErrorAction SilentlyContinue
+                $killed += $pidInt
+            }
+        }
+    } catch {}
 }
 
 Start-Sleep -Seconds 3
@@ -44,9 +46,9 @@ $batDir = "$env:TEMP\sdpj"
 if (-not (Test-Path $batDir)) { New-Item -ItemType Directory -Path $batDir -Force | Out-Null }
 
 # 使用 UTF-8 编码写入 bat 文件，避免中文路径乱码
-$backendContent = "@echo off`r`nchcp 65001 >nul 2>&1`r`ncd /d `"E:\Sky毕业设计\4.系统源代码\SDPJ-System`"`r`nif %ERRORLEVEL% NEQ 0 (`r`n    echo [错误] 无法切换到项目目录`r`n    exit /b 1`r`n)`r`necho [后端] 正在启动 FastAPI 服务器...`r`nC:\Users\asus\.conda\envs\SDPJ-System\python.exe -m uvicorn sdpj.ui.webui.backend.app:app --host 0.0.0.0 --port 8000"
-$utf8NoBom = New-Object System.Text.UTF8Encoding $false
-[System.IO.File]::WriteAllText("$batDir\start_backend.bat", $backendContent, $utf8NoBom)
+$backendContent = "@echo off`r`ncd /d `"E:\Sky毕业设计\4.系统源代码\SDPJ-System`"`r`nif %ERRORLEVEL% NEQ 0 (`r`n    echo [ERROR] Cannot cd to project dir`r`n    exit /b 1`r`n)`r`necho [Backend] Starting FastAPI server...`r`nC:\Users\asus\.conda\envs\SDPJ-System\python.exe -m uvicorn sdpj.ui.webui.backend.app:app --host 0.0.0.0 --port 8000"
+$gbk = [System.Text.Encoding]::GetEncoding(936)
+[System.IO.File]::WriteAllText("$batDir\start_backend.bat", $backendContent, $gbk)
 
 Start-Process "$batDir\start_backend.bat"
 Start-Sleep -Seconds 5
@@ -56,9 +58,9 @@ Write-Host ""
 Write-Host "[3/3] 正在启动前端服务..." -ForegroundColor Yellow
 
 # 使用 UTF-8 编码写入 bat 文件，避免中文路径乱码
-$frontendContent = "@echo off`r`nchcp 65001 >nul 2>&1`r`ncd /d `"E:\Sky毕业设计\4.系统源代码\SDPJ-System\sdpj\ui\webui\frontend`"`r`nif %ERRORLEVEL% NEQ 0 (`r`n    echo [错误] 无法切换到前端目录`r`n    exit /b 1`r`n)`r`necho [前端] 正在启动 Vite 开发服务器...`r`nnpm run dev"
-$utf8NoBom = New-Object System.Text.UTF8Encoding $false
-[System.IO.File]::WriteAllText("$batDir\start_frontend.bat", $frontendContent, $utf8NoBom)
+$frontendContent = "@echo off`r`ncd /d `"E:\Sky毕业设计\4.系统源代码\SDPJ-System\sdpj\ui\webui\frontend`"`r`nif %ERRORLEVEL% NEQ 0 (`r`n    echo [ERROR] Cannot cd to frontend dir`r`n    exit /b 1`r`n)`r`necho [Frontend] Starting Vite dev server...`r`nnpm run dev"
+$gbk = [System.Text.Encoding]::GetEncoding(936)
+[System.IO.File]::WriteAllText("$batDir\start_frontend.bat", $frontendContent, $gbk)
 
 Start-Process "$batDir\start_frontend.bat"
 Start-Sleep -Seconds 3

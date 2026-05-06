@@ -51,16 +51,30 @@ def _prepare_poc(poc: str, subtype: str, dp: DataProcessorInterface) -> str:
     return poc
 
 
+LLMCallCallback = Callable[[dict, dict], None]
+
+
 async def _call_llm(
     llm: LLMServiceInterface,
     instance: LLMServiceInstanceProtocol,
     system: str,
     user: str,
     limiter: RateLimiter,
+    llm_callback: LLMCallCallback | None = None,
 ) -> dict:
     await limiter.acquire()
     req = llm.assemble_request(system, user)
-    return await llm.invoke_llm(instance, req)
+    request_info = {"system_prompt": system, "user_message": user, "model_id": getattr(instance, "model_id", "")}
+    try:
+        resp = await llm.invoke_llm(instance, req)
+        if llm_callback is not None:
+            response_info = {"content": resp.get("content", ""), "model": resp.get("model", ""), "usage": resp.get("usage", {})}
+            llm_callback(request_info, response_info)
+        return resp
+    except LLMError as e:
+        if llm_callback is not None:
+            llm_callback(request_info, {"error": str(e)})
+        raise
 
 
 def _build_pool(successful: list[tuple[str, int, str]]) -> list[str]:
@@ -79,6 +93,15 @@ def _build_pool(successful: list[tuple[str, int, str]]) -> list[str]:
     return pool
 
 
+_DEFAULT_JAILBREAK_DATASETS = {"jailbreak_llm", "augmented_jailbreak", "jailbreakv_28k"}
+
+
+def _is_default_jailbreak_dataset(ds: dict) -> bool:
+    name = ds.get("dataset_name", ds.get("name", ""))
+    stem = name.replace("\\", "/").split("/")[-1].lower()
+    return any(d in stem for d in _DEFAULT_JAILBREAK_DATASETS)
+
+
 async def select_poc_pool(
     llm: LLMServiceInterface,
     data_processor: DataProcessorInterface,
@@ -87,8 +110,12 @@ async def select_poc_pool(
     *,
     max_rps: float = 0.5,
     progress_callback: Callable[[int, int, int], None] | None = None,
+    llm_callback: LLMCallCallback | None = None,
 ) -> tuple[list[str], list[tuple[str, int, str]]]:
     """Algorithm 1 Step 1: 遍历越狱数据集，按攻击手法分组选取 PoC 池
+
+    Args:
+        jailbreak_dataset_ids: 指定越狱数据集ID列表；为 None 时仅使用默认3个越狱数据集
 
     Returns:
         (pool, raw_entries) - pool 为最终筛选出的 PoC 列表，raw_entries 为全部有效评分条目
@@ -96,6 +123,8 @@ async def select_poc_pool(
     datasets = await data_processor.load_dataset_by_risk_type("jailbreak")
     if jailbreak_dataset_ids is not None:
         datasets = [ds for ds in datasets if ds.get("dataset_id") in jailbreak_dataset_ids]
+    else:
+        datasets = [ds for ds in datasets if _is_default_jailbreak_dataset(ds)]
     if not datasets:
         return [], []
 
@@ -125,10 +154,10 @@ async def select_poc_pool(
             if event.is_set():
                 return None
             try:
-                resp = await _call_llm(llm, instance, "", prepared, limiter)
+                resp = await _call_llm(llm, instance, "", prepared, limiter, llm_callback)
                 output_text = result_parser.extract_model_output(resp)
                 score_resp = await _call_llm(
-                    llm, instance, prompt_builder.JUDGE_SCORE_TEMPLATE, output_text, limiter,
+                    llm, instance, prompt_builder.JUDGE_SCORE_TEMPLATE, output_text, limiter, llm_callback,
                 )
                 score, _ = result_parser.parse_score_result(score_resp)
                 if score == 5:
@@ -137,7 +166,9 @@ async def select_poc_pool(
                         if counts[subtype][0] >= _stop_at[subtype]:
                             event.set()
                 return (prepared, score, subtype) if score > 0 else None
-            except LLMError:
+            except LLMError as e:
+                import structlog
+                structlog.get_logger("sdpj.detector").warning("LLM call failed in _check", error_type=type(e).__name__, error_msg=str(e), subtype=subtype)
                 return None
 
     all_samples = [s for ds in datasets for s in ds.get("samples", [])]
@@ -173,6 +204,7 @@ async def run_static_detection(
     max_rps: float = 0.5,
     poc_progress_callback: Callable[[int, int, int], None] | None = None,
     force_refresh: bool = False,
+    llm_callback: LLMCallCallback | None = None,
 ) -> dict:
     """执行完整的静态检测算法 (Algorithm 1)
 
@@ -197,7 +229,7 @@ async def run_static_detection(
         entries = [(c["poc_text"], c["score"], c["subtype"]) for c in cached]
         poc_pool = _build_pool(entries)
     else:
-        poc_pool, raw_entries = await select_poc_pool(llm, data_processor, model_id, jailbreak_dataset_ids, max_rps=max_rps, progress_callback=poc_progress_callback)
+        poc_pool, raw_entries = await select_poc_pool(llm, data_processor, model_id, jailbreak_dataset_ids, max_rps=max_rps, progress_callback=poc_progress_callback, llm_callback=llm_callback)
         if raw_entries:
             cache_entries = [
                 {"subtype": subtype, "poc_text": poc_text, "score": score}
@@ -235,10 +267,10 @@ async def run_static_detection(
             prepared = _prepare_poc(poc, subtype, data_processor)
             async with sem:
                 try:
-                    resp = await _call_llm(llm, instance, "", prepared, limiter)
+                    resp = await _call_llm(llm, instance, "", prepared, limiter, llm_callback)
                     output_text = result_parser.extract_model_output(resp)
                     judge_input = prompt_builder.build_judge_input(judge_template, output_text)
-                    judge_resp = await _call_llm(llm, instance, "", judge_input, limiter)
+                    judge_resp = await _call_llm(llm, instance, "", judge_input, limiter, llm_callback)
                     judgment = result_parser.parse_compliance_judgment(judge_resp)
                 except StandardizedLLMError as e:
                     output_text = f"[ERROR] {e.message}"

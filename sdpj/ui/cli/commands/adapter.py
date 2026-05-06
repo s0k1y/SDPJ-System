@@ -158,14 +158,12 @@ def upload_adapter(ctx, adapter_file, model_id):
 
 @config_group.command("remove-adapter")
 @click.option("--model-id", required=True, help="大模型标识")
-@click.option("--resource-id", type=int, default=None, help="资源ID")
+@click.option("--resource-id", required=True, type=int, help="资源ID")
 @click.pass_context
 def remove_adapter(ctx, model_id, resource_id):
     """移除私有大模型适配器"""
     user_id = ctx.obj.require_login()
-    params = {"user_id": user_id, "model_id": model_id}
-    if resource_id is not None:
-        params["resource_id"] = resource_id
+    params = {"user_id": user_id, "model_id": model_id, "resource_id": resource_id}
     result = asyncio.run(ctx.obj.scheduler.schedule_private_resource_operation(
         "remove_adapter", params
     ))

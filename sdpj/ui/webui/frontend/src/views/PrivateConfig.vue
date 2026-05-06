@@ -31,6 +31,7 @@
                 <div class="action-btns">
                   <el-button class="action-btn" size="small" @click="viewConfig(cfg)">查看</el-button>
                   <el-button class="action-btn" size="small" @click="editConfig(cfg)">编辑</el-button>
+                  <el-button class="action-btn" size="small" @click="verifyConfig(cfg)" :loading="verifyingId === cfg.config_id">测试</el-button>
                   <el-button class="action-btn action-btn-danger" size="small" @click="deleteConfig(cfg.config_id)">删除</el-button>
                 </div>
               </td>
@@ -127,6 +128,7 @@ const configJson = ref('')
 const importJson = ref('')
 const saving = ref(false)
 const importing = ref(false)
+const verifyingId = ref(null)
 const selectedTemplate = ref('openai')
 const editingConfigId = ref(null) // 正在编辑的配置ID
 
@@ -302,6 +304,52 @@ const deleteConfig = async (configId) => {
     await loadList()
   } else {
     ElMessage.error(res.message || '删除失败')
+  }
+}
+
+const verifyConfig = async (cfg) => {
+  verifyingId.value = cfg.config_id
+  try {
+    const res = await detectionConfig('verify', { config_id: cfg.config_id })
+    if (res.success && res.data?.result) {
+      const r = res.data.result
+      const lines = []
+      lines.push(`<div style="font-size:14px;line-height:2;">`)
+      lines.push(`<div><b>状态：</b><span style="color:#16a34a">✓ 连接成功</span></div>`)
+      lines.push(`<div><b>模型：</b>${r.model || '-'}</div>`)
+      lines.push(`<div><b>延迟：</b>${r.latency_ms}ms</div>`)
+      if (r.response_preview) {
+        lines.push(`<div><b>响应预览：</b>${r.response_preview}</div>`)
+      }
+      lines.push(`</div>`)
+      ElMessageBox.alert(lines.join(''), '配置可用性验证', { dangerouslyUseHTMLString: true, confirmButtonText: '关闭' })
+    } else if (res.data?.result) {
+      const r = res.data.result
+      const statusMap = {
+        auth_failed: '认证失败',
+        unreachable: '端点不可达',
+        format_mismatch: '格式不匹配',
+        timeout: '验证超时',
+        config_error: '配置错误',
+        unknown_error: '未知错误',
+      }
+      const lines = []
+      lines.push(`<div style="font-size:14px;line-height:2;">`)
+      lines.push(`<div><b>状态：</b><span style="color:#dc2626">✗ ${statusMap[r.status] || r.status}</span></div>`)
+      if (r.latency_ms) lines.push(`<div><b>延迟：</b>${r.latency_ms}ms</div>`)
+      if (r.error) lines.push(`<div><b>错误详情：</b><code style="font-size:12px;word-break:break-all;">${r.error}</code></div>`)
+      lines.push(`</div>`)
+      ElMessageBox.alert(lines.join(''), '配置可用性验证', { dangerouslyUseHTMLString: true, confirmButtonText: '关闭' })
+    } else {
+      const errMsg = res.message || res.data?.error || '未知错误'
+      ElMessageBox.alert(`<div style="font-size:14px;"><b>状态：</b><span style="color:#dc2626">✗ 验证失败</span><br/><b>详情：</b>${errMsg}</div>`, '配置可用性验证', { dangerouslyUseHTMLString: true, confirmButtonText: '关闭' })
+    }
+  } catch (e) {
+    const isTimeout = e.code === 'ECONNABORTED' || e.message?.includes('timeout')
+    const msg = isTimeout ? '验证超时(60s)，目标模型响应过慢或网络不通' : `请求失败: ${e.message || '网络错误'}`
+    ElMessageBox.alert(`<div style="font-size:14px;"><b>状态：</b><span style="color:#dc2626">✗ ${isTimeout ? '超时' : '网络错误'}</span><br/><b>详情：</b>${msg}</div>`, '配置可用性验证', { dangerouslyUseHTMLString: true, confirmButtonText: '关闭' })
+  } finally {
+    verifyingId.value = null
   }
 }
 
