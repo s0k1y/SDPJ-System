@@ -120,3 +120,13 @@ class UserRepository:
         stmt = select(User).where(User.user_id == user_id)
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def get_all(self) -> list[User]:
+        """获取所有用户
+
+        Returns:
+            用户列表
+        """
+        stmt = select(User)
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())

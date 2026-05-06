@@ -3,7 +3,7 @@
     <div class="page-inner">
       <h1 class="page-title">安全检测</h1>
       <p class="page-info">配置检测参数并启动大语言模型安全风险检测任务</p>
-      <DetectionForm @start="$emit('startDetection', $event)" />
+      <DetectionForm />
     </div>
   </div>
 </template>

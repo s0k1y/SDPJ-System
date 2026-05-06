@@ -3,10 +3,11 @@
 使用 SQLAlchemy 2.0 异步 ORM 定义检测样本数据库的数据模型。
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
-from sqlalchemy import String, Text, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import String, Text, DateTime, ForeignKey, UniqueConstraint, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from typing import Optional
 from sdpj.infrastructure.database.base import Base
 
 
@@ -27,10 +28,13 @@ class Dataset(Base):
     # 安全风险类型（如「越狱攻击」「提示词注入」「安全基准」）
     risk_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
 
+    # 对应 UserDB Resource 表的 resource_id（内置数据集为 NULL）
+    resource_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+
     # 创建时间
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
         nullable=False
     )
 
@@ -38,7 +42,7 @@ class Dataset(Base):
     samples: Mapped[List["DetectionSample"]] = relationship(
         "DetectionSample",
         back_populates="dataset",
-        cascade="all, delete-orphan",  # 级联删除
+        cascade="all, delete-orphan",
         lazy="selectin"
     )
 
@@ -74,7 +78,7 @@ class DetectionSample(Base):
     # 创建时间
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
         nullable=False
     )
 

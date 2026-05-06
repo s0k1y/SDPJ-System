@@ -7,6 +7,8 @@ from sdpj.control.state_scheduler import StateScheduler
 
 @pytest.fixture
 def scheduler():
+    llm_reg = AsyncMock()
+    llm_reg.is_model_available = AsyncMock(return_value=(True, MagicMock()))
     return StateScheduler(
         account_manager=AsyncMock(),
         dac_manager=AsyncMock(),
@@ -15,8 +17,7 @@ def scheduler():
         detector=AsyncMock(),
         event_logger=MagicMock(),
         task_queue_manager=AsyncMock(),
-        secure_comm_manager=MagicMock(),
-        llm_registry=AsyncMock(),
+        llm_registry=llm_reg,
     )
 
 
@@ -42,7 +43,7 @@ class TestWave2ToWave3Integration:
     @pytest.mark.asyncio
     async def test_state_scheduler_with_account_manager(self, scheduler):
         """测试 StateScheduler 调度 AccountManager"""
-        scheduler._account.register.return_value = (True, "1")
+        scheduler._account.register.return_value = (True, 1, "")
         result = await scheduler.schedule_user_auth("testuser", "pass", "register")
         assert result["success"] is True
 

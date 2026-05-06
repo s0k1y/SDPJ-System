@@ -6,6 +6,8 @@ from sdpj.control.state_scheduler import StateScheduler
 
 
 def _make_scheduler(**overrides):
+    llm_reg = AsyncMock()
+    llm_reg.is_model_available = AsyncMock(return_value=(True, MagicMock()))
     defaults = dict(
         account_manager=AsyncMock(),
         dac_manager=AsyncMock(),
@@ -14,8 +16,7 @@ def _make_scheduler(**overrides):
         detector=AsyncMock(),
         event_logger=MagicMock(),
         task_queue_manager=AsyncMock(),
-        secure_comm_manager=MagicMock(),
-        llm_registry=AsyncMock(),
+        llm_registry=llm_reg,
     )
     defaults.update(overrides)
     return StateScheduler(**defaults)
@@ -66,21 +67,21 @@ class TestQueryDetectionProgress:
 class TestScheduleUserAuth:
     async def test_login_success(self):
         acct = AsyncMock()
-        acct.login = AsyncMock(return_value=(True, 42))
+        acct.login = AsyncMock(return_value=(True, 42, ""))
         s = _make_scheduler(account_manager=acct)
-        result = await s.schedule_user_auth("alice", "pw", "login", is_encrypted=False)
+        result = await s.schedule_user_auth("alice", "pw", "login")
         assert result["success"] and result["user_id"] == 42
 
     async def test_register_short_password(self):
         acct = AsyncMock()
-        acct.register = AsyncMock(return_value=(False, "密码长度至少6个字符"))
+        acct.register = AsyncMock(return_value=(False, None, "密码长度至少6个字符"))
         s = _make_scheduler(account_manager=acct)
-        result = await s.schedule_user_auth("alice", "123", "register", is_encrypted=False)
+        result = await s.schedule_user_auth("alice", "123", "register")
         assert not result["success"]
 
     async def test_unknown_action(self):
         s = _make_scheduler()
-        result = await s.schedule_user_auth("a", "b", "unknown", is_encrypted=False)
+        result = await s.schedule_user_auth("a", "b", "unknown")
         assert not result["success"]
 
 

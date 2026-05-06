@@ -1,5 +1,5 @@
 """动态检测器 - SDPJ Algorithm 2 实现"""
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sdpj.drivers.data_processor_interface import DataProcessorInterface
 from sdpj.drivers.llm_service_interface import LLMServiceInterface, LLMError
@@ -45,7 +45,7 @@ async def run_dynamic_detection(
 
         ds_id = task.get("dataset_id", "0")
         dyn_task_id = await data_processor.create_detection_task(
-            task_group_id, int(ds_id), "running", datetime.now()
+            task_group_id, int(ds_id), "running", datetime.now(timezone.utc)
         )
         dyn_report_id = await data_processor.create_detection_report(dyn_task_id)
 
@@ -105,7 +105,7 @@ async def run_dynamic_detection(
             total_iterations += sample_iterations
             dynamic_sample_count += 1
 
-        await data_processor.update_task_status(dyn_task_id, "completed", datetime.now())
+        await data_processor.update_task_status(dyn_task_id, "completed", datetime.now(timezone.utc))
 
     avg_iteration_count = (
         round(total_iterations / dynamic_sample_count, 2)

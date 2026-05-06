@@ -110,26 +110,34 @@ class EventLoggerInterface(Protocol):
         """
         ...
 
-    def query_logs(
+    async def query_logs(
         self,
         category: LogCategory | None = None,
+        level: LogLevel | None = None,
         time_start: datetime | None = None,
         time_end: datetime | None = None,
         source_module: str | None = None,
-        user_id: str | None = None
-    ) -> list[LogEntry]:
+        user_id: str | None = None,
+        user_ids: list[str] | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> tuple[list[LogEntry], int]:
         """
         按条件查询日志
 
         Args:
             category: 日志类别（可选）
+            level: 日志级别（可选）
             time_start: 时间范围起始（可选）
             time_end: 时间范围结束（可选）
             source_module: 来源模块（可选）
             user_id: 用户ID（可选）
+            user_ids: 用户ID列表（可选）
+            page: 页码（可选）
+            page_size: 每页数量（可选）
 
         Returns:
-            匹配条件的日志条目列表
+            (匹配条件的日志条目列表, 总数)
         """
         ...
 

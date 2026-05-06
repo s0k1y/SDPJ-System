@@ -26,7 +26,7 @@ async def test_create_config_success():
 @pytest.mark.asyncio
 async def test_create_config_model_unavailable():
     mgr, dp, uc, reg = make_manager()
-    reg.is_model_available = AsyncMock(return_value=(False, None))
+    uc.register_resource = AsyncMock(side_effect=ValueError("注册失败"))
     ok, rid = await mgr.create_config(1, {"model_id": "bad-model"})
     assert not ok and rid is None
 

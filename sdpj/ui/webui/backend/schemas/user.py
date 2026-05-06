@@ -6,7 +6,6 @@ from typing import Optional
 class AuthRequest(BaseModel):
     username: str
     password: str
-    is_encrypted: bool = False
 
 
 class AuthResponse(BaseModel):

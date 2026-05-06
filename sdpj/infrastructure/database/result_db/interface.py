@@ -306,6 +306,17 @@ class ResultDBInterface(Protocol):
         """
         ...
 
+    async def get_result_data(self, result_data_id: str) -> Optional[dict]:
+        """按ID查询单条检测结果数据
+
+        Args:
+            result_data_id: 结果数据ID
+
+        Returns:
+            结果数据元信息，不存在时返回 None
+        """
+        ...
+
     async def count_compliance_results(self) -> dict[str, int]:
         """按合规判断结果统计数量
 
@@ -322,5 +333,78 @@ class ResultDBInterface(Protocol):
 
         Returns:
             删除是否成功
+        """
+        ...
+
+    # ==================== PoC 池缓存 ====================
+
+    async def get_poc_pool_cache(self, model_id: str) -> list[dict]:
+        """获取指定模型的 PoC 池缓存（仅返回未过期条目）
+
+        Args:
+            model_id: 被测模型ID
+
+        Returns:
+            缓存条目列表，按 score 降序排列，每条包含：
+            - cache_id, model_id, subtype, poc_text, score, dataset_version, created_at, expires_at
+        """
+        ...
+
+    async def save_poc_pool_cache(
+        self,
+        model_id: str,
+        entries: list[dict],
+        dataset_version: str,
+    ) -> int:
+        """批量保存 PoC 池缓存（先清除该模型旧缓存再写入）
+
+        Args:
+            model_id: 被测模型ID
+            entries: 缓存条目列表，每条包含 subtype, poc_text, score
+            dataset_version: 数据集版本标识
+
+        Returns:
+            写入的条目数
+        """
+        ...
+
+    async def invalidate_poc_pool_cache(self, model_id: str) -> int:
+        """手动失效指定模型的 PoC 池缓存
+
+        Args:
+            model_id: 被测模型ID
+
+        Returns:
+            删除的条目数
+        """
+        ...
+        ...
+
+    # ==================== 报告列表摘要（高性能） ====================
+
+    async def compute_reports_summary(
+        self,
+        user_id: Optional[int] = None,
+        model_id: Optional[str] = None,
+    ) -> list[dict]:
+        """用 SQL 聚合查询计算报告列表摘要
+
+        避免对每个任务组单独查询并加载全部 result_data 大文本字段，
+        仅通过 2 条 SQL 聚合查询获取列表视图所需的统计数据。
+
+        Args:
+            user_id: 用户ID过滤条件（可选）
+            model_id: 模型ID过滤条件（可选）
+
+        Returns:
+            任务组列表，每组包含：
+            - task_group_id: 任务组ID
+            - user_id: 用户ID
+            - model_id: 模型ID
+            - compliance_rate: 合规率
+            - risk_level: 风险等级
+            - subtype_compliance: 子类型合规统计
+            - status: 状态
+            - children: 子任务摘要列表
         """
         ...

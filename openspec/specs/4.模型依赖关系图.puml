@@ -17,7 +17,7 @@ Boundary(Layer3, "执行逻辑层") {
   Container(ReportManager, "检测报告管理模块", "未设置")
   Container(PrivateConfigManager, "用户私有检测配置管理模块", "未设置")
   Container(DACManager, "自主访问控制管理模块", "未设置")
-  Container(SecureCommManager, "安全通信管理模块", "未设置")
+  Container(SecureCommManager, "安全通信管理模块", "已移除RSA,保留空壳")
   Container(AccountManager, "用户账号管理模块", "未设置")
 }
 
@@ -42,7 +42,7 @@ Rel(WebUI,StateScheduler,"调用接口:StateSchedulerInterface")
 
 Rel(StateScheduler,TaskQueueManager,"调用接口:TaskQueueManagerInterface")
 Rel(StateScheduler,EventLogger,"调用接口:EventLoggerInterface")
-Rel(StateScheduler,SecureCommManager,"调用接口:SecureCommManagerInterface")
+'Rel(StateScheduler,SecureCommManager,"调用接口:SecureCommManagerInterface")  ' 已移除:RSA加解密已删除,传输安全由HTTPS/TLS保障
 Rel(StateScheduler,SDPJDetector,"调用接口:SDPJDetectorInterface")
 Rel(StateScheduler,ReportManager,"调用接口:ReportManagerInterface")
 Rel(StateScheduler,PrivateConfigManager,"调用接口:PrivateConfigManagerInterface")

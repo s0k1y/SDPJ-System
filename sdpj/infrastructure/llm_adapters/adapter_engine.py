@@ -1,6 +1,5 @@
 """通用 OpenAI 兼容格式适配器引擎"""
 import aiohttp
-from typing import Optional
 
 from sdpj.infrastructure.llm_adapters.base import LLMAdapter
 from sdpj.infrastructure.llm_adapters.errors import (
@@ -14,6 +13,11 @@ class OpenAICompatibleAdapter(LLMAdapter):
 
     支持所有遵循 OpenAI Chat Completions API 格式的大模型服务
     （DeepSeek、通义千问、Moonshot 等）。
+
+    向上抽象职责：
+    - 将 OpenAI 格式的配置参数（base_url、api_key、model）转换为统一的调用接口
+    - 屏蔽 OpenAI API 的请求/响应格式细节
+    - 提供统一的错误处理和超时控制
     """
 
     def __init__(self, model_id: str, base_url: str, api_key: str, model_name: str | None = None):
@@ -35,21 +39,19 @@ class OpenAICompatibleAdapter(LLMAdapter):
     async def call(
         self,
         prompt: str,
-        model_id: str,
         system_prompt: str = "",
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
         max_tokens: int = 2048,
         temperature: float = 0.0,
         timeout: int = 60,
     ) -> dict:
-        actual_base_url = base_url or self._base_url
-        actual_api_key = api_key or self._api_key
-        actual_model = self._model_name
+        """调用 OpenAI 兼容 API（统一接口）
 
-        url = f"{actual_base_url}/v1/chat/completions"
+        使用构造时配置的 base_url、api_key、model_name，
+        不允许运行时覆盖配置参数。
+        """
+        url = f"{self._base_url}/v1/chat/completions"
         headers = {
-            "Authorization": f"Bearer {actual_api_key}",
+            "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
         messages = []
@@ -58,7 +60,7 @@ class OpenAICompatibleAdapter(LLMAdapter):
         messages.append({"role": "user", "content": prompt})
 
         payload = {
-            "model": actual_model,
+            "model": self._model_name,
             "messages": messages,
             "max_tokens": max_tokens,
             "temperature": temperature,
@@ -78,16 +80,19 @@ class OpenAICompatibleAdapter(LLMAdapter):
                     return {
                         "success": True,
                         "content": content,
-                        "model": data.get("model", actual_model),
+                        "model": data.get("model", self._model_name),
                         "usage": data.get("usage", {}),
                     }
-                self._raise_api_error(resp.status, data)
+                retry_after = resp.headers.get("Retry-After") or resp.headers.get("retry-after")
+                self._raise_api_error(resp.status, data, retry_after=retry_after)
         except StandardizedLLMError:
             raise
         except aiohttp.ServerTimeoutError as e:
             raise StandardizedLLMError(
                 ErrorCategory.TIMEOUT, f"Request timed out ({timeout}s)", original_error=e
             )
+        except aiohttp.ClientResponseError as e:
+            self._raise_api_error(e.status, {}, retry_after=None)
         except aiohttp.ClientError as e:
             raise StandardizedLLMError(
                 ErrorCategory.NETWORK, str(e), original_error=e
@@ -98,27 +103,33 @@ class OpenAICompatibleAdapter(LLMAdapter):
             )
 
     @staticmethod
-    def _raise_api_error(status: int, data: dict) -> None:
+    def _raise_api_error(status: int, data: dict, *, retry_after: str | None = None) -> None:
+        detail: dict | None = None
+        if retry_after is not None:
+            try:
+                detail = {"retry_after_seconds": float(retry_after)}
+            except (ValueError, TypeError):
+                detail = {"retry_after": retry_after}
         if status == 401:
             raise StandardizedLLMError(
-                ErrorCategory.AUTH, "Authentication failed", status_code=status, detail=data
+                ErrorCategory.AUTH, "Authentication failed", status_code=status, detail=detail
             )
         if status == 429:
             raise StandardizedLLMError(
-                ErrorCategory.RATE_LIMIT, "Rate limit exceeded", status_code=status, detail=data
+                ErrorCategory.RATE_LIMIT, "Rate limit exceeded", status_code=status, detail=detail
             )
         if 400 <= status < 500:
             raise StandardizedLLMError(
                 ErrorCategory.INVALID_REQUEST,
                 f"Client error {status}",
                 status_code=status,
-                detail=data,
+                detail=detail or data,
             )
         raise StandardizedLLMError(
             ErrorCategory.SERVER_ERROR,
             f"Server error {status}",
             status_code=status,
-            detail=data,
+            detail=detail or data,
         )
 
     def get_metadata(self) -> dict:

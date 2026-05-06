@@ -282,3 +282,96 @@ foreach 合规样本 (i, j) in Report do
 ```
 
 最大尝试次数为 len(poc_pool) × max_iterations（默认 10 × 3 = 30 次），相比原方案（3次）大幅提升动态检测的突破概率，同时通过双层早停避免无效调用。
+
+# LLM API 限流问题
+
+## 问题背景
+当数据集规模较大时（如越狱数据集含 12 万+ 样本），静态检测每个样本需 2 次 LLM 调用（1 次攻击 + 1 次评分），总调用量可达 24 万次。若以高并发无间隔方式发送请求，将远超 API 提供商的速率限制（免费 API 通常仅 3-10 RPM），导致大量 HTTP 429 (Too Many Requests) 错误，最终使检测失败并产生空报告。
+
+## 解决方案：四层防线架构
+
+### 第一层：请求速率控制（RateLimiter）
+- 实现：`sdpj/infrastructure/utils/rate_limiter.py` — 基于滑动窗口的异步速率控制器
+- 原理：维护最近一次请求的时间戳，每次 `acquire()` 时计算需等待的时间，`asyncio.sleep` 后放行
+- 参数：`max_rps`（每秒最大请求数），默认 0.5（即每 2 秒 1 个请求，约 30 RPM）
+- 位置：在 `_call_llm()` 中，每次 API 调用前 `await limiter.acquire()`
+- 效果：从源头控制请求速率，而非依赖重试处理 429
+
+```
+RateLimiter 工作流程：
+  acquire() → 计算距上次请求的间隔 → 不足 min_interval 则 sleep 补齐 → 放行
+  min_interval = 1.0 / max_rps
+  例：max_rps=0.5 → min_interval=2.0s → 每2秒最多1个请求
+```
+
+### 第二层：并发度降低 + 分批处理
+- 并发度：`_CONCURRENCY` 从 10 降为 3，减少同时占用的 API 连接数
+- 分批处理：新增 `_BATCH_SIZE = 50`，将样本分批调度而非一次性启动全部协程
+- 批间早停：每批完成后检查 `asyncio.Event` 早停条件，已满足则不再创建下一批任务
+- 位置：`select_poc_pool` 和 `run_static_detection` 中的样本遍历循环
+
+```
+分批处理流程：
+  for batch_start in range(0, len(all_samples), BATCH_SIZE):
+      if all(e.is_set() for e in found_max.values()):  // 批间早停检查
+          break
+      batch = all_samples[batch_start : batch_start + BATCH_SIZE]
+      results = await asyncio.gather(*[_check(s) for s in batch])
+```
+
+### 第三层：重试策略增强
+- 位置：`sdpj/drivers/llm_service.py` — LLMService 的 tenacity 重试配置
+- 调整：重试次数 3 → 5；退避时间 min=1s,max=10s → min=2s,max=60s
+- 429 (RATE_LIMIT) 属于可恢复错误类别，指数退避后自动重试
+- 作用：即使偶尔触发 429，更长的退避时间足以让 API 限额恢复
+
+### 第四层：Retry-After 头提取
+- 位置：`AnthropicAdapter` 和 `OpenAICompatibleAdapter` 的 `_raise_api_error()` 方法
+- 实现：从 429 响应的 HTTP 头中提取 `Retry-After` 字段，传递到 `StandardizedLLMError.detail`
+- 作用：为后续更智能的退避策略提供 API 提供商建议的等待时间数据
+
+```
+429 响应处理流程：
+  API 返回 429 → 提取 Retry-After 头 → 封装到 StandardizedLLMError(detail={"retry_after_seconds": N})
+  → LLMService 十次重试退避 → 按 min=2s,max=60s 指数退避等待 → 重试成功
+```
+
+## 参数可配置性
+`max_rps` 参数已暴露到 `select_poc_pool()` 和 `run_static_detection()` 的函数签名中（默认 0.5），调用方可根据 API 提供商的实际限额调整：
+- 免费 API（3-10 RPM）：使用默认 0.5 RPS
+- 付费 API（60+ RPM）：可传入 `max_rps=2.0` 或更高
+- 企业级 API（无限制）：可传入 `max_rps=10.0` 以最大化检测速度
+
+## 四层防线的协同关系
+```
+请求发出路径：
+  _call_llm() → RateLimiter.acquire() [第一层：速率控制]
+             → Semaphore(3) [第二层：并发限制]
+             → LLMService.invoke_llm() → adapter.call() → HTTP 请求
+
+429 错误恢复路径：
+  adapter 收到 429 → 提取 Retry-After [第四层：头提取]
+  → StandardizedLLMError(RATE_LIMIT) → LLMService 重试 [第三层：退避重试]
+  → 指数退避(2s~60s) → 重新走请求发出路径
+```
+
+## PoC池缓存机制
+当前算法流程： 每次启动检测，都要先跑 select_poc_pool — 遍历全部 120,175 个越狱样本，逐个调用 LLM 筛选出有效的越狱提示（PoC）。这个过程耗时极长（估算 5-13 小时），且不受被测数据集大小影响，因为 PoC 筛选只看越狱数据集。
+
+问题所在：
+
+- 越狱数据集（PoC 来源）相对稳定，不需要每次检测都重新筛选
+- 但当前实现每次检测都重新遍历全部 12 万样本
+- API 限流进一步放大了这个问题
+## 解决方案
+PoC 池缓存机制：
+
+1. 缓存存储 ：新建一张数据库表 PocPoolCache ，存 model_id + 越狱子类型 + PoC文本 + 评分 ，以及版本号/时间戳
+2. 缓存命中 ：检测开始前，先查 PocPoolCache 是否有所需 PoC（按 model_id 区分，因为不同模型对同一 PoC 评分不同），有则直接用，无则走 select_poc_pool 并写入缓存
+3. 手动刷新 ：用户更新越狱数据集时，提供一个"刷新 PoC 池"按钮，清空旧缓存并重新筛选
+4. 自动失效 ：缓存命中率低时（如数据集变化大），可设置 TTL 或按数据集版本号失效
+预期效果：
+
+- 首次检测：仍然耗时（需筛选 PoC）
+- 后续检测：PoC 池秒级加载，直接进入样本检测阶段
+- 用户更新越狱数据集：手动刷新即可

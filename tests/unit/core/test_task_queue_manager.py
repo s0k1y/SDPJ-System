@@ -355,3 +355,241 @@ class TestConcurrency:
         # 验证所有任务都被取出
         assert all(task is not None for task in tasks)
         assert len(set(task.task_id for task in tasks)) == 10
+
+
+@pytest.mark.asyncio
+class TestTaskCancel:
+    """测试任务取消"""
+
+    async def test_cancel_pending_task(self):
+        manager = TaskQueueManager()
+        task_desc = {
+            "user_id": "user1",
+            "model_id": "gpt-4",
+            "algorithm_type": "static",
+            "dataset_id": "dataset1"
+        }
+
+        task_id = await manager.enqueue_task(task_desc)
+        result = await manager.cancel_task(task_id)
+
+        assert result is True
+        status = await manager.get_task_status(task_id)
+        assert status == TaskStatus.CANCELLED
+
+    async def test_cancel_running_task(self):
+        manager = TaskQueueManager()
+        task_desc = {
+            "user_id": "user1",
+            "model_id": "gpt-4",
+            "algorithm_type": "static",
+            "dataset_id": "dataset1"
+        }
+
+        task_id = await manager.enqueue_task(task_desc)
+        await manager.dequeue_task()
+
+        result = await manager.cancel_task(task_id)
+
+        assert result is True
+        status = await manager.get_task_status(task_id)
+        assert status == TaskStatus.CANCELLED
+
+    async def test_cancel_completed_task_fails(self):
+        manager = TaskQueueManager()
+        task_desc = {
+            "user_id": "user1",
+            "model_id": "gpt-4",
+            "algorithm_type": "static",
+            "dataset_id": "dataset1"
+        }
+
+        task_id = await manager.enqueue_task(task_desc)
+        await manager.dequeue_task()
+        await manager.update_task_status(task_id, TaskStatus.COMPLETED)
+
+        result = await manager.cancel_task(task_id)
+
+        assert result is False
+        status = await manager.get_task_status(task_id)
+        assert status == TaskStatus.COMPLETED
+
+    async def test_cancel_nonexistent_task_fails(self):
+        manager = TaskQueueManager()
+        result = await manager.cancel_task("nonexistent")
+
+        assert result is False
+
+    async def test_cancel_already_cancelled_task_fails(self):
+        manager = TaskQueueManager()
+        task_desc = {
+            "user_id": "user1",
+            "model_id": "gpt-4",
+            "algorithm_type": "static",
+            "dataset_id": "dataset1"
+        }
+
+        task_id = await manager.enqueue_task(task_desc)
+        await manager.cancel_task(task_id)
+
+        result = await manager.cancel_task(task_id)
+
+        assert result is False
+
+
+@pytest.mark.asyncio
+class TestRemoveTask:
+    """测试从队列中移除任务"""
+
+    async def test_remove_pending_task(self):
+        manager = TaskQueueManager()
+        task_desc = {
+            "user_id": "user1",
+            "model_id": "gpt-4",
+            "algorithm_type": "static",
+            "dataset_id": "dataset1"
+        }
+
+        task_id = await manager.enqueue_task(task_desc)
+        result = await manager.remove_task(task_id)
+
+        assert result is True
+        status = await manager.get_task_status(task_id)
+        assert status is None
+
+        view = await manager.get_queue_view()
+        assert len(view) == 0
+
+    async def test_remove_completed_task(self):
+        manager = TaskQueueManager()
+        task_desc = {
+            "user_id": "user1",
+            "model_id": "gpt-4",
+            "algorithm_type": "static",
+            "dataset_id": "dataset1"
+        }
+
+        task_id = await manager.enqueue_task(task_desc)
+        await manager.dequeue_task()
+        await manager.update_task_status(task_id, TaskStatus.COMPLETED)
+
+        result = await manager.remove_task(task_id)
+
+        assert result is True
+        status = await manager.get_task_status(task_id)
+        assert status is None
+
+    async def test_remove_nonexistent_task_fails(self):
+        manager = TaskQueueManager()
+        result = await manager.remove_task("nonexistent")
+
+        assert result is False
+
+    async def test_remove_task_not_in_queue_view(self):
+        manager = TaskQueueManager()
+
+        task_ids = []
+        for i in range(3):
+            task_desc = {
+                "user_id": f"user{i}",
+                "model_id": "gpt-4",
+                "algorithm_type": "static",
+                "dataset_id": "dataset1"
+            }
+            task_id = await manager.enqueue_task(task_desc)
+            task_ids.append(task_id)
+
+        await manager.remove_task(task_ids[1])
+
+        view = await manager.get_queue_view()
+        assert len(view) == 2
+        view_ids = [t.task_id for t in view]
+        assert task_ids[1] not in view_ids
+
+
+@pytest.mark.asyncio
+class TestTerminalStateProtection:
+    """测试终态保护：已处于终态的任务状态不可被覆盖"""
+
+    async def test_update_status_does_not_overwrite_cancelled(self):
+        manager = TaskQueueManager()
+        task_desc = {
+            "user_id": "user1",
+            "model_id": "gpt-4",
+            "algorithm_type": "static",
+            "dataset_id": "dataset1"
+        }
+
+        task_id = await manager.enqueue_task(task_desc)
+        await manager.dequeue_task()
+        await manager.cancel_task(task_id)
+
+        result = await manager.update_task_status(task_id, TaskStatus.COMPLETED)
+
+        assert result is False
+        status = await manager.get_task_status(task_id)
+        assert status == TaskStatus.CANCELLED
+
+    async def test_update_status_does_not_overwrite_completed(self):
+        manager = TaskQueueManager()
+        task_desc = {
+            "user_id": "user1",
+            "model_id": "gpt-4",
+            "algorithm_type": "static",
+            "dataset_id": "dataset1"
+        }
+
+        task_id = await manager.enqueue_task(task_desc)
+        await manager.dequeue_task()
+        await manager.update_task_status(task_id, TaskStatus.COMPLETED)
+
+        result = await manager.update_task_status(task_id, TaskStatus.RUNNING)
+
+        assert result is False
+        status = await manager.get_task_status(task_id)
+        assert status == TaskStatus.COMPLETED
+
+    async def test_update_status_does_not_overwrite_failed(self):
+        manager = TaskQueueManager()
+        task_desc = {
+            "user_id": "user1",
+            "model_id": "gpt-4",
+            "algorithm_type": "static",
+            "dataset_id": "dataset1"
+        }
+
+        task_id = await manager.enqueue_task(task_desc)
+        await manager.dequeue_task()
+        await manager.update_task_status(task_id, TaskStatus.FAILED)
+
+        result = await manager.update_task_status(task_id, TaskStatus.COMPLETED)
+
+        assert result is False
+        status = await manager.get_task_status(task_id)
+        assert status == TaskStatus.FAILED
+
+    async def test_cancelled_task_skipped_on_dequeue(self):
+        manager = TaskQueueManager()
+
+        task_ids = []
+        for i in range(3):
+            task_desc = {
+                "user_id": f"user{i}",
+                "model_id": "gpt-4",
+                "algorithm_type": "static",
+                "dataset_id": "dataset1"
+            }
+            task_id = await manager.enqueue_task(task_desc)
+            task_ids.append(task_id)
+
+        await manager.cancel_task(task_ids[1])
+
+        dequeued = []
+        for _ in range(3):
+            task = await manager.dequeue_task()
+            if task:
+                dequeued.append(task.task_id)
+
+        assert task_ids[1] not in dequeued
+        assert task_ids[0] in dequeued
+        assert task_ids[2] in dequeued

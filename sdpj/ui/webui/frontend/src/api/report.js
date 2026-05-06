@@ -50,6 +50,10 @@ export function getVisualization(taskGroupId) {
   return api.get(`/reports/${taskGroupId}/visualization`)
 }
 
+export function getTaskVisualization(taskId) {
+  return api.get(`/reports/task/${taskId}/visualization`)
+}
+
 export function getComplianceStatistics() {
   return api.get('/reports/statistics')
 }

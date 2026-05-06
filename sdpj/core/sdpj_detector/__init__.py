@@ -3,6 +3,8 @@
 依赖模块: DataProcessor (via DataProcessorInterface), LLMService (via LLMServiceInterface)
 被依赖模块: StateScheduler
 """
+from typing import Callable
+
 from sdpj.drivers.data_processor_interface import DataProcessorInterface
 from sdpj.drivers.llm_service_interface import LLMServiceInterface, LLMError
 
@@ -33,9 +35,13 @@ class SDPJDetector:
         self._data_processor = data_processor
         self._llm = llm_service
 
-    async def run_static_detection(self, model_id: str, user_id: str, dataset_ids: list[int] | None = None) -> dict:
+    async def run_static_detection(self, model_id: str, user_id: str, dataset_ids: list[int] | None = None, *, task_group_id: str | None = None, jailbreak_dataset_ids: list[int] | None = None, poc_progress_callback: Callable[[int, int, int], None] | None = None, force_refresh: bool = False) -> dict:
         return await run_static_detection(
-            self._llm, self._data_processor, model_id, user_id, dataset_ids
+            self._llm, self._data_processor, model_id, user_id, dataset_ids,
+            task_group_id=task_group_id,
+            jailbreak_dataset_ids=jailbreak_dataset_ids,
+            poc_progress_callback=poc_progress_callback,
+            force_refresh=force_refresh,
         )
 
     async def run_dynamic_detection(

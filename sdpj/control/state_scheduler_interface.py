@@ -2,7 +2,7 @@
 
 被依赖模块: CLI, WebUI
 """
-from typing import Callable, Protocol, Optional
+from typing import Callable, Protocol, Optional, Any
 
 
 class StateSchedulerInterface(Protocol):
@@ -31,14 +31,33 @@ class StateSchedulerInterface(Protocol):
         """查询检测任务执行进度"""
         ...
 
-    # ── 报告管理调度 (职责 5-8) ──
-
-    async def generate_report(self, task_group_id: str, detection_type: str) -> dict:
-        """生成检测报告"""
+    async def cancel_task(self, task_id: str) -> dict:
+        """取消单个检测任务"""
         ...
 
-    async def view_report(self, task_group_id: str) -> dict:
-        """查看单份检测报告"""
+    async def cancel_task_group(self, task_group_id: str) -> dict:
+        """取消整个任务组及其关联报告"""
+        ...
+
+    # ── 报告管理调度 (职责 5-8) ──
+
+    async def generate_report(self, task_group_id: str, detection_type: str, *, user_id: int | None = None) -> dict:
+        """生成检测报告
+
+        Args:
+            task_group_id: 任务组 ID
+            detection_type: 检测类型
+            user_id: 请求者用户 ID，用于权限校验
+        """
+        ...
+
+    async def view_report(self, task_group_id: str, *, user_id: int | None = None) -> dict:
+        """查看单份检测报告
+
+        Args:
+            task_group_id: 任务组 ID
+            user_id: 请求者用户 ID，用于权限校验
+        """
         ...
 
     async def list_reports(self, filters: Optional[dict] = None) -> list:
@@ -51,12 +70,32 @@ class StateSchedulerInterface(Protocol):
         """删除检测报告"""
         ...
 
-    async def export_report(self, task_group_id: str, target_format: str) -> dict:
-        """导出检测报告文件"""
+    async def export_report(self, task_group_id: str, target_format: str, *, user_id: int | None = None) -> dict:
+        """导出检测报告文件
+
+        Args:
+            task_group_id: 任务组 ID
+            target_format: 目标文件格式
+            user_id: 请求者用户 ID，用于权限校验
+        """
         ...
 
-    async def prepare_visualization_data(self, task_group_id: str) -> dict:
-        """准备可视化图表数据"""
+    async def prepare_visualization_data(self, task_group_id: str, *, user_id: int | None = None) -> dict:
+        """准备可视化图表数据
+
+        Args:
+            task_group_id: 任务组 ID
+            user_id: 请求者用户 ID，用于权限校验
+        """
+        ...
+
+    async def prepare_task_visualization_data(self, task_id: str, *, user_id: int | None = None) -> dict:
+        """准备单个任务的可视化图表数据
+
+        Args:
+            task_id: 任务 ID
+            user_id: 请求者用户 ID，用于权限校验
+        """
         ...
 
     async def query_compliance_statistics(self) -> dict:
@@ -71,6 +110,14 @@ class StateSchedulerInterface(Protocol):
 
     async def shutdown(self) -> None:
         """应用关闭时清理资源"""
+        ...
+
+    def start_task_consumer(self, interval: float = 2.0, max_concurrency: int = 3) -> None:
+        """启动后台任务消费者协程"""
+        ...
+
+    async def stop_task_consumer(self) -> None:
+        """停止后台任务消费者协程"""
         ...
 
     def get_system_state(self) -> str:
@@ -93,20 +140,24 @@ class StateSchedulerInterface(Protocol):
         """取消异常订阅"""
         ...
 
-    async def query_logs(self, filters: Optional[dict] = None) -> list:
-        """查询系统日志"""
+    def subscribe_logs(self, callback: Callable[[dict], None]) -> None:
+        """订阅日志推送，callback 接收日志字典"""
+        ...
+
+    def unsubscribe_logs(self, callback: Callable[[dict], None]) -> None:
+        """取消日志订阅"""
+        ...
+
+    async def query_logs(self, filters: Optional[dict] = None) -> dict:
+        """查询系统日志，返回 {"logs": [...], "total": int}"""
         ...
 
     # ── 用户账号调度 (职责 13-14) ──
 
     async def schedule_user_auth(
-        self, username: str, password: str, action: str, is_encrypted: bool = False
+        self, username: str, password: str, action: str
     ) -> dict:
         """调度用户注册与登录"""
-        ...
-
-    def get_comm_public_key(self) -> str:
-        """返回通信公钥（SPKI DER base64），供前端加密凭据"""
         ...
 
     async def schedule_account_operation(self, operation: str, params: dict) -> dict:
@@ -129,8 +180,24 @@ class StateSchedulerInterface(Protocol):
         """调度用户私有检测配置的全生命周期管理"""
         ...
 
-    async def query_available_datasets(self) -> list:
+    async def query_available_datasets(self, user_id: int) -> list:
         """查询可用检测数据集清单"""
+        ...
+
+    async def query_dataset_detail(self, dataset_id: int) -> dict | None:
+        """查询数据集详情"""
+        ...
+
+    async def export_dataset_file(self, dataset_id: int) -> dict | None:
+        """导出数据集文件"""
+        ...
+
+    async def import_dataset_file(self, user_id: int, filename: str, content: bytes) -> dict:
+        """导入用户数据集文件"""
+        ...
+
+    async def delete_user_dataset(self, dataset_id: int, user_id: int) -> dict:
+        """删除用户数据集（仅允许删除 user_datasets 下的数据集）"""
         ...
 
     async def schedule_private_resource_operation(

@@ -26,12 +26,13 @@ class SampleDB:
 
     # ==================== 数据集级能力 ====================
 
-    async def create_dataset(self, name: str, risk_type: str) -> int:
+    async def create_dataset(self, name: str, risk_type: str, resource_id: int | None = None) -> int:
         """创建检测数据集
 
         Args:
             name: 数据集名称
             risk_type: 安全风险类型
+            resource_id: 对应 UserDB Resource 表的 resource_id（内置数据集为 None）
 
         Returns:
             新创建数据集的数据集 ID
@@ -41,7 +42,7 @@ class SampleDB:
         """
         async with self.session_manager.get_session() as session:
             repo = DatasetRepository(session)
-            dataset = await repo.create(name, risk_type)
+            dataset = await repo.create(name, risk_type, resource_id)
             await session.commit()
             return dataset.dataset_id
 
@@ -71,16 +72,7 @@ class SampleDB:
         """
         async with self.session_manager.get_session() as session:
             repo = DatasetRepository(session)
-            datasets = await repo.get_all()
-            return [
-                {
-                    "dataset_id": ds.dataset_id,
-                    "name": ds.name,
-                    "risk_type": ds.risk_type,
-                    "created_at": ds.created_at,
-                }
-                for ds in datasets
-            ]
+            return await repo.get_all_with_sample_count()
 
     async def get_dataset_by_id(self, dataset_id: int) -> Optional[dict]:
         """按 ID 查询单个数据集
@@ -100,6 +92,7 @@ class SampleDB:
                 "dataset_id": dataset.dataset_id,
                 "name": dataset.name,
                 "risk_type": dataset.risk_type,
+                "resource_id": dataset.resource_id,
                 "created_at": dataset.created_at,
             }
 
@@ -120,6 +113,7 @@ class SampleDB:
                     "dataset_id": ds.dataset_id,
                     "name": ds.name,
                     "risk_type": ds.risk_type,
+                    "resource_id": ds.resource_id,
                     "created_at": ds.created_at,
                 }
                 for ds in datasets

@@ -63,18 +63,15 @@ async def test_detection_sample_creation(async_session):
 @pytest.mark.asyncio
 async def test_dataset_sample_relationship(async_session):
     """测试数据集与样本的关系"""
-    # 创建数据集
     dataset = Dataset(name="关系测试数据集", risk_type="安全基准")
     async_session.add(dataset)
     await async_session.commit()
 
-    # 创建多个样本
     sample1 = DetectionSample(subtype="子类1", poc="PoC1", dataset_id=dataset.dataset_id)
     sample2 = DetectionSample(subtype="子类2", poc="PoC2", dataset_id=dataset.dataset_id)
     async_session.add_all([sample1, sample2])
     await async_session.commit()
 
-    # 刷新数据集对象以加载关系
     await async_session.refresh(dataset)
 
     assert len(dataset.samples) == 2

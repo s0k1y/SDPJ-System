@@ -126,6 +126,22 @@ class UserCenter:
 
         return False, None, "密码错误"
 
+    async def get_all_users(self) -> list[dict]:
+        """获取所有用户列表
+
+        Returns:
+            用户列表，每个用户包含 user_id, username, created_at
+        """
+        users = await self._user_db.get_all_users()
+        return [
+            {
+                "user_id": u["user_id"],
+                "username": u["username"],
+                "created_at": u.get("created_at", "-")
+            }
+            for u in users
+        ]
+
     # ==================== 资源登记与查询 ====================
 
     async def register_resource(self, resource_type: str, owner_user_id: int) -> int:
@@ -164,6 +180,10 @@ class UserCenter:
             该用户拥有的全部资源列表
         """
         return await self._user_db.get_resources_by_owner(user_id)
+
+    async def get_resources_shared_with(self, user_id: int) -> list[dict]:
+        """按被授权用户查询被共享的资源清单"""
+        return await self._user_db.get_resources_shared_with(user_id)
 
     async def get_resource_by_id(self, resource_id: int) -> Optional[dict]:
         """按 ID 查询资源
@@ -218,6 +238,9 @@ class UserCenter:
     async def check_access(self, resource_id: int, user_id: int) -> bool:
         return await self._user_db.check_access_control_exists(resource_id, user_id)
 
+    async def get_accessible_resource_ids(self, user_id: int, resource_ids: list[int]) -> set[int]:
+        return await self._user_db.get_accessible_resource_ids(user_id, resource_ids)
+
     async def get_acl_by_id(self, acl_id: int):
         return await self._user_db.get_access_control_by_id(acl_id)
 
@@ -249,6 +272,17 @@ class UserCenter:
             配置内容 JSON，不存在时返回 None
         """
         return await self._user_db.read_private_config(config_id)
+
+    async def read_private_configs_batch(self, config_ids: list[int]) -> dict[int, dict]:
+        """批量读取用户私有检测配置内容
+
+        Args:
+            config_ids: 配置 ID 列表
+
+        Returns:
+            {config_id: config_content_dict} 映射
+        """
+        return await self._user_db.read_private_configs_batch(config_ids)
 
     async def update_private_config(self, config_id: int, config_content: dict) -> bool:
         """更新用户私有检测配置内容

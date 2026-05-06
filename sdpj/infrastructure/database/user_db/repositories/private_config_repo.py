@@ -115,3 +115,19 @@ class PrivateConfigRepository:
         result = await self._session.execute(stmt)
         await self._session.flush()
         return result.rowcount > 0
+
+    async def get_by_ids(self, config_ids: list[int]) -> dict[int, dict]:
+        """批量按 ID 读取私有检测配置内容
+
+        Args:
+            config_ids: 配置 ID 列表
+
+        Returns:
+            {config_id: config_content_dict} 映射，不存在的 ID 不出现在结果中
+        """
+        if not config_ids:
+            return {}
+        stmt = select(PrivateConfig).where(PrivateConfig.config_id.in_(config_ids))
+        result = await self._session.execute(stmt)
+        configs = result.scalars().all()
+        return {c.config_id: json.loads(c.config_content) for c in configs}

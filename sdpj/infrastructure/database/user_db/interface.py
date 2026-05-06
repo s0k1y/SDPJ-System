@@ -116,6 +116,33 @@ class UserDBInterface(Protocol):
         """
         ...
 
+    async def update_role(self, user_id: int, new_role: str) -> bool:
+        """更新用户角色
+
+        Args:
+            user_id: 用户 ID
+            new_role: 新角色
+
+        Returns:
+            更新结果（True 表示成功）
+
+        Raises:
+            ValueError: 用户 ID 不存在时抛出
+        """
+        ...
+
+    async def get_all_users(self) -> list[dict]:
+        """获取所有用户列表
+
+        Returns:
+            所有用户信息列表，每条包含：
+            - user_id: 用户 ID
+            - username: 账号
+            - password: 已存储密码
+            - created_at: 创建时间
+        """
+        ...
+
     # ==================== 资源级能力 ====================
 
     async def register_resource(self, resource_type: str, owner_user_id: int) -> int:
@@ -156,6 +183,21 @@ class UserDBInterface(Protocol):
 
         Returns:
             该用户拥有的全部资源列表，每条包含：
+            - resource_id: 资源 ID
+            - resource_type: 资源类型
+            - owner_user_id: 拥有者用户 ID
+            - created_at: 创建时间
+        """
+        ...
+
+    async def get_resources_shared_with(self, user_id: int) -> list[dict]:
+        """按被授权用户查询被共享的资源列表
+
+        Args:
+            user_id: 被授权用户 ID
+
+        Returns:
+            该用户被授权访问的全部资源列表，每条包含：
             - resource_id: 资源 ID
             - resource_type: 资源类型
             - owner_user_id: 拥有者用户 ID

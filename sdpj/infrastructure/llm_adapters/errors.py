@@ -79,11 +79,11 @@ class LLMServiceInstance:
     async def call(self, system_prompt: str, user_message: str, **kwargs) -> dict:
         if not self._active:
             raise RuntimeError(f"Service instance for '{self.model_id}' has been destroyed")
+        adapter_kwargs = {k: v for k, v in kwargs.items() if k != "model_id"}
         return await self.adapter.call(
             prompt=user_message,
-            model_id=self.model_id,
             system_prompt=system_prompt,
-            **kwargs,
+            **adapter_kwargs,
         )
 
     def destroy(self) -> None:

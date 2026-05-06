@@ -23,7 +23,7 @@ async function fetchProgress() {
   try {
     const res = await getProgress()
     if (res.success) {
-      const queue = res.queue || []
+      const queue = res.data?.queue || []
       runningCount.value = queue.filter(t => t.status === 'running').length
       pendingCount.value = queue.filter(t => t.status === 'pending').length
     }

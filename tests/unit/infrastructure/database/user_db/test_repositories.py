@@ -46,8 +46,8 @@ class TestUserRepository:
         result = await user_db.update_user_password(sample_user["user_id"], "new_hashed_password")
         assert result is True
 
-        # 验证密码已更新
-        user = await user_db.get_user_by_id(sample_user["user_id"])
+        user = await user_db.get_user_by_username(sample_user["username"])
+        assert user is not None
         assert user["password"] == "new_hashed_password"
 
     async def test_update_nonexistent_user_password(self, user_db):

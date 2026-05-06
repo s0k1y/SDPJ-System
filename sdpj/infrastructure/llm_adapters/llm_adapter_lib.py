@@ -88,6 +88,17 @@ class LLMAdapterLib:
         import aiohttp
         if isinstance(exc, aiohttp.ServerTimeoutError):
             return StandardizedLLMError(ErrorCategory.TIMEOUT, str(exc), original_error=exc)
+        if isinstance(exc, aiohttp.ClientResponseError):
+            s = exc.status
+            if s == 401:
+                cat = ErrorCategory.AUTH
+            elif s == 429:
+                cat = ErrorCategory.RATE_LIMIT
+            elif 400 <= s < 500:
+                cat = ErrorCategory.INVALID_REQUEST
+            else:
+                cat = ErrorCategory.SERVER_ERROR
+            return StandardizedLLMError(cat, str(exc), status_code=s, original_error=exc)
         if isinstance(exc, aiohttp.ClientError):
             return StandardizedLLMError(ErrorCategory.NETWORK, str(exc), original_error=exc)
         return StandardizedLLMError(ErrorCategory.UNKNOWN, str(exc), original_error=exc)

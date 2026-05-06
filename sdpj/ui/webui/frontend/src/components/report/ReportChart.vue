@@ -1,10 +1,6 @@
 <template>
   <div class="report-chart">
-    <div v-if="loading" class="chart-loading">
-      <el-skeleton :rows="5" animated />
-    </div>
-
-    <el-empty v-else-if="!chartData" description="暂无可视化数据" />
+    <el-empty v-if="!loading && !chartData" description="暂无可视化数据" />
 
     <div v-else class="chart-content">
       <div class="stats-row">
@@ -67,7 +63,7 @@
             </tbody>
             <tbody v-else>
               <tr>
-                <td colspan="99" class="empty-row">暂无详细数据</td>
+                <td colspan="99" class="empty-row"><div class="empty-center" style="margin-right: 16%;">暂无详细数据</div></td>
               </tr>
             </tbody>
           </table>
@@ -79,14 +75,32 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import * as echarts from 'echarts'
-import { getVisualization } from '../../api/report'
+import * as echarts from 'echarts/core'
+import { PieChart, BarChart } from 'echarts/charts'
+import {
+  TitleComponent,
+  TooltipComponent,
+  LegendComponent,
+  GridComponent
+} from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
+
+echarts.use([
+  PieChart,
+  BarChart,
+  TitleComponent,
+  TooltipComponent,
+  LegendComponent,
+  GridComponent,
+  CanvasRenderer
+])
+import { getVisualization, getTaskVisualization } from '../../api/report'
 
 const props = defineProps({
-  taskGroupId: { type: String, default: '' }
+  targetId: { type: String, default: '' },
+  granularity: { type: String, default: 'task_group' }
 })
 
-const loading = ref(false)
 const chartData = ref(null)
 const riskPieChart = ref(null)
 const subtypeBarChart = ref(null)
@@ -156,44 +170,45 @@ const initSubtypeBarChart = () => {
   })
 }
 
+let resizeTimer = null
 const handleResize = () => {
-  riskPieInstance?.resize()
-  subtypeBarInstance?.resize()
+  if (resizeTimer) return
+  resizeTimer = setTimeout(() => {
+    riskPieInstance?.resize()
+    subtypeBarInstance?.resize()
+    resizeTimer = null
+  }, 200)
 }
 
 const fetchData = async () => {
-  if (!props.taskGroupId) return
-  loading.value = true
+  if (!props.targetId) return
   try {
-    const res = await getVisualization(props.taskGroupId)
+    const res = props.granularity === 'task'
+      ? await getTaskVisualization(props.targetId)
+      : await getVisualization(props.targetId)
     if (res.success) {
-      chartData.value = res.data
+      chartData.value = res.data?.data
       await nextTick()
       initRiskPieChart()
       initSubtypeBarChart()
     }
   } catch {
     chartData.value = null
-  } finally {
-    loading.value = false
   }
 }
 
-watch(() => props.taskGroupId, fetchData, { immediate: true })
+watch(() => [props.targetId, props.granularity], fetchData, { immediate: true })
 
 onMounted(() => window.addEventListener('resize', handleResize))
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+  if (resizeTimer) clearTimeout(resizeTimer)
   riskPieInstance?.dispose()
   subtypeBarInstance?.dispose()
 })
 </script>
 
 <style scoped>
-.chart-loading {
-  padding: 16px 0;
-}
-
 .stats-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -275,9 +290,12 @@ td {
 
 .empty-row {
   padding: 24px 8px;
-  text-align: center;
   color: #8b8b8b;
   font-size: 13px;
+}
+
+.empty-center {
+  text-align: center;
 }
 
 @media (max-width: 768px) {

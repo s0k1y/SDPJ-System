@@ -5,6 +5,7 @@
 
 from typing import Optional
 from sqlalchemy import select, delete, and_
+from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
@@ -79,9 +80,9 @@ class ACLRepository:
         Returns:
             该资源下全部访问控制项列表
         """
-        stmt = select(AccessControl).where(AccessControl.resource_id == resource_id)
+        stmt = select(AccessControl).options(joinedload(AccessControl.grantee)).where(AccessControl.resource_id == resource_id)
         result = await self._session.execute(stmt)
-        return list(result.scalars().all())
+        return list(result.scalars().unique().all())
 
     async def get_by_resource_and_grantee(
         self, resource_id: int, grantee_user_id: int
@@ -104,6 +105,23 @@ class ACLRepository:
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_by_grantee(self, grantee_user_id: int) -> list[AccessControl]:
+        """按被授权用户 ID 查询所有访问控制项（含关联资源）
+
+        Args:
+            grantee_user_id: 被授权用户 ID
+
+        Returns:
+            该用户被授权的全部访问控制项列表
+        """
+        stmt = (
+            select(AccessControl)
+            .options(joinedload(AccessControl.resource))
+            .where(AccessControl.grantee_user_id == grantee_user_id)
+        )
+        result = await self._session.execute(stmt)
+        return list(result.scalars().unique().all())
+
     async def get_by_id(self, acl_id: int) -> Optional[AccessControl]:
         stmt = select(AccessControl).where(AccessControl.acl_id == acl_id)
         result = await self._session.execute(stmt)
@@ -121,3 +139,34 @@ class ACLRepository:
         """
         acl = await self.get_by_resource_and_grantee(resource_id, grantee_user_id)
         return acl is not None
+
+    async def get_accessible_resource_ids(self, user_id: int, resource_ids: list[int]) -> set[int]:
+        """批量查询用户在指定资源中有访问权限的资源 ID 集合
+
+        拥有者自动有权限，此外检查 ACL 表
+        
+        Args:
+            user_id: 用户 ID
+            resource_ids: 待检查的资源 ID 列表
+
+        Returns:
+            用户有访问权限的资源 ID 集合
+        """
+        if not resource_ids:
+            return set()
+        from ..models import Resource
+        owner_stmt = select(Resource.resource_id).where(
+            Resource.resource_id.in_(resource_ids),
+            Resource.owner_user_id == user_id,
+        )
+        owner_result = await self._session.execute(owner_stmt)
+        accessible = {row[0] for row in owner_result.all()}
+        remaining = [rid for rid in resource_ids if rid not in accessible]
+        if remaining:
+            acl_stmt = select(AccessControl.resource_id).where(
+                AccessControl.resource_id.in_(remaining),
+                AccessControl.grantee_user_id == user_id,
+            )
+            acl_result = await self._session.execute(acl_stmt)
+            accessible.update(row[0] for row in acl_result.all())
+        return accessible

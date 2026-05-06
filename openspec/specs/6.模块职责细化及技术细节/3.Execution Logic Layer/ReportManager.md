@@ -50,7 +50,7 @@ ReportManager / 检测报告管理模块
    - 输出:可供用户下载的检测报告文件内容
    - 触发场景:用户下载历史检测报告(对应 1.spec.md 功能 1.6)
    - 调用下层:DataProcessor 的「汇总任务组下全部检测明细」与「导出检测报告文件」
-   - 不负责的边界:不做 C-S 链路上的加解密(由 SecureCommManager 完成)
+   - 不负责的边界:检测报告不在敏感字段范围内,传输安全由 HTTPS/TLS 保障
 
 8. 准备可视化图表数据
    - 输入:任务组ID
@@ -62,7 +62,7 @@ ReportManager / 检测报告管理模块
 # 接口契约
 9. 通过 ReportManagerInterface 对外暴露上述能力,被 StateScheduler 调用(符合 4.模型依赖关系图.puml 中 StateScheduler → ReportManager 边)
 
-不需要的:[做检测合规判断逻辑(由 SDPJDetector 完成),把原始结果明细写入 ResultDB(由 DataProcessor 完成),做权限判定(由 DACManager 完成),做图表的 UI 渲染(由 UI 层完成),维护受控资源的 ACL(由 DACManager / UserCenter 完成),做报告文件在 C-S 链路上的加解密(由 SecureCommManager 完成)]
+不需要的:[做检测合规判断逻辑(由 SDPJDetector 完成),把原始结果明细写入 ResultDB(由 DataProcessor 完成),做权限判定(由 DACManager 完成),做图表的 UI 渲染(由 UI 层完成),维护受控资源的 ACL(由 DACManager / UserCenter 完成)]
 
 依赖模块:DataProcessor,UserCenter,调用接口:DataProcessorInterface,UserCenterInterface
 应实现接口:ReportManagerInterface

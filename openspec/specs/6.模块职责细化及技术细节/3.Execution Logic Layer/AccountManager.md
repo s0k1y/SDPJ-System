@@ -8,7 +8,7 @@ AccountManager / 用户账号管理模块
    - 触发场景:用户通过 UI 层发起注册请求(对应 1.spec.md 功能 3.1.1.1)
    - 调用下层:UserCenter 的「注册新用户」
    - 错误情形:账号格式不合法/密码强度不足在本模块做前置校验后拒绝;账号已存在由下层透传错误
-   - 不负责的边界:不做密码哈希(由 UserCenter 借 UtilsLib 完成);不做账号密码在 C-S 链路上的加解密(由 SecureCommManager 完成)
+   - 不负责的边界:不做密码哈希(由 UserCenter 借 UtilsLib 完成)
 
 2. 用户注销
    - 输入:用户ID
@@ -24,7 +24,7 @@ AccountManager / 用户账号管理模块
    - 后置条件:通过时建立本模块维护的登录会话,记录当前登录态与用户ID
    - 触发场景:用户通过 UI 层发起登录(对应 1.spec.md 功能 3.1.1.1)
    - 调用下层:UserCenter 的「登录凭据校验」
-   - 不负责的边界:不做账号密码在 C-S 链路上的加解密(由 SecureCommManager 完成);不做密码哈希(由 UserCenter 完成)
+   - 不负责的边界:不做密码哈希(由 UserCenter 完成)
 
 4. 维护登录会话与在线态
    - 输入:无(本模块在登录成功时主动建立、登出/账号切换/注销时清理)
@@ -79,7 +79,7 @@ AccountManager / 用户账号管理模块
 # 接口契约
 11. 通过 AccountManagerInterface 对外暴露上述能力,被 StateScheduler 调用(符合 4.模型依赖关系图.puml 中 StateScheduler → AccountManager 边)
 
-不需要的:[做账号密码在 C-S 链路上的加解密(由 SecureCommManager 完成),做密码哈希(由 UserCenter 完成),做账号格式与密码强度的具体规则规范(可在本模块做前置校验,但规则的工程化沉淀属于配置层),做受控资源内容管理(由 PrivateConfigManager 完成),做权限授予与判定(由 DACManager 完成),持久化登录会话到外部存储(仅本模块内存态)]
+不需要的:[做密码哈希(由 UserCenter 完成),做账号格式与密码强度的具体规则规范(可在本模块做前置校验,但规则的工程化沉淀属于配置层),做受控资源内容管理(由 PrivateConfigManager 完成),做权限授予与判定(由 DACManager 完成),持久化登录会话到外部存储(仅本模块内存态)]
 
 依赖模块:UserCenter,调用接口:UserCenterInterface
 应实现接口:AccountManagerInterface

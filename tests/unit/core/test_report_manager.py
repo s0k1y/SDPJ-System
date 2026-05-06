@@ -59,24 +59,58 @@ async def test_generate_static_report():
 @pytest.mark.asyncio
 async def test_list_reports():
     mgr, dp, uc = make_manager()
-    dp.list_task_groups = AsyncMock(return_value=[{"task_group_id": "tg_1"}])
+    dp.list_reports_summary = AsyncMock(return_value=[{
+        "task_group_id": "tg_1",
+        "user_id": "1",
+        "model_id": "gpt-4",
+        "compliance_rate": 80.0,
+        "risk_level": "中风险",
+        "subtype_compliance": [],
+        "status": "completed",
+        "children": [],
+    }])
+    uc.get_user_by_id = AsyncMock(return_value={"username": "alice"})
     result = await mgr.list_reports()
     assert len(result) == 1
+    assert result[0]["task_group_id"] == "tg_1"
+    assert result[0]["user"]["username"] == "alice"
 
 
 @pytest.mark.asyncio
 async def test_delete_report_by_task_group():
     mgr, dp, uc = make_manager()
+    dp.resolve_task_group_id = AsyncMock(return_value="tg_1")
+    dp.aggregate_task_group_results = AsyncMock(return_value=make_aggregated())
     dp.delete_task_group = AsyncMock(return_value=True)
-    ok, _ = await mgr.delete_report(task_group_id="tg_1")
+    ok, _ = await mgr.delete_report(task_group_id="tg_1", user_id=1)
     assert ok
 
 
 @pytest.mark.asyncio
 async def test_delete_report_no_target():
-    mgr, _, _ = make_manager()
+    mgr, dp, _ = make_manager()
+    dp.resolve_task_group_id = AsyncMock(return_value=None)
     ok, msg = await mgr.delete_report()
-    assert not ok and "必须" in msg
+    assert not ok and "不存在" in msg
+
+
+@pytest.mark.asyncio
+async def test_delete_report_ownership_denied():
+    mgr, dp, uc = make_manager()
+    dp.resolve_task_group_id = AsyncMock(return_value="tg_1")
+    dp.aggregate_task_group_results = AsyncMock(return_value={"user_id": "2"})
+    ok, msg = await mgr.delete_report(task_group_id="tg_1", user_id=1)
+    assert not ok and "权限" in msg
+
+
+@pytest.mark.asyncio
+async def test_delete_report_ownership_allowed():
+    mgr, dp, uc = make_manager()
+    dp.resolve_task_group_id = AsyncMock(return_value="tg_1")
+    dp.aggregate_task_group_results = AsyncMock(return_value=make_aggregated())
+    dp.delete_task_group = AsyncMock(return_value=True)
+    ok, _ = await mgr.delete_report(task_group_id="tg_1", user_id=1)
+    assert ok
 
 
 @pytest.mark.asyncio
@@ -129,4 +163,39 @@ async def test_prepare_visualization_data_no_iteration_count():
     dp.aggregate_task_group_results = AsyncMock(return_value=make_aggregated(results))
     viz = await mgr.prepare_visualization_data("tg_1")
     assert viz["avg_iteration_count"] is None
+
+
+@pytest.mark.asyncio
+async def test_export_report_returns_content():
+    mgr, dp, uc = make_manager()
+    results = [{"compliance_result": "合规", "risk_subclass": "A"}]
+    aggregated = make_aggregated(results)
+    aggregated["task_group_id"] = "tg_1"
+    dp.aggregate_task_group_results = AsyncMock(return_value=aggregated)
+    dp.export_report_file = AsyncMock(return_value=("tg_1.jsonl", '{"compliance_result": "合规"}'))
+    filename, content = await mgr.export_report("tg_1", "jsonl", user_id=1)
+    assert filename == "tg_1.jsonl"
+    assert "合规" in content
+
+
+@pytest.mark.asyncio
+async def test_export_report_empty_data():
+    mgr, dp, uc = make_manager()
+    aggregated = make_aggregated(results=[])
+    aggregated["task_group_id"] = "tg_empty"
+    dp.aggregate_task_group_results = AsyncMock(return_value=aggregated)
+    dp.export_report_file = AsyncMock(return_value=("tg_empty.jsonl", ""))
+    filename, content = await mgr.export_report("tg_empty", "jsonl", user_id=1)
+    assert filename == "tg_empty.jsonl"
+    assert content == ""
+
+
+@pytest.mark.asyncio
+async def test_export_report_with_none_task_group_id_still_proceeds():
+    mgr, dp, uc = make_manager()
+    dp.aggregate_task_group_results = AsyncMock(return_value=make_aggregated())
+    dp.export_report_file = AsyncMock(return_value=("None.jsonl", ""))
+    filename, content = await mgr.export_report(None, "jsonl", user_id=1)
+    assert dp.aggregate_task_group_results.call_count == 2
+    dp.export_report_file.assert_called_once()
 

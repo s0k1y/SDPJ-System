@@ -10,36 +10,60 @@
         <el-button class="btn-refresh" @click="loadList" :icon="null">刷新</el-button>
       </div>
 
-      <div class="table-wrapper" v-loading="loading">
+      <div class="table-wrapper">
         <table>
           <thead>
             <tr>
               <th style="width: 15%">配置ID</th>
-              <th style="width: 15%">资源ID</th>
-              <th style="width: 15%">操作</th>
+              <th style="width: 20%">模型ID</th>
+              <th style="width: 15%">格式</th>
+              <th style="width: 30%">API地址</th>
+              <th style="width: 20%">操作</th>
             </tr>
           </thead>
           <tbody v-if="configs.length > 0">
             <tr v-for="cfg in configs" :key="cfg.config_id">
               <td><span class="cell-mono">{{ cfg.config_id }}</span></td>
-              <td><span class="cell-mono">{{ cfg.resource_id || '-' }}</span></td>
+              <td><span class="cell-mono">{{ getModelId(cfg) }}</span></td>
+              <td>{{ getFormat(cfg) }}</td>
+              <td class="url-cell">{{ getApiUrl(cfg) }}</td>
               <td>
-                <el-button class="action-btn" size="small" @click="deleteConfig(cfg.config_id)">删除</el-button>
+                <div class="action-btns">
+                  <el-button class="action-btn" size="small" @click="viewConfig(cfg)">查看</el-button>
+                  <el-button class="action-btn" size="small" @click="editConfig(cfg)">编辑</el-button>
+                  <el-button class="action-btn action-btn-danger" size="small" @click="deleteConfig(cfg.config_id)">删除</el-button>
+                </div>
               </td>
             </tr>
           </tbody>
-          <tbody v-else>
+          <tbody v-else-if="!loading && configs.length === 0">
             <tr>
-              <td colspan="99" class="empty-row">暂无配置</td>
+              <td colspan="99" class="empty-row"><div class="empty-center" style="margin-right: 36%;">暂无配置</div></td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <el-dialog v-model="dialogVisible" title="新建配置" width="500px">
+      <el-dialog v-model="dialogVisible" :title="editingConfigId ? '编辑配置' : '新建配置'" width="700px">
         <el-form>
+          <el-form-item label="选择模板">
+            <el-select v-model="selectedTemplate" placeholder="请选择适配器模板" @change="applyTemplate" style="width: 100%">
+              <el-option label="OpenAI 格式" value="openai" />
+              <el-option label="Anthropic 格式" value="anthropic" />
+              <el-option label="系统抽象规范" value="custom" />
+            </el-select>
+          </el-form-item>
+
+          <el-alert
+            :title="templateGuide.title"
+            :description="templateGuide.description"
+            type="info"
+            :closable="false"
+            style="margin-bottom: 16px"
+          />
+
           <el-form-item label="配置内容 (JSON)">
-            <el-input v-model="configJson" type="textarea" :rows="10" placeholder='{"key": "value"}' />
+            <el-input v-model="configJson" type="textarea" :rows="14" placeholder='{"key": "value"}' />
           </el-form-item>
         </el-form>
         <template #footer>
@@ -50,6 +74,33 @@
 
       <el-dialog v-model="importVisible" title="导入配置" width="500px">
         <el-form>
+          <el-form-item label="选择模板">
+            <el-select v-model="selectedTemplate" placeholder="请选择适配器模板" @change="applyTemplate" style="width: 100%">
+              <el-option label="OpenAI 格式" value="openai" />
+              <el-option label="Anthropic 格式" value="anthropic" />
+              <el-option label="系统抽象规范" value="custom" />
+            </el-select>
+          </el-form-item>
+
+          <el-alert
+            :title="templateGuide.title"
+            :description="templateGuide.description"
+            type="info"
+            :closable="false"
+            style="margin-bottom: 16px"
+          />
+
+          <el-form-item label="配置文件">
+            <el-upload
+              :auto-upload="false"
+              :on-change="handleFileChange"
+              :show-file-list="false"
+              accept=".json,.jsonl"
+            >
+              <el-button :icon="null">选择文件 (JSON/JSONL)</el-button>
+            </el-upload>
+          </el-form-item>
+
           <el-form-item label="配置内容 (JSON)">
             <el-input v-model="importJson" type="textarea" :rows="10" placeholder='{"key": "value"}' />
           </el-form-item>
@@ -67,34 +118,98 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { detectionConfig } from '../api/detection'
-import { encryptPassword } from '../utils/crypto'
 
 const configs = ref([])
-const loading = ref(false)
+const loading = ref(true)
 const dialogVisible = ref(false)
 const importVisible = ref(false)
 const configJson = ref('')
 const importJson = ref('')
 const saving = ref(false)
 const importing = ref(false)
+const selectedTemplate = ref('openai')
+const editingConfigId = ref(null) // 正在编辑的配置ID
 
-const encryptConfig = async (configContent) => {
-  const jsonStr = JSON.stringify(configContent)
-  return await encryptPassword(jsonStr)
+const templates = {
+  openai: {
+    model: "gpt-4",
+    request_format: "openai",
+    api_key: "your-openai-api-key",
+    base_url: "https://api.openai.com",
+    timeout: 60
+  },
+  anthropic: {
+    model: "claude-3-opus-20240229",
+    request_format: "anthropic",
+    api_key: "your-anthropic-api-key",
+    api_url: "https://api.anthropic.com",
+    timeout: 60
+  },
+  custom: {
+    model_id: "custom/my-model",
+    api_key: "your-api-key",
+    api_endpoint: "https://your-api.com/v1/chat",
+    timeout: 60
+  }
 }
+
+const templateGuides = {
+  openai: {
+    title: 'OpenAI 格式适配器',
+    description: '适用于所有兼容 OpenAI Chat Completions API 的大模型服务（OpenAI、DeepSeek、通义千问、Moonshot 等）。必需字段：model_id、request_format、api_key、base_url、model。'
+  },
+  anthropic: {
+    title: 'Anthropic 格式适配器',
+    description: '适用于 Anthropic Claude 系列模型。必需字段：model_id、request_format、api_key、api_url、model。'
+  },
+  custom: {
+    title: '系统抽象规范',
+    description: '使用系统内部统一的抽象接口。系统会自动将配置参数适配到统一的调用接口，无需指定 request_format。适用于任意符合系统抽象规范的大模型 API。必需字段：model_id、api_key、api_endpoint。'
+  }
+}
+
+const templateGuide = ref(templateGuides.openai)
 
 const loadList = async () => {
   loading.value = true
   try {
     const res = await detectionConfig('list', {})
-    configs.value = res.success ? (res.configs || []) : []
+    configs.value = res.success ? (res.data?.configs || []) : []
   } catch { configs.value = [] }
   finally { loading.value = false }
 }
 
 const openCreate = () => {
-  configJson.value = ''
+  editingConfigId.value = null
+  selectedTemplate.value = 'openai'
+  configJson.value = JSON.stringify(templates.openai, null, 2)
+  templateGuide.value = templateGuides.openai
   dialogVisible.value = true
+}
+
+const applyTemplate = () => {
+  const template = templates[selectedTemplate.value]
+  configJson.value = JSON.stringify(template, null, 2)
+  templateGuide.value = templateGuides[selectedTemplate.value]
+}
+
+const handleFileChange = (file) => {
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    const content = e.target.result
+    // 支持 JSON 和 JSONL 格式
+    if (file.name.endsWith('.jsonl')) {
+      // JSONL 格式：每行一个 JSON 对象，取第一行
+      const firstLine = content.split('\n')[0].trim()
+      if (firstLine) {
+        importJson.value = firstLine
+      }
+    } else {
+      // JSON 格式
+      importJson.value = content
+    }
+  }
+  reader.readAsText(file.raw)
 }
 
 const saveConfig = async () => {
@@ -107,20 +222,76 @@ const saveConfig = async () => {
   }
   saving.value = true
   try {
-    const encryptedContent = await encryptConfig(content)
-    const res = await detectionConfig('create', {
-      config_content: encryptedContent,
-      is_encrypted: true
-    })
+    const operation = editingConfigId.value ? 'update' : 'create'
+    const params = {
+      config_content: content
+    }
+
+    if (editingConfigId.value) {
+      params.config_id = editingConfigId.value
+    }
+
+    const res = await detectionConfig(operation, params)
     if (res.success) {
-      ElMessage.success('创建成功')
+      ElMessage.success(editingConfigId.value ? '更新成功' : '创建成功')
       dialogVisible.value = false
+      editingConfigId.value = null
       await loadList()
     } else {
-      ElMessage.error(res.error || '操作失败')
+      ElMessage.error(res.message || '操作失败')
     }
   } catch { ElMessage.error('操作失败') }
   finally { saving.value = false }
+}
+
+const getModelId = (cfg) => {
+  const content = cfg.content || {}
+  return content.model_id || content.model || '-'
+}
+
+const getFormat = (cfg) => {
+  const content = cfg.content || {}
+  const format = content.request_format
+  if (format === 'openai') return 'OpenAI'
+  if (format === 'anthropic') return 'Anthropic'
+  if (!format) return '系统抽象'
+  return format
+}
+
+const getApiUrl = (cfg) => {
+  const content = cfg.content || {}
+  return content.base_url || content.api_url || content.api_endpoint || '-'
+}
+
+const viewConfig = (cfg) => {
+  ElMessageBox.alert(
+    `<pre style="max-height: 400px; overflow: auto; background: #f5f5f5; padding: 12px; border-radius: 4px;">${JSON.stringify(cfg.content, null, 2)}</pre>`,
+    '配置详情',
+    {
+      dangerouslyUseHTMLString: true,
+      confirmButtonText: '关闭'
+    }
+  )
+}
+
+const editConfig = (cfg) => {
+  editingConfigId.value = cfg.config_id
+  configJson.value = JSON.stringify(cfg.content, null, 2)
+
+  // 根据配置内容自动选择模板
+  const content = cfg.content || {}
+  if (content.request_format === 'openai') {
+    selectedTemplate.value = 'openai'
+    templateGuide.value = templateGuides.openai
+  } else if (content.request_format === 'anthropic') {
+    selectedTemplate.value = 'anthropic'
+    templateGuide.value = templateGuides.anthropic
+  } else {
+    selectedTemplate.value = 'custom'
+    templateGuide.value = templateGuides.custom
+  }
+
+  dialogVisible.value = true
 }
 
 const deleteConfig = async (configId) => {
@@ -130,7 +301,7 @@ const deleteConfig = async (configId) => {
     ElMessage.success('已删除')
     await loadList()
   } else {
-    ElMessage.error(res.error || '删除失败')
+    ElMessage.error(res.message || '删除失败')
   }
 }
 
@@ -144,17 +315,15 @@ const doImport = async () => {
   }
   importing.value = true
   try {
-    const encryptedContent = await encryptConfig(content)
     const res = await detectionConfig('import', {
-      file_content: encryptedContent,
-      is_encrypted: true
+      file_content: content
     })
     if (res.success) {
       ElMessage.success('导入成功')
       importVisible.value = false
       await loadList()
     } else {
-      ElMessage.error(res.error || '导入失败')
+      ElMessage.error(res.message || '导入失败')
     }
   } catch { ElMessage.error('导入失败') }
   finally { importing.value = false }
@@ -271,7 +440,7 @@ td {
 
 .action-btn {
   height: 30px;
-  padding: 0 14px;
+  padding: 0;
   font-size: 12px;
   border-radius: 10px;
   border: none;
@@ -281,13 +450,35 @@ td {
 
 .action-btn:hover {
   background: #e5e5e5;
+}
+
+.action-btn-danger:hover {
   color: #dc2626;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.action-btns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.url-cell {
+  font-size: 13px;
+  color: #666;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .empty-row {
   padding: 24px 8px;
-  text-align: center;
   color: #8b8b8b;
   font-size: 13px;
+}
+
+.empty-center {
+  text-align: center;
 }
 </style>

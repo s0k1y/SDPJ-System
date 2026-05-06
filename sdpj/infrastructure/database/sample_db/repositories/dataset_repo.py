@@ -4,10 +4,11 @@
 """
 
 from typing import Optional
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
-from ..models import Dataset
+from sqlalchemy.orm import noload
+from ..models import Dataset, DetectionSample
 
 
 class DatasetRepository:
@@ -24,12 +25,13 @@ class DatasetRepository:
         """
         self.session = session
 
-    async def create(self, name: str, risk_type: str) -> Dataset:
+    async def create(self, name: str, risk_type: str, resource_id: int | None = None) -> Dataset:
         """创建数据集
 
         Args:
             name: 数据集名称
             risk_type: 安全风险类型
+            resource_id: 对应 UserDB Resource 表的 resource_id（内置数据集为 None）
 
         Returns:
             创建的数据集对象
@@ -37,7 +39,7 @@ class DatasetRepository:
         Raises:
             ValueError: 数据集名称重复时抛出
         """
-        dataset = Dataset(name=name, risk_type=risk_type)
+        dataset = Dataset(name=name, risk_type=risk_type, resource_id=resource_id)
         self.session.add(dataset)
 
         try:
@@ -71,9 +73,44 @@ class DatasetRepository:
         Returns:
             数据集列表
         """
-        stmt = select(Dataset).order_by(Dataset.created_at.desc())
+        stmt = select(Dataset).options(noload(Dataset.samples)).order_by(Dataset.created_at.desc())
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
+
+    async def get_all_with_sample_count(self) -> list[dict]:
+        """查询所有数据集（带样本数量）
+
+        使用 func.count() 子查询仅获取样本数量，避免加载全部样本对象。
+        通过 noload() 跳过 samples 关系的自动加载，避免 selectin 策略触发额外查询。
+
+        Returns:
+            字典列表，每项包含 dataset 字段和 sample_count 字段
+        """
+        count_subq = (
+            select(func.count(DetectionSample.sample_id))
+            .where(DetectionSample.dataset_id == Dataset.dataset_id)
+            .correlate(Dataset)
+            .scalar_subquery()
+            .label("sample_count")
+        )
+        stmt = (
+            select(Dataset, count_subq)
+            .options(noload(Dataset.samples))
+            .order_by(Dataset.created_at.desc())
+        )
+        result = await self.session.execute(stmt)
+        rows = result.all()
+        return [
+            {
+                "dataset_id": ds.dataset_id,
+                "name": ds.name,
+                "risk_type": ds.risk_type,
+                "resource_id": ds.resource_id,
+                "created_at": ds.created_at,
+                "sample_count": sample_count,
+            }
+            for ds, sample_count in rows
+        ]
 
     async def get_by_id(self, dataset_id: int) -> Optional[Dataset]:
         """按 ID 查询数据集
@@ -110,6 +147,6 @@ class DatasetRepository:
         Returns:
             匹配的数据集列表
         """
-        stmt = select(Dataset).where(Dataset.risk_type == risk_type).order_by(Dataset.created_at.desc())
+        stmt = select(Dataset).options(noload(Dataset.samples)).where(Dataset.risk_type == risk_type).order_by(Dataset.created_at.desc())
         result = await self.session.execute(stmt)
         return list(result.scalars().all())

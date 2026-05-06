@@ -8,16 +8,16 @@ from typing import Protocol, Optional
 class AccountManagerInterface(Protocol):
     """用户账号管理接口"""
 
-    async def register(self, username: str, password: str) -> tuple[bool, str]:
-        """用户注册"""
+    async def register(self, username: str, password: str) -> tuple[bool, Optional[int], str]:
+        """用户注册，返回 (成功标志, 用户ID或None, 消息)"""
         ...
 
     async def unregister(self, user_id: int) -> tuple[bool, str]:
         """用户注销"""
         ...
 
-    async def login(self, username: str, password: str) -> tuple[bool, Optional[int]]:
-        """用户登录，返回 (成功标志, 用户ID或None)"""
+    async def login(self, username: str, password: str) -> tuple[bool, Optional[int], str]:
+        """用户登录，返回 (成功标志, 用户ID或None, 消息)"""
         ...
 
     def get_current_session(self) -> Optional[int]:
@@ -46,4 +46,8 @@ class AccountManagerInterface(Protocol):
 
     async def list_user_resources(self) -> list[dict]:
         """列出当前用户拥有的受控资源"""
+        ...
+
+    async def list_all_users(self) -> list[dict]:
+        """获取所有用户列表"""
         ...

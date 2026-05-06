@@ -122,10 +122,11 @@ def logs(ctx, category, source_module, user_id):
     if user_id:
         filters["user_id"] = user_id
     entries = asyncio.run(ctx.obj.scheduler.query_logs(filters or None))
-    if not entries:
+    logs_list = entries.get("logs", []) if isinstance(entries, dict) else entries
+    if not logs_list:
         output.info("暂无日志")
         return
-    for e in entries:
+    for e in logs_list:
         ts = getattr(e, "timestamp", "")
         cat = getattr(e, "category", "")
         desc = getattr(e, "description", str(e))

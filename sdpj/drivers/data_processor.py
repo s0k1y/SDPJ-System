@@ -11,8 +11,6 @@ from typing import Optional, Literal, Any, Union
 from pathlib import Path
 from datetime import datetime
 
-from sdpj.infrastructure.config.settings import get_settings
-
 from sdpj.infrastructure.database.sample_db.interface import SampleDBInterface
 from sdpj.infrastructure.database.result_db.interface import ResultDBInterface
 from sdpj.infrastructure.utils.utils_interface import UtilsInterface
@@ -44,7 +42,10 @@ class DataProcessor:
             {
                 "dataset_id": ds["dataset_id"],
                 "name": ds["name"],
-                "risk_type": ds["risk_type"]
+                "risk_type": ds["risk_type"],
+                "resource_id": ds.get("resource_id"),
+                "created_at": ds.get("created_at"),
+                "sample_count": ds.get("sample_count", 0),
             }
             for ds in datasets
         ]
@@ -86,7 +87,8 @@ class DataProcessor:
         self,
         name: str,
         risk_type: str,
-        samples: list[dict]
+        samples: list[dict],
+        resource_id: int | None = None
     ) -> dict:
         """导入用户私有数据集
 
@@ -94,12 +96,13 @@ class DataProcessor:
             name: 数据集名称
             risk_type: 安全风险类型
             samples: 样本条目清单
+            resource_id: 对应 UserDB Resource 表的 resource_id
 
         Returns:
             导入结果字典
         """
         # 创建数据集
-        dataset_id = await self._sample_db.create_dataset(name, risk_type)
+        dataset_id = await self._sample_db.create_dataset(name, risk_type, resource_id)
 
         # 批量添加样本
         sample_ids = []
@@ -126,6 +129,51 @@ class DataProcessor:
             删除结果
         """
         return await self._sample_db.delete_dataset(dataset_id)
+
+    async def add_dataset_record(self, name: str, sample_count: int, file_path: str, risk_type: str = "custom", resource_id: int | None = None) -> int:
+        """添加数据集记录到数据库
+
+        Args:
+            name: 数据集名称
+            sample_count: 样本数量
+            file_path: 文件路径
+            risk_type: 安全风险类型
+            resource_id: 对应 UserDB Resource 表的 resource_id
+
+        Returns:
+            数据集 ID
+        """
+        dataset_id = await self._sample_db.create_dataset(
+            name=name,
+            risk_type=risk_type,
+            resource_id=resource_id
+        )
+
+        import json
+        from pathlib import Path
+        p = Path(file_path)
+        if p.exists() and p.is_file():
+            try:
+                with open(p, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line:
+                            try:
+                                data = json.loads(line)
+                                subtype = data.get("subtype", "unknown")
+                                poc = data.get("poc", "")
+                                if poc:
+                                    await self._sample_db.add_sample(
+                                        subtype=subtype,
+                                        poc=poc,
+                                        dataset_id=dataset_id
+                                    )
+                            except json.JSONDecodeError:
+                                continue
+            except Exception:
+                pass
+
+        return dataset_id
 
     # ==================== 检测结果的持久化 ====================
 
@@ -305,6 +353,25 @@ class DataProcessor:
             model_id=model_id
         )
 
+    async def list_reports_summary(
+        self,
+        user_id: Optional[str] = None,
+        model_id: Optional[str] = None
+    ) -> list[dict]:
+        """查询检测报告列表摘要（高性能，使用 SQL 聚合查询）
+
+        Args:
+            user_id: 用户 ID 过滤条件
+            model_id: 模型 ID 过滤条件
+
+        Returns:
+            任务组列表，每组包含摘要统计和子任务列表
+        """
+        return await self._result_db.compute_reports_summary(
+            user_id=int(user_id) if user_id else None,
+            model_id=model_id
+        )
+
     async def list_detection_reports(
         self,
         task_group_id: Optional[str] = None
@@ -365,6 +432,43 @@ class DataProcessor:
         """
         return await self._result_db.delete_result_data(result_data_id)
 
+    async def resolve_task_group_id(
+        self,
+        task_group_id: Optional[str] = None,
+        task_id: Optional[str] = None,
+        report_id: Optional[str] = None,
+        result_data_id: Optional[str] = None,
+    ) -> Optional[str]:
+        if task_group_id:
+            return task_group_id
+        if task_id:
+            try:
+                task = await self._result_db.get_detection_task(task_id)
+                return task.get("task_group_id")
+            except ValueError:
+                return None
+        if report_id:
+            try:
+                report = await self._result_db.get_detection_report(report_id)
+                tid = report.get("task_id")
+                if tid:
+                    task = await self._result_db.get_detection_task(tid)
+                    return task.get("task_group_id")
+            except ValueError:
+                return None
+        if result_data_id:
+            try:
+                rd = await self._result_db.get_result_data(result_data_id)
+                if rd:
+                    report = await self._result_db.get_detection_report(rd["report_id"])
+                    tid = report.get("task_id")
+                    if tid:
+                        task = await self._result_db.get_detection_task(tid)
+                        return task.get("task_group_id")
+            except (ValueError, Exception):
+                return None
+        return None
+
     async def count_compliance_results(self) -> dict[str, int]:
         return await self._result_db.count_compliance_results()
 
@@ -372,24 +476,22 @@ class DataProcessor:
         self,
         report_data: dict,
         target_format: Literal["json", "yaml", "jsonl"]
-    ) -> str:
+    ) -> tuple[str, str]:
         if target_format == "jsonl":
-            lines = [
-                self._utils.serialize_json(r)
-                for task in report_data.get("tasks", [])
-                for r in task.get("results", [])
-            ]
+            lines = []
+            for task in report_data.get("tasks", []):
+                report = task.get("report")
+                if report and report.get("result_data"):
+                    for r in report["result_data"]:
+                        lines.append(self._utils.serialize_json(r))
             content = "\n".join(lines)
         elif target_format == "json":
             content = self._utils.serialize_json(report_data)
         else:
             content = self._utils.serialize_yaml(report_data)
         task_group_id = report_data.get("task_group_id", "unknown")
-        export_dir = Path(get_settings().export_dir)
-        export_dir.mkdir(parents=True, exist_ok=True)
-        path = export_dir / f"{task_group_id}.{target_format}"
-        self._utils.write_file(str(path), content)
-        return str(path)
+        filename = f"{task_group_id}.{target_format}"
+        return filename, content
 
     # ==================== 多模态与多编码的样本构造及响应处理 ====================
 
@@ -467,3 +569,21 @@ class DataProcessor:
         if format == "json":
             return self._utils.deserialize_json(serialized_data)
         return self._utils.deserialize_yaml(serialized_data)
+
+    # ==================== PoC 池缓存 ====================
+
+    async def get_poc_pool_cache(self, model_id: str) -> list[dict]:
+        return await self._result_db.get_poc_pool_cache(model_id)
+
+    async def save_poc_pool_cache(
+        self,
+        model_id: str,
+        entries: list[dict],
+        dataset_version: str,
+    ) -> int:
+        return await self._result_db.save_poc_pool_cache(
+            model_id, entries, dataset_version
+        )
+
+    async def invalidate_poc_pool_cache(self, model_id: str) -> int:
+        return await self._result_db.invalidate_poc_pool_cache(model_id)

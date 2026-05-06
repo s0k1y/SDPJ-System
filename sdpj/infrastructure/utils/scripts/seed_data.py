@@ -12,9 +12,11 @@ async def seed() -> None:
     data_dir = Path(__file__).resolve().parents[4] / "data" / "db"
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    sample_sm = SampleDBSessionManager()
-    result_sm = ResultDBSessionManager(f"sqlite+aiosqlite:///{data_dir / 'sdpj_results.db'}")
-    user_sm = UserDBSessionManager(f"sqlite+aiosqlite:///{data_dir / 'sdpj_users.db'}")
+    # 使用统一的数据库文件
+    db_url = f"sqlite+aiosqlite:///{data_dir / 'sdpj.db'}"
+    sample_sm = SampleDBSessionManager(db_url)
+    result_sm = ResultDBSessionManager(db_url)
+    user_sm = UserDBSessionManager(db_url)
 
     await sample_sm.create_tables()
     await result_sm.create_tables()

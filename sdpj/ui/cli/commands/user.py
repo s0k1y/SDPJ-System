@@ -46,8 +46,10 @@ def login(ctx, username, password):
 @click.pass_context
 def logout(ctx):
     """用户登出"""
+    user_id = ctx.obj.current_user_id
+    params = {"user_id": user_id} if user_id else {}
     result = asyncio.run(
-        ctx.obj.scheduler.schedule_account_operation("logout", {})
+        ctx.obj.scheduler.schedule_account_operation("logout", params)
     )
     ctx.obj.current_user_id = None
     output.success("已登出")

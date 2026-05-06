@@ -56,6 +56,38 @@ class UserDBSessionManager:
         """创建所有表（如果不存在）"""
         async with self._engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+        await self._migrate_schema()
+
+    async def _migrate_schema(self) -> None:
+        """检测并补齐 ORM 模型中定义但数据库缺失的列"""
+        from sqlalchemy import inspect as sa_inspect, text
+
+        async with self._engine.begin() as conn:
+            for table_name, table_obj in Base.metadata.tables.items():
+                existing_cols = set()
+                try:
+                    result = await conn.execute(text(f"PRAGMA table_info(\"{table_name}\")"))
+                    for row in result:
+                        existing_cols.add(row[1])
+                except Exception:
+                    continue
+                for col in table_obj.columns:
+                    if col.name not in existing_cols:
+                        col_type = col.type.compile(dialect=self._engine.dialect)
+                        nullable = "" if col.nullable else " NOT NULL"
+                        default = ""
+                        if col.server_default is not None:
+                            default = f" DEFAULT {col.server_default.arg}"
+                        elif col.default is not None:
+                            if col.default.is_scalar:
+                                val = col.default.arg
+                                if isinstance(val, str):
+                                    default = f" DEFAULT '{val}'"
+                                else:
+                                    default = f" DEFAULT {val}"
+                        await conn.execute(text(
+                            f'ALTER TABLE "{table_name}" ADD COLUMN {col.name} {col_type}{nullable}{default}'
+                        ))
 
     async def drop_tables(self) -> None:
         """删除所有表（慎用，仅用于测试）"""

@@ -1,6 +1,5 @@
 """Anthropic 格式适配器 — 支持 Anthropic Messages API"""
 import aiohttp
-from typing import Optional
 
 from sdpj.infrastructure.llm_adapters.base import LLMAdapter
 from sdpj.infrastructure.llm_adapters.errors import (
@@ -10,7 +9,13 @@ from sdpj.infrastructure.llm_adapters.errors import (
 
 
 class AnthropicAdapter(LLMAdapter):
-    """Anthropic Messages API 格式适配器"""
+    """Anthropic Messages API 格式适配器
+
+    向上抽象职责：
+    - 将 Anthropic 格式的配置参数（api_url、api_key、model）转换为统一的调用接口
+    - 屏蔽 Anthropic API 的请求/响应格式细节（如 x-api-key header、messages 结构）
+    - 提供统一的错误处理和超时控制
+    """
 
     def __init__(
         self,
@@ -39,25 +44,23 @@ class AnthropicAdapter(LLMAdapter):
     async def call(
         self,
         prompt: str,
-        model_id: str,
         system_prompt: str = "",
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
         max_tokens: int = 2048,
         temperature: float = 0.0,
         timeout: int = 60,
     ) -> dict:
-        actual_url = base_url or self._api_url
-        actual_key = api_key or self._api_key
-        actual_timeout = timeout or self._timeout
+        """调用 Anthropic Messages API（统一接口）
 
-        if not actual_url.endswith("/messages"):
-            url = f"{actual_url}/v1/messages"
+        使用构造时配置的 api_url、api_key、model_name，
+        不允许运行时覆盖配置参数。
+        """
+        if not self._api_url.endswith("/messages"):
+            url = f"{self._api_url}/v1/messages"
         else:
-            url = actual_url
+            url = self._api_url
 
         headers = {
-            "x-api-key": actual_key,
+            "x-api-key": self._api_key,
             "anthropic-version": "2023-06-01",
             "Content-Type": "application/json",
         }
@@ -77,7 +80,7 @@ class AnthropicAdapter(LLMAdapter):
                 url,
                 json=payload,
                 headers=headers,
-                timeout=aiohttp.ClientTimeout(total=actual_timeout),
+                timeout=aiohttp.ClientTimeout(total=timeout),
             ) as resp:
                 data = await resp.json()
                 if resp.status == 200:
@@ -88,13 +91,16 @@ class AnthropicAdapter(LLMAdapter):
                         "model": data.get("model", self._model_name),
                         "usage": data.get("usage", {}),
                     }
-                self._raise_api_error(resp.status, data)
+                retry_after = resp.headers.get("Retry-After") or resp.headers.get("retry-after")
+                self._raise_api_error(resp.status, data, retry_after=retry_after)
         except StandardizedLLMError:
             raise
         except aiohttp.ServerTimeoutError as e:
             raise StandardizedLLMError(
-                ErrorCategory.TIMEOUT, f"Request timed out ({actual_timeout}s)", original_error=e
+                ErrorCategory.TIMEOUT, f"Request timed out ({timeout}s)", original_error=e
             )
+        except aiohttp.ClientResponseError as e:
+            self._raise_api_error(e.status, {}, retry_after=None)
         except aiohttp.ClientError as e:
             raise StandardizedLLMError(
                 ErrorCategory.NETWORK, str(e), original_error=e
@@ -105,15 +111,21 @@ class AnthropicAdapter(LLMAdapter):
             )
 
     @staticmethod
-    def _raise_api_error(status: int, data: dict) -> None:
+    def _raise_api_error(status: int, data: dict, *, retry_after: str | None = None) -> None:
         error_msg = data.get("error", {}).get("message", f"HTTP {status}")
+        detail: dict | None = None
+        if retry_after is not None:
+            try:
+                detail = {"retry_after_seconds": float(retry_after)}
+            except (ValueError, TypeError):
+                detail = {"retry_after": retry_after}
         if status == 401:
-            raise StandardizedLLMError(ErrorCategory.AUTH, error_msg, status_code=status)
+            raise StandardizedLLMError(ErrorCategory.AUTH, error_msg, status_code=status, detail=detail)
         if status == 429:
-            raise StandardizedLLMError(ErrorCategory.RATE_LIMIT, error_msg, status_code=status)
+            raise StandardizedLLMError(ErrorCategory.RATE_LIMIT, error_msg, status_code=status, detail=detail)
         if 400 <= status < 500:
-            raise StandardizedLLMError(ErrorCategory.INVALID_REQUEST, error_msg, status_code=status)
-        raise StandardizedLLMError(ErrorCategory.SERVER_ERROR, error_msg, status_code=status)
+            raise StandardizedLLMError(ErrorCategory.INVALID_REQUEST, error_msg, status_code=status, detail=detail)
+        raise StandardizedLLMError(ErrorCategory.SERVER_ERROR, error_msg, status_code=status, detail=detail)
 
     def get_metadata(self) -> dict:
         return {

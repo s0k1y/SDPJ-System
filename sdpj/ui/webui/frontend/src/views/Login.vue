@@ -121,12 +121,11 @@ const handleLogin = async () => {
     if (res && res.success) {
       // 直接保存用户名（使用登录时输入的用户名）
       authStore.setUser({
-        user_id: res.user_id,
+        user_id: res.data.user_id,
         username: form.value.username
       })
 
       ElMessage.success('登录成功')
-      await new Promise(resolve => setTimeout(resolve, 100))
       await router.push('/dashboard')
     } else {
       ElMessage.error(res?.message || '登录失败')
@@ -134,7 +133,7 @@ const handleLogin = async () => {
   } catch (error) {
     console.error('登录错误:', error)
     // 显示具体的错误信息
-    const errorMsg = error.response?.data?.detail || error.message || '登录失败，请检查用户名和密码'
+    const errorMsg = error.response?.data?.message || error.message || '登录失败，请检查用户名和密码'
     ElMessage.error(errorMsg)
   } finally {
     loading.value = false

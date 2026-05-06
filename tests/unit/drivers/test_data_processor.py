@@ -139,7 +139,7 @@ class TestDatasetOperations:
 
         # 验证调用
         mock_sample_db.create_dataset.assert_called_once_with(
-            "我的私有数据集", "越狱攻击"
+            "我的私有数据集", "越狱攻击", None
         )
         assert mock_sample_db.add_sample.call_count == 3
 
@@ -462,13 +462,122 @@ class TestFileAndSerialization:
         """测试导出报告文件"""
         report_data = {"task_group_id": "tg_001", "user_id": "user_123", "tasks": []}
         mock_utils.serialize_json.return_value = '{"task_group_id": "tg_001"}'
-        mock_utils.write_file.return_value = True
 
-        result = await data_processor.export_report_file(
+        filename, content = await data_processor.export_report_file(
             report_data=report_data,
             target_format="json"
         )
 
-        assert result.endswith(".json")
+        assert filename.endswith(".json")
+        assert content == '{"task_group_id": "tg_001"}'
         mock_utils.serialize_json.assert_called_once_with(report_data)
-        mock_utils.write_file.assert_called_once()
+
+
+class TestAddDatasetRecord:
+    """测试 add_dataset_record 方法"""
+
+    @pytest.fixture
+    def mock_sample_db(self):
+        mock = AsyncMock()
+        mock.create_dataset.return_value = 1
+        mock.add_sample.return_value = 1
+        return mock
+
+    @pytest.fixture
+    def mock_result_db(self):
+        return AsyncMock()
+
+    @pytest.fixture
+    def mock_utils(self):
+        return Mock()
+
+    @pytest.fixture
+    def data_processor(self, mock_sample_db, mock_result_db, mock_utils):
+        return DataProcessor(mock_sample_db, mock_result_db, mock_utils)
+
+    @pytest.mark.asyncio
+    async def test_add_dataset_record_creates_samples_from_file(
+        self, data_processor, mock_sample_db, tmp_path
+    ):
+        """测试 add_dataset_record 从文件创建样本记录"""
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False, encoding='utf-8') as f:
+            f.write('{"subtype": "越狱攻击", "poc": "测试PoC1"}\n')
+            f.write('{"subtype": "提示词注入", "poc": "测试PoC2"}\n')
+            f.write('{"subtype": "安全基准", "poc": "测试PoC3"}\n')
+            file_path = f.name
+
+        dataset_id = await data_processor.add_dataset_record(
+            name="测试数据集",
+            sample_count=3,
+            file_path=file_path,
+            risk_type="越狱攻击",
+            resource_id=100
+        )
+
+        assert dataset_id == 1
+        mock_sample_db.create_dataset.assert_called_once_with(
+            name="测试数据集",
+            risk_type="越狱攻击",
+            resource_id=100
+        )
+        assert mock_sample_db.add_sample.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_add_dataset_record_with_empty_file(
+        self, data_processor, mock_sample_db, tmp_path
+    ):
+        """测试 add_dataset_record 处理空文件"""
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False, encoding='utf-8') as f:
+            f.write('')
+            file_path = f.name
+
+        dataset_id = await data_processor.add_dataset_record(
+            name="空数据集",
+            sample_count=0,
+            file_path=file_path,
+            risk_type="越狱攻击"
+        )
+
+        assert dataset_id == 1
+        mock_sample_db.create_dataset.assert_called_once()
+        mock_sample_db.add_sample.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_add_dataset_record_file_not_exists(
+        self, data_processor, mock_sample_db
+    ):
+        """测试 add_dataset_record 处理文件不存在的情况"""
+        dataset_id = await data_processor.add_dataset_record(
+            name="不存在文件的数据集",
+            sample_count=0,
+            file_path="/nonexistent/path/dataset.jsonl",
+            risk_type="越狱攻击"
+        )
+
+        assert dataset_id == 1
+        mock_sample_db.create_dataset.assert_called_once()
+        mock_sample_db.add_sample.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_add_dataset_record_skips_invalid_json_lines(
+        self, data_processor, mock_sample_db, tmp_path
+    ):
+        """测试 add_dataset_record 跳过无效的 JSON 行"""
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False, encoding='utf-8') as f:
+            f.write('{"subtype": "有效样本", "poc": "有效PoC"}\n')
+            f.write('invalid json line\n')
+            f.write('{"subtype": "另一个有效样本", "poc": "另一个有效PoC"}\n')
+            file_path = f.name
+
+        dataset_id = await data_processor.add_dataset_record(
+            name="混合数据集",
+            sample_count=2,
+            file_path=file_path,
+            risk_type="越狱攻击"
+        )
+
+        assert dataset_id == 1
+        assert mock_sample_db.add_sample.call_count == 2

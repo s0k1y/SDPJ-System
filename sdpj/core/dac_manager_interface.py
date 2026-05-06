@@ -8,7 +8,7 @@ from typing import Protocol
 class DACManagerInterface(Protocol):
     """自主访问控制管理接口"""
 
-    async def grant_access(self, resource_id: int, target_user_id: int, caller_user_id: int) -> tuple[bool, str]:
+    async def grant_access(self, resource_id: int, target_username: str, caller_user_id: int) -> tuple[bool, str]:
         """授予其他用户对私有资源的读权限"""
         ...
 

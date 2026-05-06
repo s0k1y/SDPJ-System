@@ -17,7 +17,7 @@ export const useUserStore = defineStore('user', {
       try {
         const res = await getProfile()
         if (res.success) {
-          this.profile = res.profile
+          this.profile = res.data?.profile
         }
         return res
       } catch (error) {
@@ -30,7 +30,7 @@ export const useUserStore = defineStore('user', {
       try {
         const res = await getResources()
         if (res.success) {
-          this.resources = res.resources
+          this.resources = res.data?.resources
         }
         return res
       } catch (error) {

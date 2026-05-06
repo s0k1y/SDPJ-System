@@ -4,7 +4,7 @@
 """
 
 import pytest
-from datetime import datetime
+from datetime import datetime, timedelta
 from sdpj.infrastructure.database.result_db import ResultDB, SessionManager
 
 
@@ -401,3 +401,100 @@ async def test_cascade_delete_full_chain(result_db):
 
     result_data_list = await result_db.list_result_data_by_report(report_id)
     assert len(result_data_list) == 0
+
+
+# ==================== PoC 池缓存能力测试 ====================
+
+@pytest.mark.asyncio
+async def test_save_and_get_poc_pool_cache(result_db):
+    """测试保存并读取 PoC 池缓存"""
+    entries = [
+        {"subtype": "模板化越狱", "poc_text": "poc_1", "score": 5},
+        {"subtype": "default_jailbreak", "poc_text": "poc_2", "score": 3},
+    ]
+    count = await result_db.save_poc_pool_cache("gpt-4", entries, "v1", ttl_hours=24)
+    assert count == 2
+
+    cached = await result_db.get_poc_pool_cache("gpt-4")
+    assert len(cached) == 2
+    assert cached[0]["score"] >= cached[1]["score"]
+    assert cached[0]["model_id"] == "gpt-4"
+    assert cached[0]["dataset_version"] == "v1"
+
+
+@pytest.mark.asyncio
+async def test_get_poc_pool_cache_empty(result_db):
+    """测试无缓存时返回空列表"""
+    cached = await result_db.get_poc_pool_cache("gpt-4")
+    assert cached == []
+
+
+@pytest.mark.asyncio
+async def test_save_poc_pool_cache_replaces_old(result_db):
+    """测试保存缓存会替换同模型旧缓存"""
+    entries_v1 = [{"subtype": "模板化越狱", "poc_text": "old_poc", "score": 3}]
+    await result_db.save_poc_pool_cache("gpt-4", entries_v1, "v1")
+
+    entries_v2 = [
+        {"subtype": "模板化越狱", "poc_text": "new_poc_1", "score": 5},
+        {"subtype": "说服式越狱", "poc_text": "new_poc_2", "score": 4},
+    ]
+    count = await result_db.save_poc_pool_cache("gpt-4", entries_v2, "v2")
+    assert count == 2
+
+    cached = await result_db.get_poc_pool_cache("gpt-4")
+    assert len(cached) == 2
+    assert all(c["dataset_version"] == "v2" for c in cached)
+
+
+@pytest.mark.asyncio
+async def test_invalidate_poc_pool_cache(result_db):
+    """测试手动失效缓存"""
+    entries = [{"subtype": "模板化越狱", "poc_text": "poc_1", "score": 5}]
+    await result_db.save_poc_pool_cache("gpt-4", entries, "v1")
+
+    deleted = await result_db.invalidate_poc_pool_cache("gpt-4")
+    assert deleted == 1
+
+    cached = await result_db.get_poc_pool_cache("gpt-4")
+    assert cached == []
+
+
+@pytest.mark.asyncio
+async def test_invalidate_nonexistent_cache(result_db):
+    """测试失效不存在的缓存返回0"""
+    deleted = await result_db.invalidate_poc_pool_cache("no-such-model")
+    assert deleted == 0
+
+
+@pytest.mark.asyncio
+async def test_cleanup_expired_cache(result_db):
+    """测试清理过期缓存"""
+    entries = [{"subtype": "模板化越狱", "poc_text": "poc_1", "score": 5}]
+    await result_db.save_poc_pool_cache("gpt-4", entries, "v1", ttl_hours=0)
+
+    import asyncio
+    await asyncio.sleep(0.1)
+
+    deleted = await result_db.cleanup_expired_cache()
+    assert deleted >= 1
+
+    cached = await result_db.get_poc_pool_cache("gpt-4")
+    assert cached == []
+
+
+@pytest.mark.asyncio
+async def test_cache_isolation_between_models(result_db):
+    """测试不同模型的缓存互不影响"""
+    entries_gpt = [{"subtype": "模板化越狱", "poc_text": "gpt_poc", "score": 5}]
+    entries_claude = [{"subtype": "说服式越狱", "poc_text": "claude_poc", "score": 4}]
+
+    await result_db.save_poc_pool_cache("gpt-4", entries_gpt, "v1")
+    await result_db.save_poc_pool_cache("claude-3", entries_claude, "v1")
+
+    await result_db.invalidate_poc_pool_cache("gpt-4")
+
+    gpt_cache = await result_db.get_poc_pool_cache("gpt-4")
+    claude_cache = await result_db.get_poc_pool_cache("claude-3")
+    assert gpt_cache == []
+    assert len(claude_cache) == 1

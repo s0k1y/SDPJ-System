@@ -170,8 +170,10 @@ async def test_verify_credentials_success(user_center, mock_user_db):
         "user_id": 1, "username": username, "password": password,
         "created_at": datetime(2026, 5, 1, 10, 0, 0)
     }
-    user_id = await user_center.verify_credentials(username, password)
+    success, user_id, error_msg = await user_center.verify_credentials(username, password)
+    assert success is True
     assert user_id == 1
+    assert error_msg == ""
 
 
 @pytest.mark.asyncio
@@ -180,21 +182,22 @@ async def test_verify_credentials_wrong_password(user_center, mock_user_db):
         "user_id": 1, "username": "testuser", "password": "password123",
         "created_at": datetime(2026, 5, 1, 10, 0, 0)
     }
-    user_id = await user_center.verify_credentials("testuser", "wrongpassword")
+    success, user_id, error_msg = await user_center.verify_credentials("testuser", "wrongpassword")
+    assert success is False
     assert user_id is None
+    assert error_msg == "密码错误"
 
 
 @pytest.mark.asyncio
 async def test_verify_credentials_user_not_found(user_center, mock_user_db):
     """测试凭据校验失败：用户不存在"""
-    # 配置 mock
     mock_user_db.get_user_by_username.return_value = None
 
-    # 执行测试
-    user_id = await user_center.verify_credentials("nonexistent", "password")
+    success, user_id, error_msg = await user_center.verify_credentials("nonexistent", "password")
 
-    # 验证结果
+    assert success is False
     assert user_id is None
+    assert error_msg == "账号未注册，请先注册"
 
 
 # ==================== 资源登记与查询测试 ====================

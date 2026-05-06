@@ -26,8 +26,13 @@ class ReportManagerInterface(Protocol):
         """查询检测报告列表"""
         ...
 
-    async def view_report(self, task_group_id: str) -> dict:
-        """查看单份检测报告"""
+    async def view_report(self, task_group_id: str, user_id: int | None = None) -> dict:
+        """查看单份检测报告
+
+        Args:
+            task_group_id: 任务组 ID
+            user_id: 请求者用户 ID，用于权限校验
+        """
         ...
 
     async def delete_report(
@@ -36,18 +41,50 @@ class ReportManagerInterface(Protocol):
         task_id: Optional[str] = None,
         report_id: Optional[str] = None,
         result_data_id: Optional[str] = None,
+        user_id: int | None = None,
     ) -> tuple[bool, str]:
-        """删除检测报告"""
+        """删除检测报告
+
+        Args:
+            task_group_id: 任务组 ID
+            task_id: 任务 ID
+            report_id: 报告 ID
+            result_data_id: 结果数据 ID
+            user_id: 请求者用户 ID，用于权限校验
+        """
         ...
 
     async def export_report(
-        self, task_group_id: str, target_format: Literal["json", "yaml"] = "json"
-    ) -> str:
-        """导出检测报告文件"""
+        self, task_group_id: str, target_format: Literal["json", "yaml", "jsonl"] = "json", *, user_id: int | None = None
+    ) -> tuple[str, str]:
+        """导出检测报告文件
+
+        Args:
+            task_group_id: 任务组 ID
+            target_format: 目标文件格式
+            user_id: 请求者用户 ID，用于权限校验
+
+        Returns:
+            (文件名, 文件内容字符串)
+        """
         ...
 
-    async def prepare_visualization_data(self, task_group_id: str) -> dict:
-        """准备可视化图表数据"""
+    async def prepare_visualization_data(self, task_group_id: str, user_id: int | None = None) -> dict:
+        """准备可视化图表数据
+
+        Args:
+            task_group_id: 任务组 ID
+            user_id: 请求者用户 ID，用于权限校验
+        """
+        ...
+
+    async def prepare_task_visualization_data(self, task_id: str, user_id: int | None = None) -> dict:
+        """准备单个任务的可视化图表数据
+
+        Args:
+            task_id: 任务 ID
+            user_id: 请求者用户 ID，用于权限校验
+        """
         ...
 
     async def get_compliance_statistics(self) -> dict:

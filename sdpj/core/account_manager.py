@@ -15,16 +15,16 @@ class AccountManager:
         self._user_center = user_center
         self._current_user_id: Optional[int] = None
 
-    async def register(self, username: str, password: str) -> tuple[bool, str]:
+    async def register(self, username: str, password: str) -> tuple[bool, Optional[int], str]:
         if not username or len(username) < 3:
-            return False, "账号长度至少3个字符"
+            return False, None, "账号长度至少3个字符"
         if not password or len(password) < 6:
-            return False, "密码长度至少6个字符"
+            return False, None, "密码长度至少6个字符"
         try:
             user_id = await self._user_center.register_user(username, password)
-            return True, str(user_id)
+            return True, user_id, ""
         except ValueError as e:
-            return False, str(e)
+            return False, None, str(e)
 
     async def unregister(self, user_id: int) -> tuple[bool, str]:
         try:
@@ -107,3 +107,11 @@ class AccountManager:
 
     async def list_resources_for_user(self, user_id: int) -> list[dict]:
         return await self._user_center.get_resources_by_owner(user_id)
+
+    async def list_shared_resources_for_user(self, user_id: int) -> list[dict]:
+        return await self._user_center.get_resources_shared_with(user_id)
+
+    async def list_all_users(self) -> list[dict]:
+        """获取所有用户列表"""
+        return await self._user_center.get_all_users()
+

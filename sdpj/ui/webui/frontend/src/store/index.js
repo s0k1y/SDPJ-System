@@ -7,12 +7,6 @@ export const useAuthStore = defineStore('auth', {
     user: getUser()
   }),
   actions: {
-    setLoggedIn(userId) {
-      const user = { user_id: userId }
-      this.user = user
-      this.isAuthenticated = true
-      saveUser(user)
-    },
     setUser(user) {
       this.user = user
       this.isAuthenticated = true

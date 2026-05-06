@@ -1,14 +1,16 @@
 """检测相关 Pydantic 模型"""
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Union
 
 
 class DetectionStartRequest(BaseModel):
-    model_id: str
+    model_id: Union[str, int]
     detection_type: str = "static"
     dataset_ids: list[int] = []
+    jailbreak_dataset_ids: list[int] = []
     config_id: Optional[int] = None
     max_iterations: int = 3
+    force_refresh: bool = False
 
 
 class ConcurrentRunRequest(BaseModel):
@@ -18,6 +20,11 @@ class ConcurrentRunRequest(BaseModel):
 class ConfigOperationRequest(BaseModel):
     operation: str
     params: dict = {}
+
+
+class CancelTaskRequest(BaseModel):
+    task_id: str | None = None
+    task_group_id: str | None = None
 
 
 class PrivateResourceRequest(BaseModel):

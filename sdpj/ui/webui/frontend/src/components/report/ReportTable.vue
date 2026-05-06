@@ -1,40 +1,58 @@
 <template>
   <div class="report-table">
-    <div class="table-wrapper" v-loading="loading">
+    <div class="table-wrapper" v-show="!loading">
       <table>
         <thead>
           <tr>
-            <th style="width: 25%">报告ID</th>
-            <th style="width: 15%">任务ID</th>
-            <th style="width: 10%">合规率</th>
-            <th style="width: 20%">生成时间</th>
-            <th style="width: 15%">状态</th>
-            <th style="width: 15%">操作</th>
+            <th style="width: 22%">任务组ID / 任务ID</th>
+            <th style="width: 14%">合规率</th>
+            <th style="width: 14%">风险等级</th>
+            <th style="width: 14%">状态</th>
+            <th style="width: 36%">操作</th>
           </tr>
         </thead>
-        <tbody v-if="reports.length > 0">
-          <tr v-for="report in reports" :key="report.report_id">
-            <td><span class="cell-mono">{{ report.report_id }}</span></td>
-            <td><span class="cell-mono">{{ report.task_id || '-' }}</span></td>
-            <td>{{ report.compliance_rate != null ? (report.compliance_rate * 100).toFixed(1) + '%' : '-' }}</td>
-            <td>{{ report.generated_at || '-' }}</td>
-            <td>
-              <span class="status-tag" :class="`tag-${report.status || 'unknown'}`">
-                {{ statusText(report.status) }}
-              </span>
-            </td>
-            <td>
-              <div class="action-btns">
-                <el-button class="action-btn" size="small" @click="$emit('view', report)" v-if="report.report_id">查看</el-button>
-                <el-button class="action-btn" size="small" @click="$emit('download', report)" v-if="report.report_id">下载</el-button>
-                <el-button class="action-btn action-btn-danger" size="small" @click="$emit('delete', report)" v-if="report.report_id">删除</el-button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-        <tbody v-else>
+        <template v-if="flattenedRows.length > 0">
+          <template v-for="row in flattenedRows" :key="row.id">
+            <tr :class="{ 'group-row': !row.isLeaf, 'task-row': row.isLeaf }">
+              <td>
+                <div class="name-cell" :style="{ paddingLeft: (row.level * 20) + 'px' }">
+                  <span v-if="!row.isLeaf" class="folder-icon" @click="toggleExpand(row)">
+                    {{ row.expanded ? '▼' : '▶' }}
+                  </span>
+                  <span v-else class="file-icon">📄</span>
+                  <span class="cell-mono name-text">{{ row.label }}</span>
+                </div>
+              </td>
+              <td>
+                <span v-if="row.isLeaf">{{ row.compliance_rate != null ? row.compliance_rate.toFixed(1) + '%' : '-' }}</span>
+                <span v-else class="folder-summary">{{ row.compliance_rate != null ? row.compliance_rate.toFixed(1) + '%' : '-' }}</span>
+              </td>
+              <td>
+                <span :class="riskClass(row.risk_level)">{{ row.risk_level || '-' }}</span>
+              </td>
+              <td>
+                <span class="status-tag" :class="`tag-${row.status || 'unknown'}`">
+                  {{ statusText(row.status) }}
+                </span>
+              </td>
+              <td>
+                <div class="action-btns" v-if="row.isLeaf">
+                  <el-button class="action-btn" size="small" @click="$emit('view', row.raw)">查看</el-button>
+                  <el-button class="action-btn" size="small" @click="$emit('download', row.raw)">导出</el-button>
+                  <el-button class="action-btn action-btn-danger" size="small" @click="$emit('delete', row.raw)">删除</el-button>
+                </div>
+                <div class="action-btns" v-else-if="!row.isLeaf">
+                  <el-button class="action-btn" size="small" @click="$emit('viewGroup', row.raw)">查看</el-button>
+                  <el-button class="action-btn" size="small" @click="$emit('downloadAll', row.raw)">全部导出</el-button>
+                  <el-button class="action-btn action-btn-danger" size="small" @click="$emit('delete', row.raw)">删除</el-button>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </template>
+        <tbody v-else-if="!loading && flattenedRows.length === 0">
           <tr>
-            <td colspan="99" class="empty-row">暂无检测报告</td>
+            <td colspan="99" class="empty-row"><div class="empty-center" style="margin-right: 26%;">暂无检测报告</div></td>
           </tr>
         </tbody>
       </table>
@@ -43,17 +61,67 @@
 </template>
 
 <script setup>
-import { ref, onMounted, defineEmits } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { getReportList } from '../../api/report'
 
-defineEmits(['view', 'download', 'delete'])
+const emit = defineEmits(['view', 'viewGroup', 'download', 'downloadAll', 'delete'])
 
-const reports = ref([])
-const loading = ref(false)
+const groups = ref([])
+const loading = ref(true)
+const expandedMap = ref({})
 
 const statusText = (status) => {
   const map = { completed: '已完成', generating: '生成中', failed: '失败' }
   return map[status] || status || '未知'
+}
+
+const riskClass = (level) => {
+  if (!level || level === 'N/A') return 'risk-na'
+  if (level === '低风险') return 'risk-low'
+  if (level === '中风险') return 'risk-mid'
+  return 'risk-high'
+}
+
+const buildFlattenedRows = (groups) => {
+  const result = []
+  groups.forEach(group => {
+    const tgId = group.task_group_id
+    const isExpanded = expandedMap.value[tgId] !== false
+    result.push({
+      id: tgId,
+      isLeaf: false,
+      level: 0,
+      expanded: isExpanded,
+      label: tgId,
+      compliance_rate: group.compliance_rate,
+      risk_level: group.risk_level,
+      status: group.status,
+      raw: group,
+    })
+    if (isExpanded && group.children) {
+      group.children.forEach(child => {
+        result.push({
+          id: child.task_id,
+          isLeaf: true,
+          level: 1,
+          label: child.task_id,
+          compliance_rate: child.compliance_rate,
+          risk_level: child.risk_level,
+          status: child.status,
+          report_id: child.report_id,
+          raw: { ...child, task_group_id: tgId },
+        })
+      })
+    }
+  })
+  return result
+}
+
+const flattenedRows = computed(() => buildFlattenedRows(groups.value))
+
+const toggleExpand = (row) => {
+  expandedMap.value[row.id] = !expandedMap.value[row.id]
+  expandedMap.value = { ...expandedMap.value }
 }
 
 const fetchReports = async () => {
@@ -61,11 +129,13 @@ const fetchReports = async () => {
   try {
     const res = await getReportList()
     if (res.success) {
-      reports.value = res.reports || []
+      groups.value = res.data || []
     }
   } catch { /* keep defaults */ }
   finally { loading.value = false }
 }
+
+defineExpose({ fetchReports })
 
 onMounted(fetchReports)
 </script>
@@ -108,6 +178,54 @@ td {
   letter-spacing: 0.3px;
 }
 
+.name-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.name-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-icon {
+  cursor: pointer;
+  user-select: none;
+  color: #8b8b8b;
+  font-size: 12px;
+  width: 16px;
+  display: inline-block;
+  text-align: center;
+}
+
+.folder-icon:hover {
+  color: #404040;
+}
+
+.file-icon {
+  font-size: 14px;
+  width: 16px;
+  display: inline-block;
+  text-align: center;
+}
+
+.folder-summary {
+  color: #8b8b8b;
+  font-size: 13px;
+}
+
+.group-row {
+  background: #f5f5f5;
+  font-weight: 500;
+}
+
+.task-row:hover {
+  background: #f9f9f9;
+}
+
 .status-tag {
   font-size: 12px;
   padding: 2px 10px;
@@ -115,17 +233,17 @@ td {
 }
 
 .tag-completed {
-  background: rgba(34, 197, 94, 0.12);
+  background: transparent;
   color: #16a34a;
 }
 
 .tag-generating {
-  background: rgba(59, 130, 246, 0.12);
+  background: transparent;
   color: #2563eb;
 }
 
 .tag-failed {
-  background: rgba(239, 68, 68, 0.12);
+  background: transparent;
   color: #dc2626;
 }
 
@@ -134,35 +252,64 @@ td {
   color: #8b8b8b;
 }
 
+.risk-low {
+  color: #16a34a;
+  font-size: 13px;
+}
+
+.risk-mid {
+  color: #f59e0b;
+  font-size: 13px;
+}
+
+.risk-high {
+  color: #dc2626;
+  font-size: 13px;
+}
+
+.risk-na {
+  color: #8b8b8b;
+  font-size: 13px;
+}
+
 .action-btns {
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: 50px 70px 50px;
   gap: 8px;
+  align-items: center;
+}
+
+.action-spacer {
+  display: none;
 }
 
 .action-btn {
   height: 30px;
-  padding: 0 14px;
+  padding: 0;
   font-size: 12px;
   border-radius: 10px;
-  border: none;
-  background: transparent;
-  color: #404040;
+  border: none !important;
+  background: transparent !important;
+  color: #404040 !important;
 }
 
 .action-btn:hover {
-  background: #e5e5e5;
+  background: #e5e5e5 !important;
+  color: #404040 !important;
 }
 
 .action-btn-danger:hover {
-  color: #dc2626;
-  background: rgba(239, 68, 68, 0.08);
+  color: #dc2626 !important;
+  background: rgba(239, 68, 68, 0.08) !important;
 }
 
 .empty-row {
   padding: 24px 8px;
-  text-align: center;
   color: #8b8b8b;
   font-size: 13px;
+}
+
+.empty-center {
+  text-align: center;
 }
 </style>

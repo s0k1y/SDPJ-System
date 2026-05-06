@@ -272,6 +272,7 @@ async def test_result_data_repo_create(async_session):
         "result_001",
         "report_001",
         "prompt_injection",
+        "Test PoC",
         "Test output",
         "non_compliant"
     )
@@ -293,8 +294,8 @@ async def test_result_data_repo_list_by_report(async_session):
     await report_repo.create("report_001", "task_001")
 
     repo = ResultDataRepository(async_session)
-    await repo.create("result_001", "report_001", "prompt_injection", "Output 1", "non_compliant")
-    await repo.create("result_002", "report_001", "jailbreak", "Output 2", "compliant")
+    await repo.create("result_001", "report_001", "prompt_injection", "PoC 1", "Output 1", "non_compliant")
+    await repo.create("result_002", "report_001", "jailbreak", "PoC 2", "Output 2", "compliant")
 
     result_data_list = await repo.list_by_report("report_001")
     assert len(result_data_list) == 2
@@ -313,7 +314,7 @@ async def test_result_data_repo_delete(async_session):
     await report_repo.create("report_001", "task_001")
 
     repo = ResultDataRepository(async_session)
-    await repo.create("result_001", "report_001", "prompt_injection", "Output", "non_compliant")
+    await repo.create("result_001", "report_001", "prompt_injection", "PoC", "Output", "non_compliant")
 
     result = await repo.delete("result_001")
     assert result is True

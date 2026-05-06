@@ -22,16 +22,17 @@ class TaskGroupRepository:
         self.session = session
 
     async def create(self, user_id: int, model_id: str) -> TaskGroup:
-        """创建检测任务组
-
-        Args:
-            user_id: 用户ID
-            model_id: 模型ID
-
-        Returns:
-            创建的任务组对象
-        """
         task_group_id = f"tg_{uuid.uuid4().hex[:16]}"
+        task_group = TaskGroup(
+            task_group_id=task_group_id,
+            user_id=user_id,
+            model_id=model_id
+        )
+        self.session.add(task_group)
+        await self.session.flush()
+        return task_group
+
+    async def create_with_id(self, task_group_id: str, user_id: int, model_id: str) -> TaskGroup:
         task_group = TaskGroup(
             task_group_id=task_group_id,
             user_id=user_id,

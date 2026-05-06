@@ -14,11 +14,6 @@ class TaskRepository:
     """检测任务仓储"""
 
     def __init__(self, session: AsyncSession):
-        """初始化仓储
-
-        Args:
-            session: 异步数据库会话
-        """
         self.session = session
 
     async def create(
@@ -27,25 +22,17 @@ class TaskRepository:
         task_group_id: str,
         dataset_id: int,
         task_status: str,
-        start_time: datetime
+        start_time: datetime,
+        algorithm_type: str = "static",
+        metadata_json: Optional[dict] = None,
     ) -> DetectionTask:
-        """创建检测任务
-
-        Args:
-            task_id: 任务ID
-            task_group_id: 任务组ID
-            dataset_id: 数据集ID
-            task_status: 任务状态
-            start_time: 开始时间
-
-        Returns:
-            创建的任务对象
-        """
         task = DetectionTask(
             task_id=task_id,
             task_group_id=task_group_id,
             dataset_id=dataset_id,
             task_status=task_status,
+            algorithm_type=algorithm_type,
+            metadata_json=metadata_json,
             start_time=start_time,
             end_time=None
         )
@@ -83,7 +70,8 @@ class TaskRepository:
         self,
         task_id: str,
         task_status: str,
-        end_time: Optional[datetime] = None
+        end_time: Optional[datetime] = None,
+        error_message: Optional[str] = None
     ) -> bool:
         """更新任务状态
 
@@ -91,6 +79,7 @@ class TaskRepository:
             task_id: 任务ID
             task_status: 任务状态
             end_time: 结束时间（可选）
+            error_message: 错误信息（可选）
 
         Returns:
             更新是否成功
@@ -102,19 +91,13 @@ class TaskRepository:
         task.task_status = task_status
         if end_time is not None:
             task.end_time = end_time
+        if error_message is not None:
+            task.error_message = error_message
 
         await self.session.flush()
         return True
 
     async def delete(self, task_id: str) -> bool:
-        """删除任务
-
-        Args:
-            task_id: 任务ID
-
-        Returns:
-            删除是否成功
-        """
         task = await self.get_by_id(task_id)
         if task is None:
             return False
@@ -122,3 +105,10 @@ class TaskRepository:
         await self.session.delete(task)
         await self.session.flush()
         return True
+
+    async def list_non_terminal(self) -> list[DetectionTask]:
+        stmt = select(DetectionTask).where(
+            DetectionTask.task_status.in_(["pending", "running"])
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())

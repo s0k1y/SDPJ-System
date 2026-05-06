@@ -23,7 +23,6 @@ def build_scheduler() -> StateSchedulerInterface:
     from sdpj.core.sdpj_detector import SDPJDetector
     from sdpj.core.event_logger import EventLogger
     from sdpj.core.task_queue_manager import TaskQueueManager
-    from sdpj.core.secure_comm_manager import SecureCommManager
     from sdpj.control.state_scheduler import StateScheduler
 
     from sdpj.infrastructure.config.settings import get_settings
@@ -74,11 +73,8 @@ def build_scheduler() -> StateSchedulerInterface:
         config_manager=PrivateConfigManager(dp, uc, reg),
         report_manager=ReportManager(dp, uc),
         detector=SDPJDetector(dp, llm),
-        event_logger=EventLogger(),
-        task_queue_manager=TaskQueueManager(),
-        secure_comm_manager=SecureCommManager(
-            key_path=Path.home() / ".sdpj" / "rsa_private.pem"
-        ),
+        event_logger=EventLogger(result_db=result_db),
+        task_queue_manager=TaskQueueManager(session_manager=result_sm),
         llm_registry=reg,
         db_initializer=_init_db,
     )

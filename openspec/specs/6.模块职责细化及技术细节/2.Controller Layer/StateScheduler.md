@@ -97,18 +97,18 @@ StateScheduler / 系统状态管理及调度控制模块
 
 # 用户账号调度
 13. 调度用户注册与登录
-    - 输入:账号、(明文)密码;若来自 WebUI 客户端则为对应密文
+    - 输入:账号、明文密码
     - 输出:注册结果(附用户ID)或登录结果(附用户ID 与登录会话状态)
     - 后置条件:登录成功时本模块感知"当前登录用户"以驱动后续指令的归属判定
     - 触发场景:用户通过 UI 层发起注册或登录(对应 1.spec.md 功能 3.1.1.1)
-    - 调用下层:WebUI 调用场景下,先调用 SecureCommManager 的「对账号密码进行解密」获得明文密码;再调用 AccountManager 的「用户注册」或「用户登录」;最后调用 EventLogger 的「记录用户操作日志」
+    - 调用下层:AccountManager 的「用户注册」或「用户登录」;EventLogger 的「记录用户操作日志」
     - 不负责的边界:不做账号格式/密码强度的具体校验规则(由 AccountManager 在前置校验时完成);不做密码哈希(由 UserCenter 完成)
 
 14. 调度账号管理操作
     - 输入:操作类型(密码修改/用户名修改/账号切换/登出/注销/查询用户资料/列出用户拥有的受控资源)及其所需参数
     - 输出:对应操作的结果
     - 触发场景:用户在账号管理界面操作个人账号(对应 1.spec.md 功能 3.1.1.2)
-    - 调用下层:WebUI 调用场景下涉及密码字段的环节,先调用 SecureCommManager 的「对账号密码进行解密」;再按操作类型分别调用 AccountManager 的「修改指定用户密码」「修改指定用户用户名」「账号切换」「用户登出」「用户注销」「查询指定用户资料」「列出指定用户拥有的受控资源」;最后调用 EventLogger 的「记录用户操作日志」
+    - 调用下层:按操作类型分别调用 AccountManager 的「修改指定用户密码」「修改指定用户用户名」「账号切换」「用户登出」「用户注销」「查询指定用户资料」「列出指定用户拥有的受控资源」;EventLogger 的「记录用户操作日志」
     - 安全说明:涉及用户身份的操作（查询资料、修改密码/用户名、列出资源）所需的 user_id 由 WebUI 路由从 request.state.user_id（认证中间件写入）注入到 params，不依赖 AccountManager 内部单例状态，避免多用户并发时身份混淆
     - 不负责的边界:不持久化登录会话(登录会话由 AccountManager 在内存中维护)
 
@@ -129,10 +129,10 @@ StateScheduler / 系统状态管理及调度控制模块
 
 # 私有资源调度
 17. 调度用户私有检测配置的全生命周期管理
-    - 输入:操作类型(创建/读取/修改/删除/列出/导入/导出)及其所需参数;若来自 WebUI 客户端涉及私有配置文件传输的环节为对应密文
+    - 输入:操作类型(创建/读取/修改/删除/列出/导入/导出)及其所需参数
     - 输出:对应操作的结果(新建配置ID、配置内容、修改结果、删除结果、配置清单、导出文件、导入后新配置ID 等)
     - 触发场景:用户在私有配置管理界面操作私有检测配置(对应 1.spec.md 功能 3.1.1.2);系统在启动检测前加载用户选择的检测配置(对应 1.spec.md 功能 1.1 / 1.2 / 1.3)
-    - 调用下层:涉及私有资源的非创建操作(读取/修改/删除/导出/导入)前,调用 DACManager 的「判定用户对资源是否具备访问权」做前置校验;WebUI 客户端涉及私有配置文件密文输入的环节,调用 SecureCommManager 的「对用户私有检测配置文件进行解密」获得明文;输出文件供下载且需在 C-S 链路上保护的环节,调用 SecureCommManager 的「对用户私有检测配置文件进行加密」;按操作类型分别调用 PrivateConfigManager 的「创建用户私有检测配置」「读取用户私有检测配置」「修改用户私有检测配置」「删除用户私有检测配置」「列出用户的私有检测配置清单」「导入用户私有检测配置」「导出用户私有检测配置」;EventLogger 的「记录用户操作日志」
+    - 调用下层:涉及私有资源的非创建操作(读取/修改/删除/导出/导入)前,调用 DACManager 的「判定用户对资源是否具备访问权」做前置校验;按操作类型分别调用 PrivateConfigManager 的「创建用户私有检测配置」「读取用户私有检测配置」「修改用户私有检测配置」「删除用户私有检测配置」「列出用户的私有检测配置清单」「导入用户私有检测配置」「导出用户私有检测配置」;EventLogger 的「记录用户操作日志」
     - 不负责的边界:不做配置文件格式校验的具体实现(由 PrivateConfigManager 经 DataProcessor 完成);不做私有配置内容的存储(由 PrivateConfigManager 经 UserCenter 完成)
 
 17-1. 查询可用检测数据集清单
@@ -154,8 +154,8 @@ StateScheduler / 系统状态管理及调度控制模块
 
 不需要的:[监控系统资源使用情况,持有任何业务数据(业务数据由下层各 DB 模块持有,本模块仅持有"系统当前状态"FSM 与"执行调度上下文"等内存态),做检测算法的具体执行逻辑(由 SDPJDetector 完成),做检测结果的合规判断与统计指标计算(分别由 SDPJDetector 与 ReportManager 完成),做日志/报告/状态信息的 UI 渲染(由 UI 层完成),持久化登录会话到外部存储(登录会话由 AccountManager 在内存中维护),做密码哈希(由 UserCenter 完成),做下层错误的具体分类与重试/退避决策(分别由 LLMAdapterLib 与 LLMService 完成),越层调用抽象驱动层或基础设施层(仅可调用执行逻辑层 8 个模块的对外能力)]
 
-依赖模块:TaskQueueManager,EventLogger,SecureCommManager,SDPJDetector,ReportManager,PrivateConfigManager,DACManager,AccountManager
-调用接口:TaskQueueManagerInterface,EventLoggerInterface,SecureCommManagerInterface,SDPJDetectorInterface,ReportManagerInterface,PrivateConfigManagerInterface,DACManagerInterface,AccountManagerInterface
+依赖模块:TaskQueueManager,EventLogger,SDPJDetector,ReportManager,PrivateConfigManager,DACManager,AccountManager
+调用接口:TaskQueueManagerInterface,EventLoggerInterface,SDPJDetectorInterface,ReportManagerInterface,PrivateConfigManagerInterface,DACManagerInterface,AccountManagerInterface
 
 被依赖模块:CLI,WebUI
 应实现接口:StateSchedulerInterface
@@ -196,7 +196,7 @@ StateScheduler / 系统状态管理及调度控制模块
     - 向CLI/WebUI反馈指令执行情况
     - 处理系统异常和错误恢复(依赖于有限状态机的状态转移条件)
     - C-S 底层通信链路(HTTP/TCP 连接)由部署层 Web 框架在系统初始化时建立,StateScheduler 通过 StateSchedulerInterface 消费该链路,不负责链路的建立与维护
-    - 调用安全通信管理模块, 在C-S通信(webUI)中加解密敏感数据（账号密码、大模型API配置文件）,这一点应在StateSchedulerInterface中定义
+    - 敏感数据(账号密码、大模型API配置文件)的传输安全由 HTTPS/TLS 保障,不再做应用层加解密
     - 调用执行逻辑层其它模块
 
 

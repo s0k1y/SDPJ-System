@@ -8,7 +8,7 @@ PrivateConfigManager / 用户私有检测配置管理模块
    - 后置条件:对应受控资源已在 UserCenter 登记,ACL 承载点已建立;配置内容已落盘到 UserCenter 维护的私有配置内容存储中
    - 触发场景:用户创建一份私有检测配置文件(对应 1.spec.md 功能 3.1.1.2);该配置是 1.spec.md 功能 1.3(选择检测数据集)的输入之一
    - 调用下层:UserCenter 的「登记受控资源」建立 ACL 承载点;UserCenter 的「写入用户私有检测配置内容」持久化配置内容;LLMRegistry 的「按标识校验大模型是否可用」确认被测大模型可用
-   - 不负责的边界:不做权限判定(由 DACManager 在调用前完成);不做配置内容在 C-S 链路上的加解密(由 SecureCommManager 完成)
+   - 不负责的边界:不做权限判定(由 DACManager 在调用前完成)
 
 2. 读取用户私有检测配置
    - 输入:私有检测配置ID
@@ -45,17 +45,17 @@ PrivateConfigManager / 用户私有检测配置管理模块
 
 # 私有大模型适配器管理
 6. 上传用户私有大模型适配器
-   - 输入:适配器文件内容、目标大模型标识、所属用户ID
+   - 输入:适配器配置文件内容（JSON）、目标大模型标识、所属用户ID
    - 输出:上传结果(含新登记的大模型标识与对应受控资源ID)
-   - 后置条件:适配器已由 LLMRegistry 入库并注册到内存注册表;对应受控资源已在 UserCenter 登记,ACL 承载点已建立
-   - 触发场景:用户上传私有大模型适配器(对应 1.spec.md 功能 3.1.1.2)
+   - 后置条件:适配器配置已由 LLMRegistry 入库并注册到内存注册表;对应受控资源已在 UserCenter 登记,ACL 承载点已建立
+   - 触发场景:用户上传私有大模型适配器配置（对应 1.spec.md 功能 3.1.1.2）
    - 调用下层:DataProcessor 的「预校验上传文件格式」做文件格式预校验;LLMRegistry 的「注册用户上传的私有大模型」完成入库注册;UserCenter 的「登记受控资源」建立 ACL 承载点
 
 7. 移除用户私有大模型适配器
    - 输入:目标大模型标识、所属资源ID
    - 输出:移除结果
-   - 后置条件:对应适配器从 LLMRegistry 与 LLMAdapterLib 移除;对应受控资源及其相关 ACL 条目由下层级联清理
-   - 触发场景:用户移除私有大模型适配器(对应 1.spec.md 功能 3.1.1.2)
+   - 后置条件:对应适配器配置从 LLMRegistry 与 LLMAdapterLib 移除;对应受控资源及其相关 ACL 条目由下层级联清理
+   - 触发场景:用户移除私有大模型适配器配置（对应 1.spec.md 功能 3.1.1.2）
    - 调用下层:LLMRegistry 的「注销用户移除的私有大模型」;UserCenter 的「移除受控资源」
 
 # 私有数据集管理
@@ -79,7 +79,7 @@ PrivateConfigManager / 用户私有检测配置管理模块
     - 输出:可供用户下载的私有检测配置文件内容
     - 触发场景:用户导出私有检测配置以备份或跨账号复用(对应 1.spec.md 功能 3.1.1.2)
     - 调用下层:DataProcessor 的「结构化数据的序列化与反序列化」
-    - 不负责的边界:不做 C-S 链路上的加密(由 SecureCommManager 完成)
+    - 不负责的边界:传输安全由 HTTPS/TLS 保障
 
 11. 导入用户私有检测配置
     - 输入:用户上传的私有检测配置文件内容、所属用户ID
@@ -90,7 +90,7 @@ PrivateConfigManager / 用户私有检测配置管理模块
 # 接口契约
 13. 通过 PrivateConfigManagerInterface 对外暴露上述能力,被 StateScheduler 调用(符合 4.模型依赖关系图.puml 中 StateScheduler → PrivateConfigManager 边)
 
-不需要的:[做权限判定(由 DACManager 完成),做 C-S 链路上的加解密传输(由 SecureCommManager 完成),做密码/凭据管理(由 AccountManager / UserCenter 完成),做大模型 API 的实际调用(由 SDPJDetector 经 LLMService 完成),做适配器/数据集/配置文件的格式校验具体实现(由 UtilsLib 完成),做检测合规判断(由 SDPJDetector 完成)]
+不需要的:[做权限判定(由 DACManager 完成),做密码/凭据管理(由 AccountManager / UserCenter 完成),做大模型 API 的实际调用(由 SDPJDetector 经 LLMService 完成),做适配器/数据集/配置文件的格式校验具体实现(由 UtilsLib 完成),做检测合规判断(由 SDPJDetector 完成)]
 
 依赖模块:DataProcessor,UserCenter,LLMRegistry,调用接口:DataProcessorInterface,UserCenterInterface,LLMRegistryInterface
 应实现接口:PrivateConfigManagerInterface

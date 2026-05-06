@@ -23,7 +23,7 @@ class SampleDBSessionManager:
     负责管理数据库引擎和会话的生命周期。
     """
 
-    def __init__(self, database_url: str = "sqlite+aiosqlite:///./sdpj/infrastructure/database/sdpj.db", engine: Optional[AsyncEngine] = None):
+    def __init__(self, database_url: str = "sqlite+aiosqlite:///./data/db/sdpj.db", engine: Optional[AsyncEngine] = None):
         self.database_url = database_url
         self._engine: Optional[AsyncEngine] = engine
         self._session_factory: Optional[async_sessionmaker[AsyncSession]] = None
@@ -122,7 +122,7 @@ class SampleDBSessionManager:
 _session_manager: Optional[SampleDBSessionManager] = None
 
 
-def get_session_manager(database_url: str = "sqlite+aiosqlite:///./sdpj/infrastructure/database/sdpj.db") -> SampleDBSessionManager:
+def get_session_manager(database_url: str = "sqlite+aiosqlite:///./data/db/sdpj.db") -> SampleDBSessionManager:
     """获取全局会话管理器实例
 
     Args:

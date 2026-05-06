@@ -16,43 +16,43 @@ def _uc(**overrides):
 class TestRegister:
     async def test_success(self):
         mgr = AccountManager(_uc(register_user=lambda u, p: 1))
-        ok, msg = await mgr.register("alice", "password123")
-        assert ok and msg == "1"
+        ok, uid, msg = await mgr.register("alice", "password123")
+        assert ok and uid == 1 and msg == ""
 
     async def test_username_too_short(self):
         mgr = AccountManager(AsyncMock())
-        ok, _ = await mgr.register("ab", "password123")
-        assert not ok
+        ok, uid, _ = await mgr.register("ab", "password123")
+        assert not ok and uid is None
 
     async def test_password_too_short(self):
         mgr = AccountManager(AsyncMock())
-        ok, _ = await mgr.register("alice", "123")
-        assert not ok
+        ok, uid, _ = await mgr.register("alice", "123")
+        assert not ok and uid is None
 
     async def test_duplicate_raises(self):
         def _raise(u, p): raise ValueError("已存在")
         mgr = AccountManager(_uc(register_user=_raise))
-        ok, msg = await mgr.register("alice", "password123")
-        assert not ok and "已存在" in msg
+        ok, uid, msg = await mgr.register("alice", "password123")
+        assert not ok and uid is None and "已存在" in msg
 
 
 @pytest.mark.asyncio
 class TestLogin:
     async def test_success(self):
-        mgr = AccountManager(_uc(verify_credentials=lambda u, p: 42))
-        ok, uid = await mgr.login("alice", "password123")
+        mgr = AccountManager(_uc(verify_credentials=lambda u, p: (True, 42, "")))
+        ok, uid, _ = await mgr.login("alice", "password123")
         assert ok and uid == 42 and mgr.get_current_session() == 42
 
     async def test_wrong_password(self):
-        mgr = AccountManager(_uc(verify_credentials=lambda u, p: None))
-        ok, uid = await mgr.login("alice", "wrong")
+        mgr = AccountManager(_uc(verify_credentials=lambda u, p: (False, None, "密码错误")))
+        ok, uid, _ = await mgr.login("alice", "wrong")
         assert not ok and uid is None
 
 
 @pytest.mark.asyncio
 class TestLogout:
     async def test_when_logged_in(self):
-        mgr = AccountManager(_uc(verify_credentials=lambda u, p: 1))
+        mgr = AccountManager(_uc(verify_credentials=lambda u, p: (True, 1, "")))
         await mgr.login("alice", "pw123456")
         assert mgr.logout() is True
         assert mgr.get_current_session() is None

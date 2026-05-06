@@ -117,6 +117,20 @@ class UserCenterInterface(Protocol):
         """
         ...
 
+    async def get_all_users(self) -> list[dict]:
+        """获取所有用户列表
+
+        Returns:
+            所有用户信息列表，每条包含：
+            - user_id: 用户 ID
+            - username: 账号
+            - created_at: 创建时间
+
+        触发场景:
+            - 日志页面展示用户名（对应 app.py 功能 /api/logs/users）
+        """
+        ...
+
     # ==================== 凭据校验 ====================
 
     async def verify_credentials(self, username: str, password: str) -> Optional[int]:
@@ -193,6 +207,25 @@ class UserCenterInterface(Protocol):
 
         触发场景:
             AccountManager 列出当前用户的受控资产（对应 1.spec.md 功能 3.1.1.2）
+        """
+        ...
+
+    async def get_resources_shared_with(self, user_id: int) -> list[dict]:
+        """按被授权用户查询被共享的资源清单
+
+        Args:
+            user_id: 被授权用户 ID
+
+        Returns:
+            该用户被授权访问的全部资源列表，每条包含：
+            - resource_id: 资源 ID
+            - resource_type: 资源类型
+            - owner_user_id: 拥有者用户 ID
+            - created_at: 创建时间
+
+        触发场景:
+            PrivateConfigManager 列出当前用户可用的配置（含被授权的）
+            AccountManager 列出被授权资源用于权限管理页面
         """
         ...
 

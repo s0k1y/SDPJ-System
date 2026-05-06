@@ -147,4 +147,15 @@
   --z-modal: 1050;
   --z-popover: 1060;
   --z-tooltip: 1070;
+
+  /* ========== Shimmer 骨架屏动画 ========== */
+
+  --shimmer-color-base: oklch(0.935 0 0);
+  --shimmer-color-highlight: oklch(0.95 0 0);
+  --shimmer-duration: 3s;
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }

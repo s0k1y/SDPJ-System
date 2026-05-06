@@ -1,14 +1,11 @@
 import api from './index'
-import { encryptPassword } from '../utils/crypto'
 
 export async function login(username, password) {
-  const enc = await encryptPassword(password)
-  return api.post('/auth/login', { username, password: enc, is_encrypted: true })
+  return api.post('/auth/login', { username, password })
 }
 
 export async function register(username, password) {
-  const enc = await encryptPassword(password)
-  return api.post('/auth/register', { username, password: enc, is_encrypted: true })
+  return api.post('/auth/register', { username, password })
 }
 
 export async function logout() {

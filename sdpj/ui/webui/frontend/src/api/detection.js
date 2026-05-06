@@ -38,6 +38,10 @@ export function getDatasets() {
 /**
  * 检测配置操作
  */
+export function cancelTask(params) {
+  return api.post('/detection/cancel', params)
+}
+
 export function detectionConfig(operation, params = {}) {
   return api.post('/detection/config', { operation, params })
 }

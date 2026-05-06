@@ -41,9 +41,9 @@ class LLMService:
         self,
         llm_adapter: LLMAdapterLibInterface,
         utils: UtilsInterface,
-        max_retry_attempts: int = 3,
-        retry_wait_min: int = 1,
-        retry_wait_max: int = 10,
+        max_retry_attempts: int = 5,
+        retry_wait_min: int = 2,
+        retry_wait_max: int = 60,
     ):
         self._llm_adapter = llm_adapter
         self._utils = utils

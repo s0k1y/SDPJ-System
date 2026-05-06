@@ -12,6 +12,7 @@ from .models import (
     DetectionTask,
     DetectionReport,
     ResultData,
+    SystemLog,
 )
 
 __all__ = [
@@ -23,4 +24,5 @@ __all__ = [
     "DetectionTask",
     "DetectionReport",
     "ResultData",
+    "SystemLog",
 ]

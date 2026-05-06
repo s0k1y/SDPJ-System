@@ -19,78 +19,56 @@
 
       <div class="section">
         <div class="section-header">
-          <h2 class="section-title">最近任务</h2>
-          <router-link to="/detection" class="section-action">查看全部</router-link>
-        </div>
-
-        <template v-if="loading">
-          <el-skeleton :rows="5" animated />
-        </template>
-        <template v-else>
-          <div v-if="recentTasks.length === 0" class="empty-hint">暂无任务</div>
-          <div v-else class="task-list">
-            <div v-for="task in recentTasks.slice(0, 5)" :key="task.task_id" class="task-row">
-              <div class="task-info">
-                <span class="task-id">{{ task.task_id }}</span>
-                <span class="task-meta">
-                  <span>{{ task.model_id }}</span>
-                  <span class="meta-sep">·</span>
-                  <span>{{ task.dataset_id }}</span>
-                </span>
-              </div>
-              <span class="task-status-tag" :class="`tag-${task.status}`">
-                {{ getTaskStatusText(task.status) }}
-              </span>
-            </div>
-          </div>
-        </template>
-      </div>
-
-      <div class="section">
-        <div class="section-header">
           <h2 class="section-title">系统状态</h2>
         </div>
 
-        <template v-if="loading">
-          <el-skeleton :rows="4" animated />
-        </template>
-        <template v-else>
-          <div class="status-list">
-            <div class="status-row">
-              <span class="status-label">运行状态</span>
+        <div class="status-list">
+          <div class="status-row">
+            <span class="status-label">运行状态</span>
+            <template v-if="!statusLoading">
               <span class="status-dot" :class="getStatusClass(systemStatus)"></span>
               <span class="status-text">{{ getSystemStatusText(systemStatus) }}</span>
-            </div>
-            <div class="status-row">
-              <span class="status-label">运行任务</span>
-              <span class="status-value">{{ runningCount }} 个</span>
-            </div>
-            <div class="status-row">
-              <span class="status-label">等待任务</span>
-              <span class="status-value">{{ pendingCount }} 个</span>
-            </div>
-            <div class="status-row">
-              <span class="status-label">今日完成</span>
-              <span class="status-value">{{ completedToday }} 个</span>
-            </div>
+            </template>
           </div>
-        </template>
+          <div class="status-row">
+            <span class="status-label">运行任务</span>
+            <span v-if="!statusLoading" class="status-value">{{ runningCount }} 个</span>
+          </div>
+          <div class="status-row">
+            <span class="status-label">等待任务</span>
+            <span v-if="!statusLoading" class="status-value">{{ pendingCount }} 个</span>
+          </div>
+          <div class="status-row">
+            <span class="status-label">任务完成</span>
+            <span v-if="!statusLoading" class="status-value">{{ completedCount }} 个</span>
+          </div>
+          <div class="status-row">
+            <span class="status-label">任务失败</span>
+            <span v-if="!statusLoading" class="status-value">{{ failedCount }} 个</span>
+          </div>
+        </div>
       </div>
+
+      <TaskList :groups="taskGroups" />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import api from '../api'
 import { getProgress } from '../api/detection'
 import { getComplianceStatistics } from '../api/report'
+import TaskList from '../components/detection/TaskList.vue'
 
-const loading = ref(false)
-const systemStatus = ref('unknown')
+const systemStatus = ref('idle')
 const runningCount = ref(0)
 const pendingCount = ref(0)
-const completedToday = ref(0)
+const completedCount = ref(0)
+const failedCount = ref(0)
+const statusLoading = ref(true)
+const taskGroups = ref([])
+let pollTimer = null
 
 const stats = ref({
   totalSamples: 0,
@@ -112,51 +90,81 @@ const statsCards = computed(() => [
 const getSystemStatusText = (status) => {
   const map = {
     idle: '空闲', detecting: '检测中', generating_report: '生成报告中',
-    configuring: '配置管理中', error: '异常', unknown: '未知'
+    configuring: '配置管理中', error: '异常'
   }
   return map[status] || status
 }
 
 const getStatusClass = (status) => {
-  return (status !== 'error' && status !== 'unknown') ? 'dot-online' : ''
+  return status !== 'error' ? 'dot-online' : ''
 }
 
-const getTaskStatusText = (status) => {
-  const map = { completed: '已完成', running: '运行中', pending: '等待中', failed: '失败' }
-  return map[status] || status
-}
-
-onMounted(async () => {
-  loading.value = true
+async function fetchStatus() {
   try {
-    const statusRes = await api.get('/status')
-    systemStatus.value = statusRes?.status || 'unknown'
-  } catch { systemStatus.value = 'unknown' }
+    const [statusRes, progressRes] = await Promise.allSettled([
+      api.get('/status'),
+      getProgress()
+    ])
 
-  try {
-    const progressRes = await getProgress()
-    if (progressRes.success && progressRes.queue) {
-      const queue = progressRes.queue
-      recentTasks.value = queue.slice(0, 10)
-      runningCount.value = queue.filter(t => t.status === 'running').length
-      pendingCount.value = queue.filter(t => t.status === 'pending').length
-      completedToday.value = queue.filter(t => t.status === 'completed').length
+    if (statusRes.status === 'fulfilled' && statusRes.value?.data?.status) {
+      systemStatus.value = statusRes.value.data.status
     }
-  } catch { /* default */ }
 
-  try {
-    const statsRes = await getComplianceStatistics()
-    if (statsRes.success) {
-      stats.value = {
-        totalSamples: statsRes.total,
-        compliantSamples: statsRes.compliant,
-        nonCompliantSamples: statsRes.non_compliant,
-        complianceRate: statsRes.compliance_rate,
-        avgIterationCount: statsRes.avg_iteration_count ?? null
+    if (progressRes.status === 'fulfilled' && progressRes.value?.success && progressRes.value?.data?.groups) {
+      const groups = progressRes.value.data.groups
+      taskGroups.value = groups
+      recentTasks.value = groups.slice(0, 5).map(g => ({
+        task_id: g.task_group_id,
+        model_name: g.model_name,
+        dataset_count: g.children?.length || 0,
+        status: g.status
+      }))
+      let running = 0, pending = 0, completed = 0, failed = 0
+      for (const g of groups) {
+        if (g.progress) {
+          running += g.progress.running || 0
+          pending += g.progress.pending || 0
+          completed += g.progress.completed || 0
+          failed += g.progress.failed || 0
+        }
       }
+      runningCount.value = running
+      pendingCount.value = pending
+      completedCount.value = completed
+      failedCount.value = failed
     }
-  } catch { /* default */ }
-  finally { loading.value = false }
+  } catch (e) {
+    console.error('fetchStatus error:', e)
+  } finally {
+    statusLoading.value = false
+  }
+}
+
+async function loadStats() {
+  const statsRes = await getComplianceStatistics().catch(() => null)
+  if (statsRes?.success) {
+    const d = statsRes.data
+    stats.value = {
+      totalSamples: d.total,
+      compliantSamples: d.compliant,
+      nonCompliantSamples: d.non_compliant,
+      complianceRate: d.compliance_rate,
+      avgIterationCount: d.avg_iteration_count ?? null
+    }
+  }
+}
+
+onMounted(() => {
+  loadStats()
+  fetchStatus()
+  pollTimer = setInterval(fetchStatus, 5000)
+})
+
+onUnmounted(() => {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
 })
 </script>
 
@@ -308,12 +316,12 @@ onMounted(async () => {
 }
 
 .tag-completed {
-  background: rgba(34, 197, 94, 0.12);
+  background: transparent;
   color: #16a34a;
 }
 
 .tag-running {
-  background: rgba(59, 130, 246, 0.12);
+  background: transparent;
   color: #2563eb;
 }
 
@@ -323,13 +331,14 @@ onMounted(async () => {
 }
 
 .tag-failed {
-  background: rgba(239, 68, 68, 0.12);
+  background: transparent;
   color: #dc2626;
 }
 
 .status-list {
   display: flex;
   flex-direction: column;
+  width: fit-content;
 }
 
 .status-row {
@@ -346,8 +355,8 @@ onMounted(async () => {
 .status-label {
   font-size: 14px;
   color: #8b8b8b;
-  width: 100px;
   flex-shrink: 0;
+  margin-right: 16px;
 }
 
 .status-dot {
@@ -384,10 +393,6 @@ onMounted(async () => {
 @media (max-width: 640px) {
   .stats-grid {
     grid-template-columns: 1fr;
-  }
-
-  .status-label {
-    width: 80px;
   }
 }
 </style>

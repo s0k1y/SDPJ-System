@@ -69,7 +69,6 @@ class UserDB:
             return {
                 "user_id": user.user_id,
                 "username": user.username,
-                "password": user.password,
                 "created_at": user.created_at,
             }
 
@@ -86,6 +85,20 @@ class UserDB:
                 "password": user.password,
                 "created_at": user.created_at,
             }
+
+    async def get_all_users(self) -> list[dict]:
+        """获取所有用户"""
+        async with self._session_manager.session() as session:
+            user_repo = UserRepository(session)
+            users = await user_repo.get_all()
+            return [
+                {
+                    "user_id": u.user_id,
+                "username": u.username,
+                "created_at": u.created_at.isoformat() if u.created_at else None
+                }
+                for u in users
+            ]
 
     # ==================== 资源级能力 ====================
 
@@ -116,6 +129,25 @@ class UserDB:
                 }
                 for r in resources
             ]
+
+    async def get_resources_shared_with(self, user_id: int) -> list[dict]:
+        """按被授权用户查询被共享的资源列表"""
+        async with self._session_manager.session() as session:
+            acl_repo = ACLRepository(session)
+            user_repo = UserRepository(session)
+            acls = await acl_repo.get_by_grantee(user_id)
+            result = []
+            for acl in acls:
+                if acl.resource is not None:
+                    owner_user = await user_repo.get_by_id(acl.resource.owner_user_id)
+                    result.append({
+                        "resource_id": acl.resource.resource_id,
+                        "resource_type": acl.resource.resource_type,
+                        "owner_user_id": acl.resource.owner_user_id,
+                        "owner_username": owner_user.username if owner_user else None,
+                        "created_at": acl.resource.created_at,
+                    })
+            return result
 
     async def get_resource_by_id(self, resource_id: int) -> Optional[dict]:
         """按 ID 查询资源"""
@@ -156,6 +188,7 @@ class UserDB:
                     "acl_id": acl.acl_id,
                     "resource_id": acl.resource_id,
                     "grantee_user_id": acl.grantee_user_id,
+                    "grantee_username": acl.grantee.username if acl.grantee else None,
                     "created_at": acl.created_at,
                 }
                 for acl in acls
@@ -180,6 +213,14 @@ class UserDB:
             acl_repo = ACLRepository(session)
             return await acl_repo.exists(resource_id, grantee_user_id)
 
+    async def get_accessible_resource_ids(self, user_id: int, resource_ids: list[int]) -> set[int]:
+        """批量查询用户在指定资源中有访问权限的资源 ID 集合"""
+        if not resource_ids:
+            return set()
+        async with self._session_manager.session() as session:
+            acl_repo = ACLRepository(session)
+            return await acl_repo.get_accessible_resource_ids(user_id, resource_ids)
+
     # ==================== 私有检测配置内容级能力 ====================
 
     async def write_private_config(self, config_id: int, config_content: dict) -> bool:
@@ -194,6 +235,21 @@ class UserDB:
         async with self._session_manager.session() as session:
             config_repo = PrivateConfigRepository(session)
             return await config_repo.get_by_id(config_id)
+
+    async def read_private_configs_batch(self, config_ids: list[int]) -> dict[int, dict]:
+        """批量按 ID 读取私有检测配置内容
+
+        Args:
+            config_ids: 配置 ID 列表
+
+        Returns:
+            {config_id: config_content_dict} 映射
+        """
+        if not config_ids:
+            return {}
+        async with self._session_manager.session() as session:
+            config_repo = PrivateConfigRepository(session)
+            return await config_repo.get_by_ids(config_ids)
 
     async def update_private_config(self, config_id: int, config_content: dict) -> bool:
         """更新私有检测配置内容"""

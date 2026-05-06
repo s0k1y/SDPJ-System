@@ -14,17 +14,3 @@ import api from './index'
 export function getLogList(params = {}) {
   return api.get('/logs', { params })
 }
-
-/**
- * 获取日志类别列表
- */
-export function getLogCategories() {
-  return api.get('/logs/categories')
-}
-
-/**
- * 获取来源模块列表
- */
-export function getSourceModules() {
-  return api.get('/logs/modules')
-}

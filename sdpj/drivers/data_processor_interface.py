@@ -60,7 +60,8 @@ class DataProcessorInterface(Protocol):
         self,
         name: str,
         risk_type: str,
-        samples: list[dict]
+        samples: list[dict],
+        resource_id: int | None = None
     ) -> dict:
         """导入用户私有数据集
 
@@ -70,6 +71,7 @@ class DataProcessorInterface(Protocol):
             samples: 样本条目清单（已完成格式预校验），每条包含：
                 - subtype: 风险具体子类 ST
                 - poc: 漏洞概念验证数据 PoC
+            resource_id: 对应 UserDB Resource 表的 resource_id
 
         Returns:
             导入结果字典，包含：
@@ -257,6 +259,36 @@ class DataProcessorInterface(Protocol):
         """
         ...
 
+    async def list_reports_summary(
+        self,
+        user_id: Optional[str] = None,
+        model_id: Optional[str] = None
+    ) -> list[dict]:
+        """查询检测报告列表摘要（高性能，使用 SQL 聚合查询）
+
+        避免对每个任务组单独查询并加载全部 result_data 大文本字段，
+        仅通过 2 条 SQL 聚合查询获取列表视图所需的统计数据。
+
+        Args:
+            user_id: 用户 ID 过滤条件（可选）
+            model_id: 模型 ID 过滤条件（可选）
+
+        Returns:
+            任务组列表，每组包含：
+            - task_group_id: 任务组 ID
+            - user_id: 用户 ID
+            - model_id: 模型 ID
+            - compliance_rate: 合规率
+            - risk_level: 风险等级
+            - subtype_compliance: 子类型合规统计
+            - status: 状态
+            - children: 子任务摘要列表
+
+        触发场景:
+            用户浏览检测报告列表
+        """
+        ...
+
     async def list_detection_reports(
         self,
         task_group_id: Optional[str] = None
@@ -333,6 +365,29 @@ class DataProcessorInterface(Protocol):
         """
         ...
 
+    async def resolve_task_group_id(
+        self,
+        task_group_id: Optional[str] = None,
+        task_id: Optional[str] = None,
+        report_id: Optional[str] = None,
+        result_data_id: Optional[str] = None,
+    ) -> Optional[str]:
+        """根据任意粒度目标反查所属任务组 ID
+
+        按优先级依次尝试：task_group_id > task_id > report_id > result_data_id，
+        逐级回溯直到定位到 task_group_id。
+
+        Args:
+            task_group_id: 任务组 ID（直接返回）
+            task_id: 任务 ID（通过任务反查任务组）
+            report_id: 报告 ID（通过报告反查任务再反查任务组）
+            result_data_id: 结果数据 ID（通过结果数据反查报告再反查任务再反查任务组）
+
+        Returns:
+            任务组 ID，无法解析时返回 None
+        """
+        ...
+
     async def count_compliance_results(self) -> dict[str, int]:
         """按合规判断结果统计数量
 
@@ -344,8 +399,8 @@ class DataProcessorInterface(Protocol):
     async def export_report_file(
         self,
         report_data: dict,
-        target_format: Literal["json", "yaml"]
-    ) -> str:
+        target_format: Literal["json", "yaml", "jsonl"]
+    ) -> tuple[str, str]:
         """导出检测报告文件
 
         Args:
@@ -353,7 +408,7 @@ class DataProcessorInterface(Protocol):
             target_format: 目标文件格式
 
         Returns:
-            可供用户下载的临时文件路径（调用方负责清理）
+            (文件名, 文件内容字符串)
 
         触发场景:
             用户下载检测报告
@@ -513,5 +568,47 @@ class DataProcessorInterface(Protocol):
 
         触发场景:
             跨层结构化数据的载入
+        """
+        ...
+
+    # ==================== PoC 池缓存 ====================
+
+    async def get_poc_pool_cache(self, model_id: str) -> list[dict]:
+        """获取指定模型的 PoC 池缓存
+
+        Args:
+            model_id: 被测模型ID
+
+        Returns:
+            未过期的缓存条目列表，按 score 降序
+        """
+        ...
+
+    async def save_poc_pool_cache(
+        self,
+        model_id: str,
+        entries: list[dict],
+        dataset_version: str,
+    ) -> int:
+        """批量保存 PoC 池缓存
+
+        Args:
+            model_id: 被测模型ID
+            entries: 缓存条目列表，每条包含 subtype, poc_text, score
+            dataset_version: 数据集版本标识
+
+        Returns:
+            写入的条目数
+        """
+        ...
+
+    async def invalidate_poc_pool_cache(self, model_id: str) -> int:
+        """手动失效指定模型的 PoC 池缓存
+
+        Args:
+            model_id: 被测模型ID
+
+        Returns:
+            删除的条目数
         """
         ...

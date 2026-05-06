@@ -4,7 +4,7 @@
       <h1 class="page-title">系统设置</h1>
       <p class="page-info">管理个人信息和修改密码</p>
 
-      <div class="form-section" v-loading="profileLoading">
+      <div class="form-section">
         <el-form :model="profileForm" label-width="120px">
           <el-form-item label="用户名">
             <el-input v-model="profileForm.username" disabled />
@@ -38,7 +38,6 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getProfile, accountOperation } from '../api/user'
-import { encryptPassword } from '../utils/crypto'
 
 const profileLoading = ref(false)
 const changingPwd = ref(false)
@@ -77,8 +76,8 @@ const fetchProfile = async () => {
   profileLoading.value = true
   try {
     const res = await getProfile()
-    if (res.success && res.profile) {
-      profileForm.value.username = res.profile.username || ''
+    if (res.success && res.data?.profile) {
+      profileForm.value.username = res.data.profile.username || ''
     }
   } catch { /* 使用默认值 */ }
   finally { profileLoading.value = false }
@@ -88,12 +87,9 @@ const changePassword = async () => {
   await pwdFormRef.value.validate()
   changingPwd.value = true
   try {
-    const encOld = await encryptPassword(passwordForm.value.oldPassword)
-    const encNew = await encryptPassword(passwordForm.value.newPassword)
     const res = await accountOperation('change_password', {
-      old_password: encOld,
-      new_password: encNew,
-      is_encrypted: true
+      old_password: passwordForm.value.oldPassword,
+      new_password: passwordForm.value.newPassword
     })
     if (res.success) {
       ElMessage.success('密码修改成功')
