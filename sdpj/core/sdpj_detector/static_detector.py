@@ -80,20 +80,49 @@ async def _call_llm(
     user: str,
     limiter: RateLimiter,
     llm_callback: LLMCallCallback | None = None,
+    *,
+    max_retries: int = 5,
+    base_delay: float = 2.0,
 ) -> dict:
-    await limiter.acquire()
-    req = llm.assemble_request(system, user)
-    request_info = {"system_prompt": system, "user_message": user, "model_id": getattr(instance, "model_id", "")}
-    try:
-        resp = await llm.invoke_llm(instance, req)
-        if llm_callback is not None:
-            response_info = {"content": resp.get("content", ""), "model": resp.get("model", ""), "usage": resp.get("usage", {})}
-            llm_callback(request_info, response_info)
-        return resp
-    except LLMError as e:
-        if llm_callback is not None:
-            llm_callback(request_info, {"error": str(e)})
-        raise
+    import time as _t
+    from sdpj.infrastructure.llm_adapters.errors import ErrorCategory
+    for attempt in range(max_retries + 1):
+        _t0 = _t.monotonic()
+        await limiter.acquire()
+        _t1 = _t.monotonic()
+        req = llm.assemble_request(system, user)
+        request_info = {"system_prompt": system, "user_message": user, "model_id": getattr(instance, "model_id", "")}
+        try:
+            resp = await llm.invoke_llm(instance, req)
+            _t2 = _t.monotonic()
+            import structlog as _sl
+            _sl.get_logger("sdpj.detector").debug("llm_call_done", wait=round(_t1-_t0, 3), call=round(_t2-_t1, 3), total=round(_t2-_t0, 3))
+            if llm_callback is not None:
+                response_info = {"content": resp.get("content", ""), "model": resp.get("model", ""), "usage": resp.get("usage", {})}
+                llm_callback(request_info, response_info)
+            return resp
+        except StandardizedLLMError as e:
+            if e.category == ErrorCategory.RATE_LIMIT and attempt < max_retries:
+                delay = base_delay * (2 ** attempt)
+                retry_after = None
+                if isinstance(e.detail, dict):
+                    retry_after = e.detail.get("retry_after_seconds") or e.detail.get("retry_after")
+                if retry_after is not None:
+                    try:
+                        delay = max(delay, float(retry_after))
+                    except (ValueError, TypeError):
+                        pass
+                import structlog as _sl
+                _sl.get_logger("sdpj.detector").warning("llm_rate_limited_retry", attempt=attempt+1, delay=round(delay, 1), max_retries=max_retries)
+                await asyncio.sleep(delay)
+                continue
+            if llm_callback is not None:
+                llm_callback(request_info, {"error": str(e)})
+            raise
+        except LLMError:
+            if llm_callback is not None:
+                llm_callback(request_info, {"error": "LLMError"})
+            raise
 
 
 def _build_pool(successful: list[tuple[str, int, str]]) -> list[str]:
@@ -214,12 +243,15 @@ async def select_poc_pool(
 
     all_samples = [s for ds in datasets for s in ds.get("samples", [])]
     total = len(all_samples)
+    import structlog as _sl
+    _sl.get_logger("sdpj.detector").info("select_poc_pool_batch_start", total=total, batch_size=_BATCH_SIZE, max_rps=max_rps, max_concurrency=max_concurrency)
 
     successful: list[tuple[str, int, str]] = []
     for batch_start in range(0, len(all_samples), _BATCH_SIZE):
         if all(e.is_set() for e in found_max.values()):
             break
         batch = all_samples[batch_start : batch_start + _BATCH_SIZE]
+        _sl.get_logger("sdpj.detector").info("select_poc_pool_processing_batch", batch_start=batch_start, batch_len=len(batch))
         results = await asyncio.gather(*[_check(s) for s in batch])
         successful.extend(r for r in results if r is not None)
         if progress_callback is not None:

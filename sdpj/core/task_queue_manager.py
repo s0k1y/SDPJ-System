@@ -203,6 +203,9 @@ class TaskQueueManager:
 
     async def update_poc_progress(self, task_group_id: str, progress: dict) -> None:
         async with self._lock:
+            existing = self._poc_progress.get(task_group_id, {})
+            if "start_time" not in progress and "start_time" in existing:
+                progress["start_time"] = existing["start_time"]
             self._poc_progress[task_group_id] = progress
 
     async def get_poc_progress(self, task_group_id: str) -> dict | None:
@@ -299,6 +302,20 @@ class TaskQueueManager:
                     )
                 except Exception:
                     pass
+
+            try:
+                dataset_id = int(task.dataset_id) if str(task.dataset_id).isdigit() else 0
+                await result_db.create_detection_task(
+                    task_group_id=task_group_id,
+                    dataset_id=dataset_id,
+                    task_status=task.status.value,
+                    start_time=datetime.now(timezone.utc),
+                    algorithm_type=task.algorithm_type,
+                    metadata_json=task.metadata,
+                    task_id=task.task_id,
+                )
+            except Exception:
+                pass
         except Exception:
             pass
 

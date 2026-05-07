@@ -168,6 +168,14 @@
                 <span class="summary-label">最大迭代次数</span>
                 <span class="summary-value">{{ form.max_iterations }}</span>
               </div>
+              <div class="summary-row">
+                <span class="summary-label">每秒最大请求数</span>
+                <span class="summary-value">{{ form.max_rps != null ? form.max_rps : maxRpsPlaceholder }}</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">最大并发数</span>
+                <span class="summary-value">{{ form.max_concurrency != null ? form.max_concurrency : maxConcurrencyPlaceholder }}</span>
+              </div>
             </div>
           </div>
 
@@ -258,6 +266,18 @@ const jailbreakSummary = computed(() => {
   const ids = form.value.jailbreak_dataset_ids
   if (!ids.length) return '未选择'
   return `重新构建 (${ids.length} 个越狱数据集)`
+})
+
+const maxRpsPlaceholder = computed(() => {
+  const selected = modelAdapters.value.find(m => m.config_id === form.value.model_id)
+  const val = selected?.content?.max_rps
+  return val != null ? val : 0.5
+})
+
+const maxConcurrencyPlaceholder = computed(() => {
+  const selected = modelAdapters.value.find(m => m.config_id === form.value.model_id)
+  const val = selected?.content?.max_concurrency
+  return val != null ? val : 3
 })
 
 const leafJailbreakDatasetIds = computed(() => {

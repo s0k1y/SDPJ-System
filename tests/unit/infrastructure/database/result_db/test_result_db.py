@@ -482,3 +482,61 @@ async def test_cache_isolation_between_models(result_db):
     claude_cache = await result_db.get_poc_pool_cache("claude-3")
     assert gpt_cache == []
     assert len(claude_cache) == 1
+
+
+# ==================== create_detection_task 幂等性测试 ====================
+
+@pytest.mark.asyncio
+async def test_create_detection_task_idempotent_same_group_and_dataset(result_db):
+    task_group_id = await result_db.create_task_group(1, "gpt-4")
+
+    task_id_1 = await result_db.create_detection_task(
+        task_group_id, 1, "pending", datetime.now()
+    )
+
+    task_id_2 = await result_db.create_detection_task(
+        task_group_id, 1, "running", datetime.now()
+    )
+
+    assert task_id_1 == task_id_2
+
+    task = await result_db.get_detection_task(task_id_1)
+    assert task["task_status"] == "running"
+
+
+@pytest.mark.asyncio
+async def test_create_detection_task_different_dataset_creates_new(result_db):
+    task_group_id = await result_db.create_task_group(1, "gpt-4")
+
+    task_id_1 = await result_db.create_detection_task(
+        task_group_id, 1, "pending", datetime.now()
+    )
+
+    task_id_2 = await result_db.create_detection_task(
+        task_group_id, 2, "pending", datetime.now()
+    )
+
+    assert task_id_1 != task_id_2
+
+    tasks = await result_db.list_tasks_by_group(task_group_id)
+    assert len(tasks) == 2
+
+
+@pytest.mark.asyncio
+async def test_create_detection_task_with_custom_task_id_idempotent(result_db):
+    task_group_id = await result_db.create_task_group(1, "gpt-4")
+
+    custom_id = "custom_task_001"
+    task_id_1 = await result_db.create_detection_task(
+        task_group_id, 1, "pending", datetime.now(), task_id=custom_id
+    )
+    assert task_id_1 == custom_id
+
+    task_id_2 = await result_db.create_detection_task(
+        task_group_id, 1, "running", datetime.now()
+    )
+
+    assert task_id_2 == custom_id
+
+    task = await result_db.get_detection_task(custom_id)
+    assert task["task_status"] == "running"

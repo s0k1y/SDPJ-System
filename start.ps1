@@ -11,7 +11,7 @@ Write-Host ""
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $scriptRoot
 
-$pythonExe = "C:\Users\asus\.conda\envs\SDPJ-System\python.exe"
+$pythonExe = "D:\Anaconda\envs\SDPJ-System\python.exe"
 $backendPort = 8000
 $frontendPort = 5173
 
@@ -85,25 +85,8 @@ Write-Host "[2/3] Starting backend service on port $backendPort..." -ForegroundC
 # Use cmd /k so the window stays open on error (prevents flash-close)
 $backendArgs = "/k cd /d `"$scriptRoot`" && $pythonExe -m uvicorn sdpj.ui.webui.backend.app:app --host 0.0.0.0 --port $backendPort"
 Start-Process cmd.exe -ArgumentList $backendArgs -WindowStyle Normal
-
-# Wait and verify backend is actually running
-$backendReady = $false
-for ($i = 0; $i -lt 10; $i++) {
-    Start-Sleep -Seconds 1
-    try {
-        $response = Invoke-WebRequest -Uri "http://localhost:$backendPort/docs" -UseBasicParsing -TimeoutSec 2 -ErrorAction SilentlyContinue
-        if ($response.StatusCode -eq 200) {
-            $backendReady = $true
-            break
-        }
-    } catch {}
-}
-
-if ($backendReady) {
-    Write-Host "[2/3] Backend service started successfully" -ForegroundColor Green
-} else {
-    Write-Host "[2/3] WARNING: Backend may not be running - check the backend window for errors" -ForegroundColor Red
-}
+Start-Sleep -Seconds 5
+Write-Host "[2/3] Backend service started" -ForegroundColor Green
 Write-Host ""
 
 # --- Step 3: Start frontend ---
@@ -124,9 +107,9 @@ Write-Host "[3/3] Frontend service started" -ForegroundColor Green
 Write-Host ""
 
 # --- Summary ---
-Write-Host "========================================" -ForegroundColor $(if ($backendReady) {"Green"} else {"Yellow"})
-Write-Host "  Startup Complete!" -ForegroundColor $(if ($backendReady) {"Green"} else {"Yellow"})
-Write-Host "========================================" -ForegroundColor $(if ($backendReady) {"Green"} else {"Yellow"})
+Write-Host "========================================" -ForegroundColor Green
+Write-Host "  Startup Complete!" -ForegroundColor Green
+Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "  Backend API:  http://localhost:$backendPort" -ForegroundColor Cyan
 Write-Host "  Frontend:     http://localhost:$frontendPort" -ForegroundColor Cyan

@@ -138,91 +138,41 @@ const templates = {
     request_format: "openai",
     api_key: "your-openai-api-key",
     base_url: "https://api.openai.com/v1",
-    timeout: 60
-  },
-  zhipu: {
-    model: "glm-4-flash",
-    request_format: "openai",
-    api_key: "your-zhipu-api-key",
-    base_url: "https://open.bigmodel.cn/api/paas/v4",
-    timeout: 60
-  },
-  deepseek: {
-    model: "deepseek-v4-flash",
-    request_format: "openai",
-    api_key: "your-deepseek-api-key",
-    base_url: "https://api.deepseek.com",
-    timeout: 60
-  },
-  deepseek_anthropic: {
-    model: "deepseek-v4-flash",
-    request_format: "anthropic",
-    api_key: "your-deepseek-api-key",
-    base_url: "https://api.deepseek.com/anthropic",
-    timeout: 60
-  },
-  qwen: {
-    model: "qwen-plus",
-    request_format: "openai",
-    api_key: "your-dashscope-api-key",
-    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    timeout: 60
-  },
-  ernie: {
-    model: "ernie-4.5-turbo-32k",
-    request_format: "openai",
-    api_key: "your-qianfan-api-key",
-    base_url: "https://qianfan.baidubce.com/v2",
-    timeout: 60
-  },
-  kimi: {
-    model: "kimi-k2.6",
-    request_format: "openai",
-    api_key: "your-moonshot-api-key",
-    base_url: "https://api.moonshot.cn/v1",
-    timeout: 60
-  },
-  doubao: {
-    model: "your-endpoint-id",
-    request_format: "openai",
-    api_key: "your-volcengine-api-key",
-    base_url: "https://ark.cn-beijing.volces.com/api/v3",
-    timeout: 60
-  },
-  gemini: {
-    model: "gemini-2.5-flash",
-    request_format: "openai",
-    api_key: "your-gemini-api-key",
-    base_url: "https://generativelanguage.googleapis.com/v1beta/openai",
-    timeout: 60
+    timeout: 60,
+    max_rps: 0.5,
+    max_concurrency: 3
   },
   anthropic: {
     model: "claude-3-opus-20240229",
     request_format: "anthropic",
     api_key: "your-anthropic-api-key",
     base_url: "https://api.anthropic.com",
-    timeout: 60
+    timeout: 60,
+    max_rps: 0.5,
+    max_concurrency: 3
   },
   custom: {
     model_id: "custom/my-model",
     api_key: "your-api-key",
     api_endpoint: "https://your-api.com/v1/chat",
-    timeout: 60
+    timeout: 60,
+    max_rps: 0.5,
+    max_concurrency: 3
   }
 }
 
 const templateGuides = {
   openai: {
     title: 'OpenAI 格式适配器',
-    description: '适用于所有兼容 OpenAI Chat Completions API 的大模型服务（OpenAI、DeepSeek、通义千问、Moonshot 等）。必需字段：model_id、request_format、api_key、base_url、model。'
+    description: '适用于所有兼容 OpenAI Chat Completions API 的大模型服务（OpenAI、DeepSeek、通义千问、Moonshot 等）。必需字段：model_id、request_format、api_key、base_url、model。可选字段：max_rps（每秒最大请求数，默认 0.5）、max_concurrency（最大并发数，默认 3）。免费 API 建议 max_rps=0.5、max_concurrency=3；付费 API 建议 max_rps=5.0、max_concurrency=10。'
   },
   anthropic: {
     title: 'Anthropic 格式适配器',
-    description: '适用于 Anthropic Claude 系列及兼容 Anthropic API 的服务。必需字段：model_id、request_format、api_key、base_url、model。注意：DeepSeek 的 Anthropic 端点 base_url 需填写 https://api.deepseek.com/anthropic。'
+    description: '适用于 Anthropic Claude 系列及兼容 Anthropic API 的服务。必需字段：model_id、request_format、api_key、base_url、model。可选字段：max_rps（每秒最大请求数，默认 0.5）、max_concurrency（最大并发数，默认 3）。注意：DeepSeek 的 Anthropic 端点 base_url 需填写 https://api.deepseek.com/anthropic。'
   },
   custom: {
     title: '系统抽象规范',
-    description: '使用系统内部统一的抽象接口。系统会自动将配置参数适配到统一的调用接口，无需指定 request_format。适用于任意符合系统抽象规范的大模型 API。必需字段：model_id、api_key、api_endpoint。'
+    description: '使用系统内部统一的抽象接口。系统会自动将配置参数适配到统一的调用接口，无需指定 request_format。适用于任意符合系统抽象规范的大模型 API。必需字段：model_id、api_key、api_endpoint。可选字段：max_rps（每秒最大请求数，默认 0.5）、max_concurrency（最大并发数，默认 3）。'
   }
 }
 

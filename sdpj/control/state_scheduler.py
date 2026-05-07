@@ -63,6 +63,17 @@ class StateScheduler(StateSchedulerInterface):
             await self._db_initializer()
         await self._registry.initialize()
         await self._task_queue.initialize()
+        await self._restore_adapters_from_db()
+        if self.get_system_state() == "idle":
+            queue_view = await self._task_queue.get_queue_view()
+            has_pending = any(t.status == TaskStatus.PENDING for t in queue_view)
+            if has_pending:
+                try:
+                    self._fsm.start_detection()
+                    self._log_state_transition("idle", "detecting", "startup_recovery")
+                    self._notify_state()
+                except Exception as e:
+                    self._log_err("FSMError", f"启动时状态恢复失败: {e}")
         self.start_task_consumer()
         if hasattr(self._logger, 'start_db_writer'):
             await self._logger.start_db_writer()
@@ -70,6 +81,30 @@ class StateScheduler(StateSchedulerInterface):
             self._logger.subscribe_logs(self._on_new_log)
         if hasattr(self._logger, 'cleanup_old_logs'):
             await self._logger.cleanup_old_logs()
+
+    async def _restore_adapters_from_db(self) -> None:
+        try:
+            from sdpj.infrastructure.database.user_db import UserDB
+            configs = await self._config.list_configs(1)
+            restored = 0
+            for cfg in configs:
+                content = cfg.get("content", {})
+                model_id = content.get("model") or content.get("model_id")
+                if not model_id:
+                    continue
+                available, _ = await self._registry.is_model_available(model_id)
+                if not available:
+                    adapter_content = json.dumps(content, ensure_ascii=False)
+                    success, _, error = await self._registry.register_private_model(adapter_content, model_id)
+                    if success:
+                        restored += 1
+                        self._log_rt("adapter_restored", f"启动时恢复适配器: {model_id}")
+                    else:
+                        self._log_err("AdapterRestore", f"恢复适配器失败: {model_id}, error={error}")
+            if restored > 0:
+                self._log_rt("adapters_restored", f"启动时共恢复 {restored} 个适配器")
+        except Exception as e:
+            self._log_err("AdapterRestore", f"恢复适配器异常: {e}")
 
     async def shutdown(self) -> None:
         if hasattr(self._logger, 'flush'):
@@ -260,6 +295,7 @@ class StateScheduler(StateSchedulerInterface):
             pass
 
         def _poc_progress_cb(processed: int, total: int, found: int, score_counts: dict = None, subtype_stats: dict = None) -> None:
+            self._log_rt("poc_progress", f"PoC进度回调: processed={processed}, total={total}, found={found}, group_id={task_group_id}")
             progress = {
                 "processed": processed,
                 "total": total,
@@ -278,7 +314,7 @@ class StateScheduler(StateSchedulerInterface):
                 task_group_id, progress
             ))
 
-        def _task_progress_cb(task_id: str, processed: int, total: int) -> None:
+        def _task_progress_cb(detection_task_id: str, processed: int, total: int) -> None:
             asyncio.ensure_future(self._task_queue.update_task_progress(
                 task_id, processed, total
             ))
@@ -307,6 +343,15 @@ class StateScheduler(StateSchedulerInterface):
             dataset_ids = [int(raw_ds_id)] if raw_ds_id is not None else None
             if cancel_event.is_set():
                 raise asyncio.CancelledError()
+            self._log_rt("detection_exec", f"开始执行检测: type={detection_type}, model={actual_model_name}, dataset_ids={dataset_ids}, jailbreak_ids={jailbreak_dataset_ids}, force_refresh={force_refresh}, group_id={task_group_id}")
+            await self._task_queue.update_poc_progress(task_group_id, {
+                "processed": 0,
+                "total": 0,
+                "found": 0,
+                "score_counts": {},
+                "start_time": time.monotonic(),
+                "last_update_time": time.monotonic(),
+            })
             if detection_type == "static":
                 result = await self._detector.run_static_detection(actual_model_name, user_id, dataset_ids, task_group_id=task_group_id, jailbreak_dataset_ids=jailbreak_dataset_ids, max_rps=suggested_max_rps, max_concurrency=suggested_max_concurrency, poc_progress_callback=_poc_progress_cb, task_progress_callback=_task_progress_cb, force_refresh=force_refresh, llm_callback=_llm_call_cb)
             elif detection_type == "dynamic":
@@ -412,6 +457,11 @@ class StateScheduler(StateSchedulerInterface):
 
         queue_view = await self._task_queue.get_queue_view()
 
+        if not queue_view and self.get_system_state() == "detecting":
+            self._cleanup_running_tasks()
+            if not self._running_tasks:
+                self._transition_detection_done("recovery_empty_queue")
+
         all_datasets = await self._config.query_datasets()
         dataset_name_map: dict[str, str] = {}
         for ds in all_datasets:
@@ -499,20 +549,40 @@ class StateScheduler(StateSchedulerInterface):
             poc_eta = -1.0
             stage_info = {"stage": "unknown"}
             if poc_progress:
-                sc = poc_progress.get("score_counts", {})
-                score_parts = []
-                for s in range(1, 6):
-                    cnt = sc.get(str(s), sc.get(s, 0))
-                    if cnt > 0:
-                        score_parts.append(f"{s}分{cnt}条")
-                found_info = "、".join(score_parts) if score_parts else f"有效 {poc_progress['found']} 条"
-                children.insert(0, {
-                    "task_id": f"poc_{group_id}",
-                    "status": "running",
-                    "dataset_id": "poc_selecting",
-                    "dataset_name": f"构建PoC池 ({poc_progress['processed']}/{poc_progress['total']}，{found_info})",
-                    "error_message": "",
-                })
+                is_initializing = poc_progress.get("total", 0) == 0
+                if is_initializing:
+                    poc_child = {
+                        "task_id": f"poc_{group_id}",
+                        "status": "running",
+                        "dataset_id": "poc_selecting",
+                        "dataset_name": "构建PoC池（初始化中...）",
+                        "error_message": "",
+                        "progress": None,
+                    }
+                else:
+                    sc = poc_progress.get("score_counts", {})
+                    score_parts = []
+                    for s in range(1, 6):
+                        cnt = sc.get(str(s), sc.get(s, 0))
+                        if cnt > 0:
+                            score_parts.append(f"{s}分{cnt}条")
+                    found_info = "、".join(score_parts) if score_parts else f"有效 {poc_progress['found']} 条"
+                    poc_child = {
+                        "task_id": f"poc_{group_id}",
+                        "status": "running",
+                        "dataset_id": "poc_selecting",
+                        "dataset_name": f"构建PoC池 ({poc_progress['processed']}/{poc_progress['total']}，{found_info})",
+                        "error_message": "",
+                        "progress": {
+                            "processed": poc_progress["processed"],
+                            "total": poc_progress["total"],
+                            "found": poc_progress["found"],
+                            "score_counts": poc_progress.get("score_counts", {}),
+                            "subtype_stats": poc_progress.get("subtype_stats", {}),
+                            "remaining_subtypes": poc_progress.get("remaining_subtypes", []),
+                        },
+                    }
+                children.insert(0, poc_child)
                 status_counts["running"] += 1
                 subtype_stats = poc_progress.get("subtype_stats", {})
                 remaining_subtypes = poc_progress.get("remaining_subtypes", [])

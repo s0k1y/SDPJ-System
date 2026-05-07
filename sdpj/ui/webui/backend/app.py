@@ -101,7 +101,8 @@ def create_app() -> FastAPI:
     async def logs_users(request: Request):
         from sdpj.ui.webui.backend.dependencies import get_scheduler
 
-        all_logs = await get_scheduler().query_logs({"category": "operation"})
+        result = await get_scheduler().query_logs({"category": "operation"})
+        all_logs = result.get("logs", [])
         unique_user_ids = set()
         for log in all_logs:
             if log.get("user_id") and log["user_id"] not in ("0", "system", None):

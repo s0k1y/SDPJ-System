@@ -146,6 +146,17 @@ class ResultDB:
         task_id: Optional[str] = None,
     ) -> str:
         async with self.session_manager.session() as session:
+            task_repo = TaskRepository(session)
+
+            existing = await task_repo.get_by_group_and_dataset(task_group_id, dataset_id)
+            if existing is not None:
+                existing.task_status = task_status
+                existing.start_time = start_time
+                if algorithm_type:
+                    existing.algorithm_type = algorithm_type
+                await session.flush()
+                return existing.task_id
+
             task_group_repo = TaskGroupRepository(session)
             if await task_group_repo.get_by_id(task_group_id) is None:
                 raise ValueError(f"任务组ID '{task_group_id}' 不存在")
@@ -154,7 +165,6 @@ class ResultDB:
                 import uuid
                 task_id = f"task_{uuid.uuid4().hex[:16]}"
 
-            task_repo = TaskRepository(session)
             await task_repo.create(
                 task_id, task_group_id, dataset_id, task_status,
                 start_time, algorithm_type, metadata_json

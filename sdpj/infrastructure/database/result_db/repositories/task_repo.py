@@ -53,6 +53,16 @@ class TaskRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_by_group_and_dataset(
+        self, task_group_id: str, dataset_id: int
+    ) -> Optional[DetectionTask]:
+        stmt = select(DetectionTask).where(
+            DetectionTask.task_group_id == task_group_id,
+            DetectionTask.dataset_id == dataset_id,
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def list_by_group(self, task_group_id: str) -> list[DetectionTask]:
         """按任务组ID查询任务列表
 

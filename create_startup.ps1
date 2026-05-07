@@ -15,7 +15,7 @@ Write-Host ""
 if (-not (Test-Path `$dbPath)) {
     Write-Host "[Init] Database not found, initializing..." -ForegroundColor Yellow
     Push-Location `$projectRoot
-    & "C:\Users\asus\.conda\envs\SDPJ-System\python.exe" -m sdpj.infrastructure.utils.scripts.seed_data
+    & "D:\Anaconda\envs\SDPJ-System\python.exe" -m sdpj.infrastructure.utils.scripts.seed_data
     Pop-Location
     Write-Host "[Init] Database initialized" -ForegroundColor Green
     Write-Host ""
@@ -48,7 +48,7 @@ Write-Host ""
 Write-Host "[2/3] Starting backend service..." -ForegroundColor Yellow
 
 `$backendScript = "`$env:TEMP\sdpj_backend.bat"
-`$backendContent = "@echo off`r`ncd /d `"`$projectRoot`"`r`nstart /b C:\Users\asus\.conda\envs\SDPJ-System\python.exe -m uvicorn sdpj.ui.webui.backend.app:app --host 0.0.0.0 --port 8000`r`nexit"
+`$backendContent = "@echo off`r`ncd /d `"`$projectRoot`"`r`nstart /b D:\Anaconda\envs\SDPJ-System\python.exe -m uvicorn sdpj.ui.webui.backend.app:app --host 0.0.0.0 --port 8000`r`nexit"
 `$gbk = [System.Text.Encoding]::GetEncoding(936)
 [System.IO.File]::WriteAllText(`$backendScript, `$backendContent, `$gbk)
 Start-Process -FilePath `$backendScript -WindowStyle Normal
