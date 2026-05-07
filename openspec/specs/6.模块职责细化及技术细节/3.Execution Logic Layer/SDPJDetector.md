@@ -64,7 +64,7 @@ SDPJDetector / SDPJ检测内核模块
 技术细节:
   静态检测算法与动态检测算法共用一套代码，单独设置一个检测类型信号量，由用户进行选择后改变该信号量的值，其中，用户选择静态检测时，静态检测执行完毕后，用户可选择是否进一步动态选择，而用户选择动态检测时，该信号量默认置为真值。
   为了实现快速检测，SDPJ检测内核需具备一定的并发能力，由于SDPJ算法的基本操作是调用大模型API，属于I/O密集性任务，此类任务最大的时间消耗是大模型的响应等待，因此我们选用了单线程异步并发进行实现，通过非阻塞地处理网络请求与响应，在内存占用率低的同时取得较好的并发能力。
-  并发实现细节：在样本遍历层使用 asyncio.Semaphore(10) 控制最大并发度，配合 asyncio.gather() 并发调度全部样本的检测协程，避免顺序执行时大量等待时间叠加。
+  并发实现细节：在样本遍历层使用 asyncio.Semaphore(max_concurrency) 控制最大并发度（默认 10，由适配器配置建议值决定），配合 asyncio.gather() 并发调度全部样本的检测协程，避免顺序执行时大量等待时间叠加。
 
 
 # 核心理论：检测技术与理论基础介绍
@@ -291,24 +291,25 @@ foreach 合规样本 (i, j) in Report do
 ## 解决方案：四层防线架构
 
 ### 第一层：请求速率控制（RateLimiter）
-- 实现：`sdpj/infrastructure/utils/rate_limiter.py` — 基于滑动窗口的异步速率控制器
-- 原理：维护最近一次请求的时间戳，每次 `acquire()` 时计算需等待的时间，`asyncio.sleep` 后放行
-- 参数：`max_rps`（每秒最大请求数），默认 0.5（即每 2 秒 1 个请求，约 30 RPM）
+- 实现：`sdpj/infrastructure/utils/rate_limiter.py` — 基于令牌桶的异步速率控制器
+- 原理：维护令牌计数，按时间补充令牌（`_rate` 个/秒），每次 `acquire()` 消耗 1 个令牌；令牌不足时计算等待时间并 `asyncio.sleep`
+- 参数：`max_rps`（每秒最大请求数），默认值由适配器配置建议值决定，函数签名默认 5.0（约 300 RPM）
 - 位置：在 `_call_llm()` 中，每次 API 调用前 `await limiter.acquire()`
 - 效果：从源头控制请求速率，而非依赖重试处理 429
 
 ```
-RateLimiter 工作流程：
-  acquire() → 计算距上次请求的间隔 → 不足 min_interval 则 sleep 补齐 → 放行
-  min_interval = 1.0 / max_rps
-  例：max_rps=0.5 → min_interval=2.0s → 每2秒最多1个请求
+RateLimiter 工作流程（令牌桶算法）：
+  acquire() → _refill() 按经过时间补充令牌 → 令牌 >= 1 则消耗并放行 → 否则计算等待时间并 sleep
+  max_tokens = max_rps（桶容量 = 速率，不允许突发积累）
+  例：max_rps=5.0 → 每秒补充5个令牌，桶容量5 → 每0.2秒可放行1个请求
 ```
 
-### 第二层：并发度降低 + 分批处理
-- 并发度：`_CONCURRENCY` 从 10 降为 3，减少同时占用的 API 连接数
-- 分批处理：新增 `_BATCH_SIZE = 50`，将样本分批调度而非一次性启动全部协程
+### 第二层：并发控制 + 分批处理
+- 并发度：`max_concurrency` 参数（默认 10），通过 `asyncio.Semaphore` 限制同时占用的 API 连接数
+- 分批处理：`_BATCH_SIZE = 100`，将样本分批调度而非一次性启动全部协程
 - 批间早停：每批完成后检查 `asyncio.Event` 早停条件，已满足则不再创建下一批任务
 - 位置：`select_poc_pool` 和 `run_static_detection` 中的样本遍历循环
+- `max_concurrency` 和 `max_rps` 均为函数参数，建议值来源于适配器 JSON 配置，调用方可覆盖
 
 ```
 分批处理流程：
@@ -336,17 +337,23 @@ RateLimiter 工作流程：
   → LLMService 十次重试退避 → 按 min=2s,max=60s 指数退避等待 → 重试成功
 ```
 
-## 参数可配置性
-`max_rps` 参数已暴露到 `select_poc_pool()` 和 `run_static_detection()` 的函数签名中（默认 0.5），调用方可根据 API 提供商的实际限额调整：
-- 免费 API（3-10 RPM）：使用默认 0.5 RPS
-- 付费 API（60+ RPM）：可传入 `max_rps=2.0` 或更高
-- 企业级 API（无限制）：可传入 `max_rps=10.0` 以最大化检测速度
+### 参数可配置性
+`max_rps` 和 `max_concurrency` 参数均已暴露到 `select_poc_pool()`、`run_static_detection()` 和 `run_dynamic_detection()` 的函数签名中，其建议值来源于适配器 JSON 配置：
 
-## 四层防线的协同关系
+- 适配器 JSON 配置中可声明 `max_rps`（默认 0.5）和 `max_concurrency`（默认 3）
+- `StateScheduler` 启动检测时查询适配器建议值并传递到检测器
+- 调用方仍可覆盖建议值，建议值为"建议"而非硬性限制
+
+推荐配置参考：
+- 免费 API（3-10 RPM）：配置 `max_rps=0.5`、`max_concurrency=3`（保守默认值）
+- 付费 API（60+ RPM）：配置 `max_rps=5.0`、`max_concurrency=10`
+- 企业级 API（无限制）：配置 `max_rps=10.0`、`max_concurrency=20`
+
+### 四层防线的协同关系
 ```
 请求发出路径：
   _call_llm() → RateLimiter.acquire() [第一层：速率控制]
-             → Semaphore(3) [第二层：并发限制]
+             → Semaphore(max_concurrency) [第二层：并发限制]
              → LLMService.invoke_llm() → adapter.call() → HTTP 请求
 
 429 错误恢复路径：

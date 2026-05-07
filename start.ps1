@@ -110,6 +110,13 @@ Write-Host ""
 Write-Host "[3/3] Starting frontend service..." -ForegroundColor Yellow
 
 $frontendDir = Join-Path $scriptRoot "sdpj\ui\webui\frontend"
+
+# Sync backend port to frontend via .env.local
+$envLocalPath = Join-Path $frontendDir ".env.local"
+$envLocalContent = "VITE_BACKEND_PORT=$backendPort"
+Set-Content -Path $envLocalPath -Value $envLocalContent -Force -Encoding UTF8
+Write-Host "  Synced backend port $backendPort to .env.local" -ForegroundColor Gray
+
 Start-Process cmd.exe -ArgumentList "/k cd /d `"$frontendDir`" && npm run dev" -WindowStyle Normal
 
 Start-Sleep -Seconds 3
@@ -125,12 +132,6 @@ Write-Host "  Backend API:  http://localhost:$backendPort" -ForegroundColor Cyan
 Write-Host "  Frontend:     http://localhost:$frontendPort" -ForegroundColor Cyan
 Write-Host "  API Docs:     http://localhost:$backendPort/docs" -ForegroundColor Cyan
 Write-Host ""
-
-if ($backendPort -ne 8000) {
-    Write-Host "  NOTE: Backend is running on alternate port $backendPort (port 8000 was occupied)" -ForegroundColor Yellow
-    Write-Host "  You may need to update the frontend proxy config to match" -ForegroundColor Yellow
-    Write-Host ""
-}
 
 Write-Host "Tips:" -ForegroundColor Yellow
 Write-Host "  - If frontend cannot connect to backend, check the backend window for errors" -ForegroundColor Yellow

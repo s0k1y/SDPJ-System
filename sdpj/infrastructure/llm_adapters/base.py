@@ -11,6 +11,16 @@ class LLMAdapter(ABC):
     - 向上层提供统一的 call() 方法，屏蔽底层 API 差异
     """
 
+    def __init__(
+        self,
+        model_id: str,
+        max_rps: float = 0.5,
+        max_concurrency: int = 3,
+    ):
+        self._model_id = model_id
+        self._max_rps = max_rps
+        self._max_concurrency = max_concurrency
+
     @abstractmethod
     async def call(
         self,
@@ -44,6 +54,8 @@ class LLMAdapter(ABC):
         return {
             "adapter_class": self.__class__.__name__,
             "module": self.__class__.__module__,
+            "max_rps": self._max_rps,
+            "max_concurrency": self._max_concurrency,
         }
 
     async def close(self) -> None:

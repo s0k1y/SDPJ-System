@@ -24,8 +24,10 @@ class AnthropicAdapter(LLMAdapter):
         api_key: str,
         model_name: str | None = None,
         timeout: int = 60,
+        max_rps: float = 0.5,
+        max_concurrency: int = 3,
     ):
-        self._model_id = model_id
+        super().__init__(model_id=model_id, max_rps=max_rps, max_concurrency=max_concurrency)
         self._api_url = api_url.rstrip("/")
         self._api_key = api_key
         self._model_name = model_name or model_id
@@ -135,7 +137,7 @@ class AnthropicAdapter(LLMAdapter):
 
     def get_metadata(self) -> dict:
         return {
-            "adapter_class": self.__class__.__name__,
+            **super().get_metadata(),
             "model_id": self._model_id,
             "model_name": self._model_name,
             "api_url": self._api_url,

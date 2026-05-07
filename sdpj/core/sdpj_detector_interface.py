@@ -11,7 +11,7 @@ from sdpj.core.sdpj_detector.dynamic_detector import DynamicProgressCallback
 class SDPJDetectorInterface(Protocol):
     """SDPJ 检测内核接口"""
 
-    async def run_static_detection(self, model_id: str, user_id: str, dataset_ids: list[int] | None = None, *, task_group_id: str | None = None, jailbreak_dataset_ids: list[int] | None = None, poc_progress_callback: Callable[[int, int, int, dict, dict | None], None] | None = None, force_refresh: bool = False, llm_callback: LLMCallCallback | None = None) -> dict:
+    async def run_static_detection(self, model_id: str, user_id: str, dataset_ids: list[int] | None = None, *, task_group_id: str | None = None, jailbreak_dataset_ids: list[int] | None = None, max_rps: float = 5.0, max_concurrency: int = 10, poc_progress_callback: Callable[[int, int, int, dict, dict | None], None] | None = None, force_refresh: bool = False, llm_callback: LLMCallCallback | None = None) -> dict:
         """执行静态自检测算法 (Algorithm 1)
 
         Args:
@@ -22,7 +22,7 @@ class SDPJDetectorInterface(Protocol):
         ...
 
     async def run_dynamic_detection(
-        self, model_id: str, user_id: str, static_result: dict, max_iterations: int = 3, llm_callback: LLMCallCallback | None = None, dynamic_progress_callback: DynamicProgressCallback | None = None
+        self, model_id: str, user_id: str, static_result: dict, max_iterations: int = 3, max_rps: float = 5.0, max_concurrency: int = 10, llm_callback: LLMCallCallback | None = None, dynamic_progress_callback: DynamicProgressCallback | None = None
     ) -> dict:
         """执行动态自检测算法 (Algorithm 2)
 

@@ -20,8 +20,8 @@ class OpenAICompatibleAdapter(LLMAdapter):
     - 提供统一的错误处理和超时控制
     """
 
-    def __init__(self, model_id: str, base_url: str, api_key: str, model_name: str | None = None):
-        self._model_id = model_id
+    def __init__(self, model_id: str, base_url: str, api_key: str, model_name: str | None = None, max_rps: float = 0.5, max_concurrency: int = 3):
+        super().__init__(model_id=model_id, max_rps=max_rps, max_concurrency=max_concurrency)
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
         self._model_name = model_name or model_id
@@ -134,7 +134,7 @@ class OpenAICompatibleAdapter(LLMAdapter):
 
     def get_metadata(self) -> dict:
         return {
-            "adapter_class": self.__class__.__name__,
+            **super().get_metadata(),
             "model_id": self._model_id,
             "model_name": self._model_name,
             "base_url": self._base_url,

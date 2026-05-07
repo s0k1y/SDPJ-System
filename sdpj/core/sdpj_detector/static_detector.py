@@ -16,7 +16,6 @@ from . import prompt_builder, result_parser
 _MODALITY_MAP = {"图像": "image", "image": "image", "音频": "audio", "audio": "audio", "视频": "video", "video": "video"}
 _ENCODING_MAP = {"base64": "base64", "url": "url", "unicode": "unicode_escape", "hex": "hex", "十六进制": "hex"}
 
-_CONCURRENCY = 10
 _BATCH_SIZE = 100
 _DEFAULT_JAILBREAK = "default_jailbreak"
 _JAILBREAKV_SUBTYPES = {
@@ -144,7 +143,8 @@ async def select_poc_pool(
     model_id: str,
     jailbreak_dataset_ids: list[int] | None = None,
     *,
-    max_rps: float = 2.0,
+    max_rps: float = 5.0,
+    max_concurrency: int = 10,
     progress_callback: Callable[[int, int, int, dict, dict | None], None] | None = None,
     llm_callback: LLMCallCallback | None = None,
 ) -> tuple[list[str], list[tuple[str, int, str]]]:
@@ -165,7 +165,7 @@ async def select_poc_pool(
         return [], []
 
     instance = await llm.get_service_instance(model_id)
-    sem = asyncio.Semaphore(_CONCURRENCY)
+    sem = asyncio.Semaphore(max_concurrency)
     limiter = RateLimiter(max_rps=max_rps)
 
     _stop_at = {st: 3 for st in _JAILBREAKV_SUBTYPES}
@@ -250,7 +250,8 @@ async def run_static_detection(
     *,
     task_group_id: str | None = None,
     jailbreak_dataset_ids: list[int] | None = None,
-    max_rps: float = 2.0,
+    max_rps: float = 5.0,
+    max_concurrency: int = 10,
     poc_progress_callback: Callable[[int, int, int, dict], None] | None = None,
     task_progress_callback: Callable[[str, int, int], None] | None = None,
     force_refresh: bool = False,
@@ -279,7 +280,7 @@ async def run_static_detection(
         entries = [(c["poc_text"], c["score"], c["subtype"]) for c in cached]
         poc_pool = _build_pool(entries)
     else:
-        poc_pool, raw_entries = await select_poc_pool(llm, data_processor, model_id, jailbreak_dataset_ids, max_rps=max_rps, progress_callback=poc_progress_callback, llm_callback=llm_callback)
+        poc_pool, raw_entries = await select_poc_pool(llm, data_processor, model_id, jailbreak_dataset_ids, max_rps=max_rps, max_concurrency=max_concurrency, progress_callback=poc_progress_callback, llm_callback=llm_callback)
         if raw_entries:
             cache_entries = [
                 {"subtype": subtype, "poc_text": poc_text, "score": score}
@@ -296,7 +297,7 @@ async def run_static_detection(
 
     judge_template = prompt_builder.build_judge_template(poc_pool[0])
     instance = await llm.get_service_instance(model_id)
-    sem = asyncio.Semaphore(_CONCURRENCY)
+    sem = asyncio.Semaphore(max_concurrency)
     limiter = RateLimiter(max_rps=max_rps)
 
     for ds_meta in non_jailbreak:

@@ -16,11 +16,15 @@ class OpenAIAdapter(OpenAICompatibleAdapter):
         api_key: str,
         model_name: str | None = None,
         timeout: int = 60,
+        max_rps: float = 0.5,
+        max_concurrency: int = 3,
     ):
         super().__init__(
             model_id=model_id,
             base_url=base_url,
             api_key=api_key,
             model_name=model_name,
+            max_rps=max_rps,
+            max_concurrency=max_concurrency,
         )
         self._timeout = timeout

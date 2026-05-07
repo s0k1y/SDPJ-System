@@ -36,6 +36,8 @@ def load_adapter_from_config(model_id: str, config: Union[dict, str, Path]) -> L
         raise AdapterValidationError("config must be a dict or valid JSON")
 
     request_format = config.get("request_format", "openai")
+    max_rps = float(config.get("max_rps", 0.5))
+    max_concurrency = int(config.get("max_concurrency", 3))
 
     # 方式 2: 用户自定义适配器（系统抽象规范）
     if request_format == "custom":
@@ -54,9 +56,9 @@ def load_adapter_from_config(model_id: str, config: Union[dict, str, Path]) -> L
             if not issubclass(adapter_class, LLMAdapter):
                 raise AdapterValidationError(f"{adapter_class_name} must inherit from LLMAdapter")
 
-            _META_KEYS = {"request_format", "adapter_class"}
+            _META_KEYS = {"request_format", "adapter_class", "max_rps", "max_concurrency"}
             filtered_config = {k: v for k, v in config.items() if k not in _META_KEYS}
-            return adapter_class(model_id=model_id, **filtered_config)
+            return adapter_class(model_id=model_id, max_rps=max_rps, max_concurrency=max_concurrency, **filtered_config)
         except (ImportError, AttributeError, TypeError) as e:
             raise AdapterValidationError(f"Failed to load custom adapter: {e}")
 
@@ -79,6 +81,8 @@ def load_adapter_from_config(model_id: str, config: Union[dict, str, Path]) -> L
             api_key=api_key,
             model_name=model_name,
             timeout=timeout,
+            max_rps=max_rps,
+            max_concurrency=max_concurrency,
         )
 
     # 默认使用 OpenAI 兼容格式
@@ -89,4 +93,6 @@ def load_adapter_from_config(model_id: str, config: Union[dict, str, Path]) -> L
         api_key=api_key,
         model_name=model_name,
         timeout=timeout,
+        max_rps=max_rps,
+        max_concurrency=max_concurrency,
     )

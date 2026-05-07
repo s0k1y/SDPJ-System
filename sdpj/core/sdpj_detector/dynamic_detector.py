@@ -8,7 +8,7 @@ from sdpj.drivers.llm_service_interface import LLMServiceInterface, LLMError
 from sdpj.infrastructure.utils.rate_limiter import RateLimiter
 
 from . import prompt_builder, result_parser
-from .static_detector import _call_llm, LLMCallCallback, _CONCURRENCY, _BATCH_SIZE
+from .static_detector import _call_llm, LLMCallCallback, _BATCH_SIZE
 
 DynamicProgressCallback = Callable[[int, int, float], None]
 
@@ -20,7 +20,8 @@ async def run_dynamic_detection(
     user_id: str,
     static_result: dict,
     max_iterations: int = 3,
-    max_rps: float = 2.0,
+    max_rps: float = 5.0,
+    max_concurrency: int = 10,
     llm_callback: LLMCallCallback | None = None,
     dynamic_progress_callback: DynamicProgressCallback | None = None,
 ) -> dict:
@@ -42,7 +43,7 @@ async def run_dynamic_detection(
     task_group_id = await data_processor.create_task_group(user_id, model_id)
     instance = await llm.get_service_instance(model_id)
     limiter = RateLimiter(max_rps=max_rps)
-    sem = asyncio.Semaphore(_CONCURRENCY)
+    sem = asyncio.Semaphore(max_concurrency)
 
     static_agg = await data_processor.aggregate_task_group_results(static_tg_id)
 

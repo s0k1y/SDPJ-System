@@ -35,11 +35,13 @@ class SDPJDetector:
         self._data_processor = data_processor
         self._llm = llm_service
 
-    async def run_static_detection(self, model_id: str, user_id: str, dataset_ids: list[int] | None = None, *, task_group_id: str | None = None, jailbreak_dataset_ids: list[int] | None = None, poc_progress_callback: Callable[[int, int, int, dict, dict | None], None] | None = None, task_progress_callback: Callable[[str, int, int], None] | None = None, force_refresh: bool = False, llm_callback: LLMCallCallback | None = None) -> dict:
+    async def run_static_detection(self, model_id: str, user_id: str, dataset_ids: list[int] | None = None, *, task_group_id: str | None = None, jailbreak_dataset_ids: list[int] | None = None, max_rps: float = 5.0, max_concurrency: int = 10, poc_progress_callback: Callable[[int, int, int, dict, dict | None], None] | None = None, task_progress_callback: Callable[[str, int, int], None] | None = None, force_refresh: bool = False, llm_callback: LLMCallCallback | None = None) -> dict:
         return await run_static_detection(
             self._llm, self._data_processor, model_id, user_id, dataset_ids,
             task_group_id=task_group_id,
             jailbreak_dataset_ids=jailbreak_dataset_ids,
+            max_rps=max_rps,
+            max_concurrency=max_concurrency,
             poc_progress_callback=poc_progress_callback,
             task_progress_callback=task_progress_callback,
             force_refresh=force_refresh,
@@ -47,11 +49,12 @@ class SDPJDetector:
         )
 
     async def run_dynamic_detection(
-        self, model_id: str, user_id: str, static_result: dict, max_iterations: int = 3, llm_callback: LLMCallCallback | None = None, dynamic_progress_callback: DynamicProgressCallback | None = None
+        self, model_id: str, user_id: str, static_result: dict, max_iterations: int = 3, max_rps: float = 5.0, max_concurrency: int = 10, llm_callback: LLMCallCallback | None = None, dynamic_progress_callback: DynamicProgressCallback | None = None
     ) -> dict:
         return await run_dynamic_detection(
             self._llm, self._data_processor, model_id, user_id,
-            static_result, max_iterations, llm_callback=llm_callback,
+            static_result, max_iterations, max_rps=max_rps, max_concurrency=max_concurrency,
+            llm_callback=llm_callback,
             dynamic_progress_callback=dynamic_progress_callback,
         )
 

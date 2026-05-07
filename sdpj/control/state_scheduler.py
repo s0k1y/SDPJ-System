@@ -126,6 +126,25 @@ class StateScheduler(StateSchedulerInterface):
     def _log_err(self, err_type: str, desc: str) -> None:
         self._logger.log_error("StateScheduler", err_type, desc)
 
+    def _transition_detection_done(self, trigger: str) -> bool:
+        """尝试执行 detection_done 状态转换 (detecting → idle)。
+
+        当前状态为 detecting 时调用 _fsm.detection_done()，记录日志并通知回调。
+        返回是否成功转换。
+        """
+        if self.get_system_state() != "detecting":
+            return False
+        try:
+            old_state = self.get_system_state()
+            self._fsm.detection_done()
+            new_state = self.get_system_state()
+            self._log_state_transition(old_state, new_state, trigger)
+            self._notify_state()
+            return True
+        except Exception as e:
+            self._log_err("FSMError", f"detection_done 状态转换失败 (trigger={trigger}): {e}")
+            return False
+
     # ── 检测调度 (职责 1-4) ──
 
     async def start_detection(self, user_id: int, config_data: dict) -> dict:
@@ -230,6 +249,16 @@ class StateScheduler(StateSchedulerInterface):
         except (ValueError, TypeError):
             pass
 
+        # 查询适配器的速率限制建议值
+        suggested_max_rps = 5.0
+        suggested_max_concurrency = 10
+        try:
+            adapter_info = self._registry._adapter_lib.get_adapter_info(actual_model_name)
+            suggested_max_rps = float(adapter_info.get("max_rps", 5.0))
+            suggested_max_concurrency = int(adapter_info.get("max_concurrency", 10))
+        except Exception:
+            pass
+
         def _poc_progress_cb(processed: int, total: int, found: int, score_counts: dict = None, subtype_stats: dict = None) -> None:
             progress = {
                 "processed": processed,
@@ -279,14 +308,14 @@ class StateScheduler(StateSchedulerInterface):
             if cancel_event.is_set():
                 raise asyncio.CancelledError()
             if detection_type == "static":
-                result = await self._detector.run_static_detection(actual_model_name, user_id, dataset_ids, task_group_id=task_group_id, jailbreak_dataset_ids=jailbreak_dataset_ids, poc_progress_callback=_poc_progress_cb, task_progress_callback=_task_progress_cb, force_refresh=force_refresh, llm_callback=_llm_call_cb)
+                result = await self._detector.run_static_detection(actual_model_name, user_id, dataset_ids, task_group_id=task_group_id, jailbreak_dataset_ids=jailbreak_dataset_ids, max_rps=suggested_max_rps, max_concurrency=suggested_max_concurrency, poc_progress_callback=_poc_progress_cb, task_progress_callback=_task_progress_cb, force_refresh=force_refresh, llm_callback=_llm_call_cb)
             elif detection_type == "dynamic":
-                static_result = await self._detector.run_static_detection(actual_model_name, user_id, dataset_ids, task_group_id=task_group_id, jailbreak_dataset_ids=jailbreak_dataset_ids, poc_progress_callback=_poc_progress_cb, task_progress_callback=_task_progress_cb, force_refresh=force_refresh, llm_callback=_llm_call_cb)
+                static_result = await self._detector.run_static_detection(actual_model_name, user_id, dataset_ids, task_group_id=task_group_id, jailbreak_dataset_ids=jailbreak_dataset_ids, max_rps=suggested_max_rps, max_concurrency=suggested_max_concurrency, poc_progress_callback=_poc_progress_cb, task_progress_callback=_task_progress_cb, force_refresh=force_refresh, llm_callback=_llm_call_cb)
                 if static_result["status"] != "completed":
                     result = static_result
                 else:
                     dynamic_result = await self._detector.run_dynamic_detection(
-                        actual_model_name, user_id, static_result, max_iterations, llm_callback=_llm_call_cb, dynamic_progress_callback=_dynamic_progress_cb
+                        actual_model_name, user_id, static_result, max_iterations, max_rps=suggested_max_rps, max_concurrency=suggested_max_concurrency, llm_callback=_llm_call_cb, dynamic_progress_callback=_dynamic_progress_cb
                     )
                     result = {
                         "status": "completed",
@@ -294,12 +323,12 @@ class StateScheduler(StateSchedulerInterface):
                         "dynamic_task_group_id": dynamic_result.get("task_group_id"),
                     }
             else:
-                static_result = await self._detector.run_static_detection(actual_model_name, user_id, dataset_ids, task_group_id=task_group_id, jailbreak_dataset_ids=jailbreak_dataset_ids, poc_progress_callback=_poc_progress_cb, task_progress_callback=_task_progress_cb, force_refresh=force_refresh, llm_callback=_llm_call_cb)
+                static_result = await self._detector.run_static_detection(actual_model_name, user_id, dataset_ids, task_group_id=task_group_id, jailbreak_dataset_ids=jailbreak_dataset_ids, max_rps=suggested_max_rps, max_concurrency=suggested_max_concurrency, poc_progress_callback=_poc_progress_cb, task_progress_callback=_task_progress_cb, force_refresh=force_refresh, llm_callback=_llm_call_cb)
                 if static_result["status"] != "completed":
                     result = static_result
                 else:
                     dynamic_result = await self._detector.run_dynamic_detection(
-                        actual_model_name, user_id, static_result, max_iterations, llm_callback=_llm_call_cb, dynamic_progress_callback=_dynamic_progress_cb
+                        actual_model_name, user_id, static_result, max_iterations, max_rps=suggested_max_rps, max_concurrency=suggested_max_concurrency, llm_callback=_llm_call_cb, dynamic_progress_callback=_dynamic_progress_cb
                     )
                     result = {
                         "status": "completed",
@@ -337,15 +366,8 @@ class StateScheduler(StateSchedulerInterface):
 
         batch = await self._task_queue.dequeue_tasks(max_concurrency)
         if not batch:
-            if self.get_system_state() == "detecting" and not self._enqueue_in_progress and not self._running_tasks:
-                try:
-                    old_state = self.get_system_state()
-                    self._fsm.detection_done()
-                    new_state = self.get_system_state()
-                    self._log_state_transition(old_state, new_state, "detection_done")
-                    self._notify_state()
-                except Exception as e:
-                    self._log_err("FSMError", f"detection_done 状态转换失败: {e}")
+            if not self._enqueue_in_progress and not self._running_tasks:
+                self._transition_detection_done("detection_done")
             return {"success": True, "tasks": [], "message": "队列为空"}
 
         for task in batch:
@@ -378,15 +400,8 @@ class StateScheduler(StateSchedulerInterface):
             has_active = any(
                 t.status in (TaskStatus.PENDING, TaskStatus.RUNNING) for t in queue_view
             )
-            if not has_active and self.get_system_state() == "detecting":
-                try:
-                    old_state = self.get_system_state()
-                    self._fsm.detection_done()
-                    new_state = self.get_system_state()
-                    self._log_state_transition(old_state, new_state, "task_finished")
-                    self._notify_state()
-                except Exception as e:
-                    self._log_err("FSMError", f"任务完成后状态转换失败: {e}")
+            if not has_active:
+                self._transition_detection_done("task_finished")
 
     async def query_detection_progress(self, task_id: Optional[str] = None) -> dict:
         if task_id is not None:
@@ -629,15 +644,8 @@ class StateScheduler(StateSchedulerInterface):
         remaining = await self._task_queue.get_queue_view()
         has_active = any(t.status in (TaskStatus.PENDING, TaskStatus.RUNNING) for t in remaining)
         self._cleanup_running_tasks()
-        if not has_active and not self._running_tasks and self.get_system_state() == "detecting":
-            try:
-                old_state = self.get_system_state()
-                self._fsm.detection_done()
-                new_state = self.get_system_state()
-                self._log_state_transition(old_state, new_state, "cancel_task")
-                self._notify_state()
-            except Exception as e:
-                self._log_err("FSMError", f"取消后状态转换失败: {e}")
+        if not has_active and not self._running_tasks:
+            self._transition_detection_done("cancel_task")
 
         return {"success": True}
 
@@ -666,15 +674,8 @@ class StateScheduler(StateSchedulerInterface):
         remaining = await self._task_queue.get_queue_view()
         has_active = any(t.status in (TaskStatus.PENDING, TaskStatus.RUNNING) for t in remaining)
         self._cleanup_running_tasks()
-        if not has_active and not self._running_tasks and self.get_system_state() == "detecting":
-            try:
-                old_state = self.get_system_state()
-                self._fsm.detection_done()
-                new_state = self.get_system_state()
-                self._log_state_transition(old_state, new_state, "cancel_task_group")
-                self._notify_state()
-            except Exception as e:
-                self._log_err("FSMError", f"取消后状态转换失败: {e}")
+        if not has_active and not self._running_tasks:
+            self._transition_detection_done("cancel_task_group")
 
         self._log_rt("task_group_cancelled", f"任务组 {task_group_id} 已取消, 共取消 {cancelled_count} 个子任务, 已从队列移除 {len(group_tasks)} 个任务")
         return {"success": True, "cancelled_count": cancelled_count, "removed_count": len(group_tasks)}
