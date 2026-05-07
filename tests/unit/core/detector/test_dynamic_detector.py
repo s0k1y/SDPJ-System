@@ -20,6 +20,7 @@ def mock_data_processor():
     dp.create_detection_task = AsyncMock(return_value="dyn_task_1")
     dp.create_detection_report = AsyncMock(return_value="dyn_report_1")
     dp.append_result_data = AsyncMock(return_value="result_1")
+    dp.append_result_data_batch = AsyncMock(return_value=["result_1"])
     dp.update_task_status = AsyncMock()
     return dp
 
@@ -59,10 +60,11 @@ async def test_dynamic_detection_static_violation_gets_zero_iterations(mock_llm,
     assert result["status"] == "completed"
     assert result["task_group_id"] == "dyn_tg_1"
 
-    # 检查 append_result_data 被调用时传入了 iteration_count=0
-    dp.append_result_data.assert_called_once()
-    call_kwargs = dp.append_result_data.call_args.kwargs
-    assert call_kwargs["iteration_count"] == 0
+    # 检查 append_result_data_batch 被调用
+    dp.append_result_data_batch.assert_called_once()
+    call_args = dp.append_result_data_batch.call_args
+    entries = call_args.args[1] if len(call_args.args) > 1 else call_args.kwargs["entries"]
+    assert any(e.get("iteration_count") == 0 for e in entries)
 
 
 @pytest.mark.asyncio
@@ -108,13 +110,13 @@ async def test_dynamic_detection_tracks_iterations(mock_llm, mock_data_processor
     result = await run_dynamic_detection(llm, dp, "gpt-4", "user_1", static_result, max_iterations=3)
 
     assert result["status"] == "completed"
-    # 应该调用了两次 append_result_data（一次是合规样本的动态检测结果）
-    assert dp.append_result_data.call_count >= 1
+    # 应该调用了 append_result_data_batch
+    assert dp.append_result_data_batch.call_count >= 1
 
-    # 最后一次调用应该有 iteration_count
-    last_call_kwargs = dp.append_result_data.call_args.kwargs
-    assert "iteration_count" in last_call_kwargs
-    assert last_call_kwargs["iteration_count"] > 0
+    # 批量结果中应该有 iteration_count > 0 的条目
+    call_args = dp.append_result_data_batch.call_args
+    entries = call_args.args[1] if len(call_args.args) > 1 else call_args.kwargs["entries"]
+    assert any(e.get("iteration_count", 0) > 0 for e in entries)
 
 
 @pytest.mark.asyncio

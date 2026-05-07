@@ -9,14 +9,15 @@ from sdpj.drivers.llm_service_interface import LLMServiceInterface
 from sdpj.drivers.llm_service_interface import LLMServiceInstanceProtocol, LLMError
 from sdpj.infrastructure.llm_adapters.errors import StandardizedLLMError
 from sdpj.infrastructure.utils.rate_limiter import RateLimiter
+from sdpj.infrastructure.utils.cpu_executor import run_cpu
 
 from . import prompt_builder, result_parser
 
 _MODALITY_MAP = {"图像": "image", "image": "image", "音频": "audio", "audio": "audio", "视频": "video", "video": "video"}
 _ENCODING_MAP = {"base64": "base64", "url": "url", "unicode": "unicode_escape", "hex": "hex", "十六进制": "hex"}
 
-_CONCURRENCY = 3
-_BATCH_SIZE = 50
+_CONCURRENCY = 10
+_BATCH_SIZE = 100
 _DEFAULT_JAILBREAK = "default_jailbreak"
 _JAILBREAKV_SUBTYPES = {
     "模板化越狱", "多步推理越狱", "多模态拼写扰动越狱",
@@ -52,6 +53,25 @@ def _prepare_poc(poc: str, subtype: str, dp: DataProcessorInterface) -> str:
 
 
 LLMCallCallback = Callable[[dict, dict], None]
+
+
+async def _prepare_poc_async(poc: str, subtype: str, dp: DataProcessorInterface) -> str:
+    lower = subtype.lower()
+    for kw, modality in _MODALITY_MAP.items():
+        if kw.lower() in lower:
+            try:
+                raw = await run_cpu(dp.construct_multimodal_sample, poc, modality)
+                encoded = await run_cpu(lambda: _b64.b64encode(raw).decode())
+                return f"[{modality.upper()}_DATA:{encoded}]"
+            except NotImplementedError:
+                return poc
+    for kw, enc in _ENCODING_MAP.items():
+        if kw in lower:
+            try:
+                return await run_cpu(dp.construct_encoded_sample, poc, enc)
+            except Exception:
+                return poc
+    return poc
 
 
 async def _call_llm(
@@ -124,8 +144,8 @@ async def select_poc_pool(
     model_id: str,
     jailbreak_dataset_ids: list[int] | None = None,
     *,
-    max_rps: float = 0.5,
-    progress_callback: Callable[[int, int, int, dict], None] | None = None,
+    max_rps: float = 2.0,
+    progress_callback: Callable[[int, int, int, dict, dict | None], None] | None = None,
     llm_callback: LLMCallCallback | None = None,
 ) -> tuple[list[str], list[tuple[str, int, str]]]:
     """Algorithm 1 Step 1: 遍历越狱数据集，按攻击手法分组选取 PoC 池
@@ -154,6 +174,7 @@ async def select_poc_pool(
     counts: dict[str, list[int]] = {st: [0] for st in _stop_at}
     locks: dict[str, asyncio.Lock] = {st: asyncio.Lock() for st in _stop_at}
     score_counts: dict[int, int] = {s: 0 for s in range(1, 6)}
+    _score_lock = asyncio.Lock()
 
     async def _check(sample) -> Optional[tuple[str, int, str]]:
         poc = sample.get("poc", "")
@@ -166,7 +187,7 @@ async def select_poc_pool(
         event = found_max[subtype]
         if event.is_set():
             return None
-        prepared = _prepare_poc(poc, raw_subtype, data_processor)
+        prepared = await _prepare_poc_async(poc, raw_subtype, data_processor)
         async with sem:
             if event.is_set():
                 return None
@@ -183,7 +204,8 @@ async def select_poc_pool(
                         if counts[subtype][0] >= _stop_at[subtype]:
                             event.set()
                 if score > 0:
-                    score_counts[score] = score_counts.get(score, 0) + 1
+                    async with _score_lock:
+                        score_counts[score] = score_counts.get(score, 0) + 1
                 return (prepared, score, subtype) if score > 0 else None
             except LLMError as e:
                 import structlog
@@ -202,7 +224,15 @@ async def select_poc_pool(
         successful.extend(r for r in results if r is not None)
         if progress_callback is not None:
             batch_end = min(batch_start + _BATCH_SIZE, total)
-            progress_callback(batch_end, total, len(successful), dict(score_counts))
+            subtype_stats = {
+                st: {
+                    "current": counts[st][0],
+                    "target": _stop_at[st],
+                    "event_set": found_max[st].is_set(),
+                }
+                for st in _stop_at
+            }
+            progress_callback(batch_end, total, len(successful), dict(score_counts), subtype_stats)
 
     if not successful:
         return [], []
@@ -220,7 +250,7 @@ async def run_static_detection(
     *,
     task_group_id: str | None = None,
     jailbreak_dataset_ids: list[int] | None = None,
-    max_rps: float = 0.5,
+    max_rps: float = 2.0,
     poc_progress_callback: Callable[[int, int, int, dict], None] | None = None,
     task_progress_callback: Callable[[str, int, int], None] | None = None,
     force_refresh: bool = False,
@@ -230,7 +260,7 @@ async def run_static_detection(
 
     Args:
         task_group_id: 可选，复用已有的任务组ID而非创建新的
-        max_rps: 每秒最大请求数，默认0.5（约30RPM），用于避免429限流
+        max_rps: 每秒最大请求数，默认2.0（约120RPM），用于避免429限流
     """
     all_datasets = await data_processor.get_all_datasets()
     non_jailbreak = [ds for ds in all_datasets if ds.get("risk_type") != "jailbreak"]
@@ -287,7 +317,7 @@ async def run_static_detection(
         async def _process(sample, _report_id=report_id):
             poc = sample.get("poc", "")
             subtype = sample.get("subtype", "")
-            prepared = _prepare_poc(poc, subtype, data_processor)
+            prepared = await _prepare_poc_async(poc, subtype, data_processor)
             async with sem:
                 try:
                     resp = await _call_llm(llm, instance, "", prepared, limiter, llm_callback)
@@ -298,11 +328,12 @@ async def run_static_detection(
                 except StandardizedLLMError as e:
                     output_text = f"[ERROR] {e.message}"
                     judgment = "违规"
-            await data_processor.append_result_data(_report_id, subtype, poc, output_text, judgment)
+            return {"risk_subclass": subtype, "poc": poc, "model_output": output_text, "compliance_result": judgment}
 
         for batch_start in range(0, len(samples), _BATCH_SIZE):
             batch = samples[batch_start : batch_start + _BATCH_SIZE]
-            await asyncio.gather(*[_process(s) for s in batch])
+            results = await asyncio.gather(*[_process(s) for s in batch])
+            await data_processor.append_result_data_batch(report_id, list(results))
             if task_progress_callback is not None:
                 processed = min(batch_start + _BATCH_SIZE, sample_total)
                 task_progress_callback(task_id, processed, sample_total)

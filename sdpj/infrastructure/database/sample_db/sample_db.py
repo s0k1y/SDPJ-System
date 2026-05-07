@@ -261,6 +261,29 @@ class SampleDB:
                 for s in samples
             ]
 
+    async def get_samples_by_risk_type(self, risk_type: str) -> list[dict]:
+        """按安全风险类型查询所有样本（单次 JOIN 查询，替代 N+1）
+
+        Args:
+            risk_type: 安全风险类型
+
+        Returns:
+            匹配的所有样本列表
+        """
+        async with self.session_manager.get_session() as session:
+            repo = SampleRepository(session)
+            samples = await repo.get_by_risk_type(risk_type)
+            return [
+                {
+                    "sample_id": s.sample_id,
+                    "subtype": s.subtype,
+                    "poc": s.poc,
+                    "dataset_id": s.dataset_id,
+                    "created_at": s.created_at,
+                }
+                for s in samples
+            ]
+
     async def get_sample_by_id(self, sample_id: int) -> Optional[dict]:
         """按 ID 查询单条样本
 

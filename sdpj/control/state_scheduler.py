@@ -5,6 +5,7 @@
 被依赖模块: CLI, WebUI
 """
 import asyncio
+import time
 import uuid
 import json
 from typing import Callable, Optional
@@ -52,6 +53,7 @@ class StateScheduler(StateSchedulerInterface):
         self._log_callbacks: list = []
         self._llm_call_callbacks: list = []
         self._consumer_task: asyncio.Task | None = None
+        self._enqueue_in_progress: bool = False
 
     # ── 内部日志辅助 ──
 
@@ -162,10 +164,12 @@ class StateScheduler(StateSchedulerInterface):
         current_state = self.get_system_state()
         if current_state == "idle":
             try:
+                self._enqueue_in_progress = True
                 self._fsm.start_detection()
                 self._log_state_transition("idle", "detecting", "start_detection")
                 self._notify_state()
             except Exception as e:
+                self._enqueue_in_progress = False
                 self._log_err("FSMError", f"start_detection 状态转换失败: {e}")
                 return {"success": False, "error": "系统状态不允许启动检测"}
         elif current_state != "detecting":
@@ -173,20 +177,23 @@ class StateScheduler(StateSchedulerInterface):
 
         task_group_id = str(uuid.uuid4())
         task_ids: list[str] = []
-        for ds_id in dataset_ids:
-            tid = await self._task_queue.enqueue_task({
-                "user_id": str(user_id),
-                "model_id": model_id,
-                "algorithm_type": detection_type,
-                "dataset_id": str(ds_id),
-                "metadata": {
-                    "task_group_id": task_group_id,
-                    "max_iterations": max_iterations,
-                    "jailbreak_dataset_ids": jailbreak_dataset_ids,
-                    "force_refresh": force_refresh,
-                },
-            })
-            task_ids.append(tid)
+        try:
+            for ds_id in dataset_ids:
+                tid = await self._task_queue.enqueue_task({
+                    "user_id": str(user_id),
+                    "model_id": model_id,
+                    "algorithm_type": detection_type,
+                    "dataset_id": str(ds_id),
+                    "metadata": {
+                        "task_group_id": task_group_id,
+                        "max_iterations": max_iterations,
+                        "jailbreak_dataset_ids": jailbreak_dataset_ids,
+                        "force_refresh": force_refresh,
+                    },
+                })
+                task_ids.append(tid)
+        finally:
+            self._enqueue_in_progress = False
 
         self._log_op(user_id, "start_detection", {
             "task_group_id": task_group_id, "task_ids": task_ids,
@@ -222,9 +229,23 @@ class StateScheduler(StateSchedulerInterface):
         except (ValueError, TypeError):
             pass
 
-        def _poc_progress_cb(processed: int, total: int, found: int, score_counts: dict = None) -> None:
+        def _poc_progress_cb(processed: int, total: int, found: int, score_counts: dict = None, subtype_stats: dict = None) -> None:
+            progress = {
+                "processed": processed,
+                "total": total,
+                "found": found,
+                "score_counts": score_counts or {},
+                "last_update_time": time.monotonic(),
+            }
+            if subtype_stats is not None:
+                progress["subtype_stats"] = subtype_stats
+                remaining = [st for st, info in subtype_stats.items() if not info.get("event_set", False)]
+                progress["remaining_subtypes"] = remaining
+            if not hasattr(_poc_progress_cb, '_started'):
+                _poc_progress_cb._started = True
+                progress["start_time"] = time.monotonic()
             asyncio.ensure_future(self._task_queue.update_poc_progress(
-                task_group_id, {"processed": processed, "total": total, "found": found, "score_counts": score_counts or {}}
+                task_group_id, progress
             ))
 
         def _task_progress_cb(task_id: str, processed: int, total: int) -> None:
@@ -234,6 +255,11 @@ class StateScheduler(StateSchedulerInterface):
 
         def _llm_call_cb(request_info: dict, response_info: dict) -> None:
             self._notify_llm_call(request_info, response_info)
+
+        def _dynamic_progress_cb(processed: int, total: int, avg_iterations: float) -> None:
+            asyncio.ensure_future(self._task_queue.update_dynamic_progress(
+                task_group_id, {"processed": processed, "total": total, "avg_iterations": avg_iterations}
+            ))
 
         cancel_event = asyncio.Event()
 
@@ -259,7 +285,7 @@ class StateScheduler(StateSchedulerInterface):
                     result = static_result
                 else:
                     dynamic_result = await self._detector.run_dynamic_detection(
-                        actual_model_name, user_id, static_result, max_iterations, llm_callback=_llm_call_cb
+                        actual_model_name, user_id, static_result, max_iterations, llm_callback=_llm_call_cb, dynamic_progress_callback=_dynamic_progress_cb
                     )
                     result = {
                         "status": "completed",
@@ -272,7 +298,7 @@ class StateScheduler(StateSchedulerInterface):
                     result = static_result
                 else:
                     dynamic_result = await self._detector.run_dynamic_detection(
-                        actual_model_name, user_id, static_result, max_iterations, llm_callback=_llm_call_cb
+                        actual_model_name, user_id, static_result, max_iterations, llm_callback=_llm_call_cb, dynamic_progress_callback=_dynamic_progress_cb
                     )
                     result = {
                         "status": "completed",
@@ -303,11 +329,12 @@ class StateScheduler(StateSchedulerInterface):
                 pass
             if task_group_id:
                 await self._task_queue.clear_poc_progress(task_group_id)
+                await self._task_queue.clear_dynamic_progress(task_group_id)
 
     async def execute_concurrent_tasks(self, max_concurrency: int = 3) -> dict:
         batch = await self._task_queue.dequeue_tasks(max_concurrency)
         if not batch:
-            if self.get_system_state() == "detecting":
+            if self.get_system_state() == "detecting" and not self._enqueue_in_progress:
                 try:
                     old_state = self.get_system_state()
                     self._fsm.detection_done()
@@ -444,6 +471,8 @@ class StateScheduler(StateSchedulerInterface):
                 children.append(child)
 
             poc_progress = await self._task_queue.get_poc_progress(group_id)
+            poc_eta = -1.0
+            stage_info = {"stage": "unknown"}
             if poc_progress:
                 sc = poc_progress.get("score_counts", {})
                 score_parts = []
@@ -460,6 +489,52 @@ class StateScheduler(StateSchedulerInterface):
                     "error_message": "",
                 })
                 status_counts["running"] += 1
+                subtype_stats = poc_progress.get("subtype_stats", {})
+                remaining_subtypes = poc_progress.get("remaining_subtypes", [])
+                start_time = poc_progress.get("start_time")
+                last_update_time = poc_progress.get("last_update_time")
+                if not remaining_subtypes:
+                    poc_eta = 0.0
+                    stage_info = {"stage": "poc_selecting", "remaining_subtypes": [], "estimated_needed": poc_progress["processed"]}
+                elif start_time and last_update_time and subtype_stats:
+                    elapsed = last_update_time - start_time
+                    processed = poc_progress["processed"]
+                    if elapsed > 0 and processed > 0:
+                        overall_speed = processed / elapsed
+                        subtype_etas = []
+                        for st in remaining_subtypes:
+                            st_info = subtype_stats.get(st, {})
+                            current = st_info.get("current", 0)
+                            target = st_info.get("target", 3)
+                            remaining = target - current
+                            if remaining > 0 and current > 0:
+                                st_elapsed = elapsed
+                                st_speed = current / st_elapsed if st_elapsed > 0 else 0
+                                if st_speed < 0.01:
+                                    subtype_etas.append((st, float('inf')))
+                                else:
+                                    subtype_etas.append((st, remaining / st_speed))
+                            elif remaining > 0:
+                                subtype_etas.append((st, float('inf')))
+                        if subtype_etas:
+                            max_eta_st, max_eta_val = max(subtype_etas, key=lambda x: x[1])
+                            poc_eta = max_eta_val if max_eta_val != float('inf') else -1.0
+                        else:
+                            poc_eta = 0.0
+                        estimated_needed = poc_progress["processed"] + (poc_eta * overall_speed if overall_speed > 0 and poc_eta > 0 else 0)
+                        stage_info = {
+                            "stage": "poc_selecting",
+                            "remaining_subtypes": remaining_subtypes,
+                            "estimated_needed": int(estimated_needed),
+                        }
+                        if poc_eta < 0:
+                            slow_subtypes = [st for st, v in subtype_etas if v == float('inf')]
+                            if slow_subtypes:
+                                stage_info["slow_subtypes"] = slow_subtypes
+                    else:
+                        stage_info = {"stage": "poc_selecting", "remaining_subtypes": remaining_subtypes}
+                else:
+                    stage_info = {"stage": "poc_selecting", "remaining_subtypes": remaining_subtypes}
 
             total = len(tasks)
             if status_counts["failed"] > 0:
@@ -473,6 +548,55 @@ class StateScheduler(StateSchedulerInterface):
             else:
                 group_status = "completed"
 
+            eta_seconds = -1.0
+            if poc_eta >= 0:
+                eta_seconds = poc_eta
+                stage_info = stage_info
+            elif poc_progress is None and group_status in ("running", "pending"):
+                task_etas = []
+                for child in children:
+                    if child.get("status") == "running" and "progress" in child:
+                        prog = child["progress"]
+                        recent_speeds = prog.get("recent_speeds", [])
+                        processed = prog.get("processed", 0)
+                        task_total = prog.get("total", 0)
+                        if recent_speeds and processed < task_total:
+                            avg_speed = sum(recent_speeds) / len(recent_speeds)
+                            if avg_speed > 0:
+                                task_etas.append((task_total - processed) / avg_speed)
+                if task_etas:
+                    eta_seconds = max(task_etas)
+                    stage_info = {"stage": "static_detecting", "tasks_remaining": sum(1 for c in children if c.get("status") in ("pending", "running"))}
+                else:
+                    stage_info = {"stage": "static_detecting", "tasks_remaining": sum(1 for c in children if c.get("status") in ("pending", "running"))}
+
+            dynamic_prog = await self._task_queue.get_dynamic_progress(group_id)
+            if dynamic_prog and group_status == "running":
+                dyn_processed = dynamic_prog.get("processed", 0)
+                dyn_total = dynamic_prog.get("total", 0)
+                dyn_avg_iter = dynamic_prog.get("avg_iterations", 0.0)
+                dyn_speeds = dynamic_prog.get("recent_speeds", [])
+                if dyn_speeds and dyn_processed < dyn_total:
+                    avg_speed = sum(dyn_speeds) / len(dyn_speeds)
+                    if avg_speed > 0:
+                        dyn_eta = (dyn_total - dyn_processed) / avg_speed
+                        if dyn_eta > eta_seconds or eta_seconds < 0:
+                            eta_seconds = dyn_eta
+                        stage_info = {
+                            "stage": "dynamic_detecting",
+                            "avg_iterations": round(dyn_avg_iter, 2),
+                            "samples_remaining": dyn_total - dyn_processed,
+                        }
+                    else:
+                        stage_info = {"stage": "dynamic_detecting", "avg_iterations": round(dyn_avg_iter, 2), "samples_remaining": dyn_total - dyn_processed}
+                elif dyn_processed >= dyn_total:
+                    eta_seconds = 0.0
+                    stage_info = {"stage": "dynamic_detecting", "avg_iterations": round(dyn_avg_iter, 2), "samples_remaining": 0}
+
+            if group_status == "completed":
+                eta_seconds = 0.0
+                stage_info = {"stage": "completed"}
+
             groups.append({
                 "task_group_id": group_id,
                 "model_id": first.model_id,
@@ -480,6 +604,8 @@ class StateScheduler(StateSchedulerInterface):
                 "status": group_status,
                 "progress": {**status_counts, "total": total},
                 "children": children,
+                "eta_seconds": eta_seconds,
+                "stage_info": stage_info,
             })
 
         return {"success": True, "groups": [g for g in groups if g["status"] != "cancelled"]}
@@ -489,6 +615,19 @@ class StateScheduler(StateSchedulerInterface):
         if not ok:
             return {"success": False, "error": "任务不存在或已处于终态"}
         self._log_rt("task_cancelled", f"任务 {task_id} 已取消")
+
+        remaining = await self._task_queue.get_queue_view()
+        has_active = any(t.status in (TaskStatus.PENDING, TaskStatus.RUNNING) for t in remaining)
+        if not has_active and self.get_system_state() == "detecting":
+            try:
+                old_state = self.get_system_state()
+                self._fsm.detection_done()
+                new_state = self.get_system_state()
+                self._log_state_transition(old_state, new_state, "cancel_task")
+                self._notify_state()
+            except Exception as e:
+                self._log_err("FSMError", f"取消后状态转换失败: {e}")
+
         return {"success": True}
 
     async def cancel_task_group(self, task_group_id: str) -> dict:

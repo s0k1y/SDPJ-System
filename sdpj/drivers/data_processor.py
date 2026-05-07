@@ -59,26 +59,25 @@ class DataProcessor:
         Returns:
             对应数据集及其全部样本列表
         """
-        # 按风险类型筛选数据集
         datasets = await self._sample_db.get_datasets_by_risk_type(risk_type)
+        all_samples = await self._sample_db.get_samples_by_risk_type(risk_type)
+
+        samples_by_dataset: dict[int, list[dict]] = {}
+        for sample in all_samples:
+            ds_id = sample["dataset_id"]
+            samples_by_dataset.setdefault(ds_id, []).append({
+                "sample_id": sample["sample_id"],
+                "subtype": sample["subtype"],
+                "poc": sample["poc"],
+            })
 
         result = []
         for dataset in datasets:
             dataset_id = dataset["dataset_id"]
-            # 加载该数据集的所有样本
-            samples = await self._sample_db.get_samples_by_dataset(dataset_id)
-
             result.append({
                 "dataset_id": dataset_id,
                 "dataset_name": dataset["name"],
-                "samples": [
-                    {
-                        "sample_id": sample["sample_id"],
-                        "subtype": sample["subtype"],
-                        "poc": sample["poc"]
-                    }
-                    for sample in samples
-                ]
+                "samples": samples_by_dataset.get(dataset_id, []),
             })
 
         return result
@@ -274,6 +273,13 @@ class DataProcessor:
             iteration_count=iteration_count
         )
 
+    async def append_result_data_batch(
+        self,
+        report_id: str,
+        entries: list[dict],
+    ) -> list[str]:
+        return await self._result_db.append_result_data_batch(report_id, entries)
+
     # ==================== 检测报告数据的汇总与产出 ====================
 
     async def aggregate_task_group_results(self, task_group_id: str, task_id: str | None = None) -> dict:
@@ -293,12 +299,21 @@ class DataProcessor:
         else:
             tasks = await self._result_db.list_tasks_by_group(task_group_id)
 
+        reports = await self._result_db.list_reports_by_task_group(task_group_id)
+        report_by_task = {r["task_id"]: r for r in reports}
+
+        report_ids = [r["report_id"] for r in reports if r.get("report_id")]
+        all_result_data = await self._result_db.list_result_data_by_reports(report_ids) if report_ids else []
+        result_data_by_report: dict[str, list[dict]] = {}
+        for rd in all_result_data:
+            rid = rd["report_id"]
+            result_data_by_report.setdefault(rid, []).append(rd)
+
         tasks_with_reports = []
         for task in tasks:
             tid = task["task_id"]
-            report = await self._result_db.get_report_by_task(tid)
+            report = report_by_task.get(tid)
             if report:
-                result_data = await self._result_db.list_result_data_by_report(report["report_id"])
                 tasks_with_reports.append({
                     "task_id": tid,
                     "dataset_id": task["dataset_id"],
@@ -307,7 +322,7 @@ class DataProcessor:
                     "end_time": task.get("end_time"),
                     "report": {
                         "report_id": report["report_id"],
-                        "result_data": result_data
+                        "result_data": result_data_by_report.get(report["report_id"], [])
                     }
                 })
             else:

@@ -82,6 +82,38 @@ class ReportRepository:
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
+    async def list_by_task_ids(self, task_ids: list[str]) -> list[DetectionReport]:
+        """按多个任务ID批量查询报告
+
+        Args:
+            task_ids: 任务ID列表
+
+        Returns:
+            匹配的报告列表
+        """
+        if not task_ids:
+            return []
+        stmt = select(DetectionReport).where(DetectionReport.task_id.in_(task_ids))
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def list_by_task_group_id(self, task_group_id: str) -> list[DetectionReport]:
+        """按任务组ID批量查询报告（JOIN 任务表）
+
+        Args:
+            task_group_id: 任务组ID
+
+        Returns:
+            该任务组下所有报告列表
+        """
+        stmt = (
+            select(DetectionReport)
+            .join(DetectionTask, DetectionReport.task_id == DetectionTask.task_id)
+            .where(DetectionTask.task_group_id == task_group_id)
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
     async def delete(self, report_id: str) -> bool:
         """删除报告
 

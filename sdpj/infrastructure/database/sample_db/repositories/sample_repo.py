@@ -96,6 +96,25 @@ class SampleRepository:
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
+    async def get_by_risk_type(self, risk_type: str) -> list[DetectionSample]:
+        """按风险类型查询所有样本（JOIN 数据集表）
+
+        Args:
+            risk_type: 安全风险类型
+
+        Returns:
+            匹配的所有样本列表
+        """
+        from ..models import Dataset
+        stmt = (
+            select(DetectionSample)
+            .join(Dataset, DetectionSample.dataset_id == Dataset.dataset_id)
+            .where(Dataset.risk_type == risk_type)
+            .order_by(DetectionSample.dataset_id, DetectionSample.created_at.asc())
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
     async def delete_by_dataset(self, dataset_id: int) -> int:
         """删除指定数据集下的所有样本
 

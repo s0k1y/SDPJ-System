@@ -315,6 +315,51 @@ class ResultDB:
             report_repo = ReportRepository(session)
             return await report_repo.delete(report_id)
 
+    async def list_reports_by_task_group(self, task_group_id: str) -> list[dict]:
+        """按任务组ID批量查询报告（单次 JOIN 查询，替代 N+1）
+
+        Args:
+            task_group_id: 任务组ID
+
+        Returns:
+            该任务组下所有报告列表
+        """
+        async with self.session_manager.session() as session:
+            report_repo = ReportRepository(session)
+            reports = await report_repo.list_by_task_group_id(task_group_id)
+            return [
+                {
+                    "report_id": report.report_id,
+                    "task_id": report.task_id,
+                }
+                for report in reports
+            ]
+
+    async def list_result_data_by_reports(self, report_ids: list[str]) -> list[dict]:
+        """按多个报告ID批量查询结果数据（单次 IN 查询，替代 N+1）
+
+        Args:
+            report_ids: 报告ID列表
+
+        Returns:
+            匹配的所有结果数据列表
+        """
+        async with self.session_manager.session() as session:
+            result_data_repo = ResultDataRepository(session)
+            result_data_list = await result_data_repo.list_by_reports(report_ids)
+            return [
+                {
+                    "result_data_id": rd.result_data_id,
+                    "report_id": rd.report_id,
+                    "risk_subclass": rd.risk_subclass,
+                    "poc": rd.poc,
+                    "model_output": rd.model_output,
+                    "compliance_result": rd.compliance_result,
+                    "iteration_count": rd.iteration_count,
+                }
+                for rd in result_data_list
+            ]
+
     async def get_report_by_task(self, task_id: str) -> Optional[dict]:
         """按任务ID查询检测报告
 
@@ -433,6 +478,34 @@ class ResultDB:
             )
 
             return result_data_id
+
+    async def append_result_data_batch(
+        self,
+        report_id: str,
+        entries: list[dict],
+    ) -> list[str]:
+        async with self.session_manager.session() as session:
+            report_repo = ReportRepository(session)
+            if await report_repo.get_by_id(report_id) is None:
+                raise ValueError(f"检测报告ID '{report_id}' 不存在")
+
+            result_ids = []
+            orm_objects = []
+            for entry in entries:
+                result_data_id = f"result_{uuid.uuid4().hex[:16]}"
+                result_ids.append(result_data_id)
+                orm_objects.append(ResultData(
+                    result_data_id=result_data_id,
+                    report_id=report_id,
+                    risk_subclass=entry["risk_subclass"],
+                    poc=entry["poc"],
+                    model_output=entry["model_output"],
+                    compliance_result=entry["compliance_result"],
+                    iteration_count=entry.get("iteration_count"),
+                ))
+            result_data_repo = ResultDataRepository(session)
+            await result_data_repo.create_batch(orm_objects)
+            return result_ids
 
     async def list_result_data_by_report(self, report_id: str) -> list[dict]:
         """按报告ID查询检测结果数据

@@ -143,6 +143,22 @@ class SampleDBInterface(Protocol):
         """
         ...
 
+    async def get_samples_by_risk_type(self, risk_type: str) -> list[dict]:
+        """按安全风险类型查询所有样本（单次 JOIN 查询）
+
+        Args:
+            risk_type: 安全风险类型
+
+        Returns:
+            匹配的所有样本列表，每条包含：
+            - sample_id: 样本 ID
+            - subtype: 风险具体子类 ST
+            - poc: 漏洞概念验证数据 PoC
+            - dataset_id: 所属数据集 ID
+            - created_at: 创建时间
+        """
+        ...
+
     async def get_sample_by_id(self, sample_id: int) -> Optional[dict]:
         """按 ID 查询单条样本
 

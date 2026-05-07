@@ -226,6 +226,28 @@ class ResultDBInterface(Protocol):
         """
         ...
 
+    async def list_reports_by_task_group(self, task_group_id: str) -> list[dict]:
+        """按任务组ID批量查询报告（单次 JOIN 查询）
+
+        Args:
+            task_group_id: 任务组ID
+
+        Returns:
+            该任务组下所有报告列表
+        """
+        ...
+
+    async def list_result_data_by_reports(self, report_ids: list[str]) -> list[dict]:
+        """按多个报告ID批量查询结果数据（单次 IN 查询）
+
+        Args:
+            report_ids: 报告ID列表
+
+        Returns:
+            匹配的所有结果数据列表
+        """
+        ...
+
     async def get_report_by_task(self, task_id: str) -> Optional[dict]:
         """按任务ID查询检测报告
 
@@ -378,6 +400,30 @@ class ResultDBInterface(Protocol):
             删除的条目数
         """
         ...
+        ...
+
+    async def append_result_data_batch(
+        self,
+        report_id: str,
+        entries: list[dict],
+    ) -> list[str]:
+        """批量追加检测结果数据条目
+
+        Args:
+            report_id: 检测报告ID
+            entries: 结果数据列表，每条包含：
+                - risk_subclass: 风险具体子类
+                - poc: 原始PoC
+                - model_output: 被测大模型输出内容
+                - compliance_result: 合规判断结果
+                - iteration_count: 动态检测迭代次数（可选）
+
+        Returns:
+            所有新创建条目的结果数据ID列表
+
+        Raises:
+            ValueError: 检测报告ID不存在
+        """
         ...
 
     # ==================== 报告列表摘要（高性能） ====================

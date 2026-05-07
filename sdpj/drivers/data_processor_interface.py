@@ -208,6 +208,30 @@ class DataProcessorInterface(Protocol):
         """
         ...
 
+    async def append_result_data_batch(
+        self,
+        report_id: str,
+        entries: list[dict],
+    ) -> list[str]:
+        """批量追加检测结果数据
+
+        Args:
+            report_id: 检测报告 ID
+            entries: 结果数据列表，每条包含：
+                - risk_subclass: 风险具体子类
+                - poc: 原始PoC
+                - model_output: 被测大模型输出内容
+                - compliance_result: 合规判断结果
+                - iteration_count: 动态检测迭代次数（可选）
+
+        Returns:
+            所有新创建条目的结果数据 ID 列表
+
+        触发场景:
+            一批样本检测完成后将模型响应与合规结论批量落盘
+        """
+        ...
+
     # ==================== 检测报告数据的汇总与产出 ====================
 
     async def aggregate_task_group_results(self, task_group_id: str, task_id: str | None = None) -> dict:

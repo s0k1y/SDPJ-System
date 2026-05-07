@@ -159,3 +159,20 @@ class TaskQueueManagerInterface(Protocol):
     async def clear_poc_progress(self, task_group_id: str) -> None:
         """清除指定任务组的 PoC 池构建进度"""
         ...
+
+    async def update_dynamic_progress(self, task_group_id: str, progress: dict) -> None:
+        """更新指定任务组的动态检测进度
+
+        Args:
+            task_group_id: 任务组ID
+            progress: {"processed": int, "total": int, "avg_iterations": float}
+        """
+        ...
+
+    async def get_dynamic_progress(self, task_group_id: str) -> dict | None:
+        """获取指定任务组的动态检测进度，不存在返回 None"""
+        ...
+
+    async def clear_dynamic_progress(self, task_group_id: str) -> None:
+        """清除指定任务组的动态检测进度"""
+        ...

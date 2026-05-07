@@ -9,7 +9,7 @@ from sdpj.drivers.data_processor_interface import DataProcessorInterface
 from sdpj.drivers.llm_service_interface import LLMServiceInterface, LLMError
 
 from .static_detector import run_static_detection, select_poc_pool, _call_llm, LLMCallCallback
-from .dynamic_detector import run_dynamic_detection
+from .dynamic_detector import run_dynamic_detection, DynamicProgressCallback
 from . import prompt_builder, result_parser
 
 from .prompt_builder import (
@@ -35,7 +35,7 @@ class SDPJDetector:
         self._data_processor = data_processor
         self._llm = llm_service
 
-    async def run_static_detection(self, model_id: str, user_id: str, dataset_ids: list[int] | None = None, *, task_group_id: str | None = None, jailbreak_dataset_ids: list[int] | None = None, poc_progress_callback: Callable[[int, int, int, dict], None] | None = None, task_progress_callback: Callable[[str, int, int], None] | None = None, force_refresh: bool = False, llm_callback: LLMCallCallback | None = None) -> dict:
+    async def run_static_detection(self, model_id: str, user_id: str, dataset_ids: list[int] | None = None, *, task_group_id: str | None = None, jailbreak_dataset_ids: list[int] | None = None, poc_progress_callback: Callable[[int, int, int, dict, dict | None], None] | None = None, task_progress_callback: Callable[[str, int, int], None] | None = None, force_refresh: bool = False, llm_callback: LLMCallCallback | None = None) -> dict:
         return await run_static_detection(
             self._llm, self._data_processor, model_id, user_id, dataset_ids,
             task_group_id=task_group_id,
@@ -47,11 +47,12 @@ class SDPJDetector:
         )
 
     async def run_dynamic_detection(
-        self, model_id: str, user_id: str, static_result: dict, max_iterations: int = 3, llm_callback: LLMCallCallback | None = None
+        self, model_id: str, user_id: str, static_result: dict, max_iterations: int = 3, llm_callback: LLMCallCallback | None = None, dynamic_progress_callback: DynamicProgressCallback | None = None
     ) -> dict:
         return await run_dynamic_detection(
             self._llm, self._data_processor, model_id, user_id,
-            static_result, max_iterations, llm_callback=llm_callback
+            static_result, max_iterations, llm_callback=llm_callback,
+            dynamic_progress_callback=dynamic_progress_callback,
         )
 
     async def judge_compliance(

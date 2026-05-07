@@ -50,6 +50,7 @@
                       <div class="progress-bar-fill" :style="{ width: groupPercent(row) + '%' }" :class="groupBarClass(row)"></div>
                     </div>
                     <span class="status-tag" :class="`tag-${row.status}`">{{ getStatusText(row.status) }}</span>
+                    <span v-if="row.etaText" class="eta-tag">{{ row.etaText }}</span>
                   </div>
                 </template>
                 <template v-else>
@@ -119,6 +120,20 @@ const canCancel = (status) => {
   return status === 'pending' || status === 'running'
 }
 
+const formatEta = (seconds) => {
+  if (seconds == null || seconds < 0) return '计算中...'
+  if (seconds === 0) return ''
+  if (seconds < 60) return `${Math.round(seconds)}秒`
+  if (seconds < 3600) {
+    const m = Math.floor(seconds / 60)
+    const s = Math.round(seconds % 60)
+    return `${m}分${s}秒`
+  }
+  const h = Math.floor(seconds / 3600)
+  const m = Math.round((seconds % 3600) / 60)
+  return `${h}小时${m}分`
+}
+
 const groupPercent = (row) => {
   if (!row.progress || row.progress.total === 0) return 0
   return Math.round((row.progress.completed / row.progress.total) * 100)
@@ -160,6 +175,7 @@ const flatRows = computed(() => {
       progress: g.progress,
       task_group_id: gid,
       error_message: groupErrors || '',
+      etaText: g.status === 'running' ? formatEta(g.eta_seconds) : '',
     })
     if (expanded) {
       for (const c of g.children) {
@@ -376,6 +392,16 @@ td {
 .progress-text {
   font-size: 12px;
   color: #8b8b8b;
+  white-space: nowrap;
+}
+
+.eta-tag {
+  display: inline-block;
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: #fff7ed;
+  color: #c2410c;
   white-space: nowrap;
 }
 

@@ -56,6 +56,11 @@ class ResultDataRepository:
         await self.session.flush()
         return result_data
 
+    async def create_batch(self, items: list[ResultData]) -> list[ResultData]:
+        self.session.add_all(items)
+        await self.session.flush()
+        return items
+
     async def get_by_id(self, result_data_id: str) -> Optional[ResultData]:
         """按ID查询结果数据
 
@@ -79,6 +84,21 @@ class ResultDataRepository:
             结果数据列表
         """
         stmt = select(ResultData).where(ResultData.report_id == report_id)
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def list_by_reports(self, report_ids: list[str]) -> list[ResultData]:
+        """按多个报告ID批量查询结果数据
+
+        Args:
+            report_ids: 报告ID列表
+
+        Returns:
+            匹配的结果数据列表
+        """
+        if not report_ids:
+            return []
+        stmt = select(ResultData).where(ResultData.report_id.in_(report_ids))
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
