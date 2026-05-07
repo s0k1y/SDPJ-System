@@ -54,6 +54,7 @@ class StateScheduler(StateSchedulerInterface):
         self._llm_call_callbacks: list = []
         self._consumer_task: asyncio.Task | None = None
         self._enqueue_in_progress: bool = False
+        self._running_tasks: set[asyncio.Task] = set()
 
     # ── 内部日志辅助 ──
 
@@ -332,9 +333,11 @@ class StateScheduler(StateSchedulerInterface):
                 await self._task_queue.clear_dynamic_progress(task_group_id)
 
     async def execute_concurrent_tasks(self, max_concurrency: int = 3) -> dict:
+        self._cleanup_running_tasks()
+
         batch = await self._task_queue.dequeue_tasks(max_concurrency)
         if not batch:
-            if self.get_system_state() == "detecting" and not self._enqueue_in_progress:
+            if self.get_system_state() == "detecting" and not self._enqueue_in_progress and not self._running_tasks:
                 try:
                     old_state = self.get_system_state()
                     self._fsm.detection_done()
@@ -345,7 +348,7 @@ class StateScheduler(StateSchedulerInterface):
                     self._log_err("FSMError", f"detection_done 状态转换失败: {e}")
             return {"success": True, "tasks": [], "message": "队列为空"}
 
-        async def _run(task) -> dict:
+        for task in batch:
             params = {
                 "model_id": task.model_id,
                 "user_id": task.user_id,
@@ -356,27 +359,34 @@ class StateScheduler(StateSchedulerInterface):
                 "jailbreak_dataset_ids": task.metadata.get("jailbreak_dataset_ids"),
                 "force_refresh": task.metadata.get("force_refresh", False),
             }
-            return await self.execute_detection_task(task.task_id, params)
+            bg_task = asyncio.create_task(self._run_task_bg(task.task_id, params))
+            self._running_tasks.add(bg_task)
+            bg_task.add_done_callback(self._running_tasks.discard)
 
-        async with asyncio.TaskGroup() as tg:
-            futures = [tg.create_task(_run(task)) for task in batch]
+        return {"success": True, "tasks": [{"task_id": t.task_id, "status": "launched"} for t in batch]}
 
-        results = [f.result() for f in futures]
+    def _cleanup_running_tasks(self) -> None:
+        self._running_tasks = {t for t in self._running_tasks if not t.done()}
 
-        queue_view = await self._task_queue.get_queue_view()
-        has_pending = any(
-            t.status in (TaskStatus.PENDING, TaskStatus.RUNNING) for t in queue_view
-        )
-        if not has_pending and self.get_system_state() == "detecting":
-            try:
-                old_state = self.get_system_state()
-                self._fsm.detection_done()
-                new_state = self.get_system_state()
-                self._log_state_transition(old_state, new_state, "detection_done")
-                self._notify_state()
-            except Exception as e:
-                self._log_err("FSMError", f"detection_done 状态转换失败: {e}")
-        return {"success": True, "tasks": results}
+    async def _run_task_bg(self, task_id: str, params: dict) -> None:
+        try:
+            await self.execute_detection_task(task_id, params)
+        except Exception as e:
+            self._log_err("BackgroundTaskError", f"后台任务 {task_id} 异常: {e}")
+        finally:
+            queue_view = await self._task_queue.get_queue_view()
+            has_active = any(
+                t.status in (TaskStatus.PENDING, TaskStatus.RUNNING) for t in queue_view
+            )
+            if not has_active and self.get_system_state() == "detecting":
+                try:
+                    old_state = self.get_system_state()
+                    self._fsm.detection_done()
+                    new_state = self.get_system_state()
+                    self._log_state_transition(old_state, new_state, "task_finished")
+                    self._notify_state()
+                except Exception as e:
+                    self._log_err("FSMError", f"任务完成后状态转换失败: {e}")
 
     async def query_detection_progress(self, task_id: Optional[str] = None) -> dict:
         if task_id is not None:
@@ -618,7 +628,8 @@ class StateScheduler(StateSchedulerInterface):
 
         remaining = await self._task_queue.get_queue_view()
         has_active = any(t.status in (TaskStatus.PENDING, TaskStatus.RUNNING) for t in remaining)
-        if not has_active and self.get_system_state() == "detecting":
+        self._cleanup_running_tasks()
+        if not has_active and not self._running_tasks and self.get_system_state() == "detecting":
             try:
                 old_state = self.get_system_state()
                 self._fsm.detection_done()
@@ -654,7 +665,8 @@ class StateScheduler(StateSchedulerInterface):
 
         remaining = await self._task_queue.get_queue_view()
         has_active = any(t.status in (TaskStatus.PENDING, TaskStatus.RUNNING) for t in remaining)
-        if not has_active and self.get_system_state() == "detecting":
+        self._cleanup_running_tasks()
+        if not has_active and not self._running_tasks and self.get_system_state() == "detecting":
             try:
                 old_state = self.get_system_state()
                 self._fsm.detection_done()
