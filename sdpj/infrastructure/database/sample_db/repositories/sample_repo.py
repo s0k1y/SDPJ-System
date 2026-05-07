@@ -4,7 +4,7 @@
 """
 
 from typing import Optional
-from sqlalchemy import select
+from sqlalchemy import select, delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from ..models import DetectionSample
@@ -95,3 +95,17 @@ class SampleRepository:
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
+
+    async def delete_by_dataset(self, dataset_id: int) -> int:
+        """删除指定数据集下的所有样本
+
+        Args:
+            dataset_id: 数据集 ID
+
+        Returns:
+            删除的行数
+        """
+        stmt = sa_delete(DetectionSample).where(DetectionSample.dataset_id == dataset_id)
+        result = await self.session.execute(stmt)
+        await self.session.flush()
+        return result.rowcount

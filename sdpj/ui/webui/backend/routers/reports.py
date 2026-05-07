@@ -75,7 +75,7 @@ async def export_report(
     scheduler: StateSchedulerInterface = Depends(get_scheduler),
 ):
     user_id: int = request.state.user_id
-    result = await scheduler.export_report(req.task_group_id, req.target_format, user_id=user_id)
+    result = await scheduler.export_report(req.task_group_id, req.target_format, user_id=user_id, task_id=req.task_id)
     if not result.get("success"):
         return wrap_scheduler_result(result)
     filename = result.get("filename", f"report.{req.target_format}")

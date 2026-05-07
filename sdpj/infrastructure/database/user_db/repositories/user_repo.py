@@ -92,7 +92,11 @@ class UserRepository:
         if not user:
             raise ValueError(f"用户 ID {user_id} 不存在")
         user.username = new_username
-        await self._session.flush()
+        try:
+            await self._session.flush()
+        except IntegrityError as e:
+            await self._session.rollback()
+            raise ValueError(f"用户名 '{new_username}' 已存在") from e
         return True
 
     async def get_by_username(self, username: str) -> Optional[User]:

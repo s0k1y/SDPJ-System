@@ -210,11 +210,12 @@ class DataProcessorInterface(Protocol):
 
     # ==================== 检测报告数据的汇总与产出 ====================
 
-    async def aggregate_task_group_results(self, task_group_id: str) -> dict:
+    async def aggregate_task_group_results(self, task_group_id: str, task_id: str | None = None) -> dict:
         """汇总任务组下全部检测明细
 
         Args:
             task_group_id: 任务组 ID
+            task_id: 可选，仅汇总指定任务的数据
 
         Returns:
             任务组 → 任务 → 报告 → 结果明细的结构化数据，包含：

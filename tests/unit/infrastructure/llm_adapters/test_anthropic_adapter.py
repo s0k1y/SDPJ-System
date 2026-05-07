@@ -20,7 +20,7 @@ async def test_call_success():
     mock_resp = MagicMock()
     mock_resp.status = 200
     mock_resp.json = AsyncMock(return_value={
-        "content": [{"text": "hello"}],
+        "content": [{"type": "text", "text": "hello"}],
         "model": "claude-3",
         "usage": {},
     })

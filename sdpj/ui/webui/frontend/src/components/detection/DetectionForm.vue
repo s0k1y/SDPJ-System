@@ -228,7 +228,7 @@ const form = ref({
   detection_type: 'static',
   dataset_ids: [],
   jailbreak_dataset_ids: [],
-  max_iterations: 10,
+  max_iterations: 3,
   force_refresh: false
 })
 
@@ -423,9 +423,11 @@ const handleSubmit = async () => {
       detectionStore.setCurrentTask(res.data)
       handleReset()
       router.push('/dashboard')
+    } else {
+      ElMessage.error(res.message || '启动检测失败')
     }
-  } catch {
-    ElMessage.error('启动检测失败')
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '启动检测失败')
   } finally {
     submitting.value = false
   }

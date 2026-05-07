@@ -1,0 +1,335 @@
+"""StateScheduler 单元测试 — 聚焦 start_detection 状态守卫逻辑"""
+import asyncio
+import pytest
+
+from sdpj.control.state_scheduler import StateScheduler
+from sdpj.control.system_states import SystemStateMachine
+from sdpj.core.task_queue_manager import TaskQueueManager
+from sdpj.core.task_queue_manager_interface import TaskStatus
+
+
+class _StubAccountManager:
+    async def authenticate(self, *a, **kw): return {"success": True}
+
+class _StubDACManager:
+    async def check_access(self, *a, **kw): return True
+
+class _StubConfigManager:
+    async def read_config(self, *a, **kw): return None
+    async def query_datasets(self, *a, **kw): return []
+
+class _StubReportManager:
+    pass
+
+class _StubDetector:
+    pass
+
+class _StubEventLogger:
+    def log_operation(self, *a, **kw): pass
+    def log_runtime(self, *a, **kw): pass
+    def log_error(self, *a, **kw): pass
+
+class _StubLLMRegistry:
+    async def is_model_available(self, model_id):
+        return (True, None)
+    async def initialize(self): pass
+    async def shutdown(self): pass
+    async def register_private_model(self, *a, **kw): return (True, None, None)
+
+
+def _make_scheduler() -> StateScheduler:
+    return StateScheduler(
+        account_manager=_StubAccountManager(),
+        dac_manager=_StubDACManager(),
+        config_manager=_StubConfigManager(),
+        report_manager=_StubReportManager(),
+        detector=_StubDetector(),
+        event_logger=_StubEventLogger(),
+        task_queue_manager=TaskQueueManager(),
+        llm_registry=_StubLLMRegistry(),
+    )
+
+
+def _state_val(scheduler: StateScheduler) -> str:
+    return scheduler.get_system_state()
+
+
+@pytest.mark.asyncio
+class TestStartDetectionStateGuard:
+    """BUG: 检测中时新任务应可入队"""
+
+    async def test_idle_state_allows_start_detection(self):
+        """idle 状态下 start_detection 应成功并转为 detecting"""
+        scheduler = _make_scheduler()
+        assert _state_val(scheduler) == "idle"
+
+        result = await scheduler.start_detection(1, {
+            "model_id": "gpt-4",
+            "detection_type": "static",
+            "dataset_ids": [1],
+        })
+
+        assert result["success"] is True
+        assert _state_val(scheduler) == "detecting"
+
+
+class _StubReportManagerForDelete:
+    def __init__(self, existing_groups=None):
+        self._existing_groups = existing_groups or []
+        self._deleted = False
+
+    async def delete_report(self, **kwargs):
+        self._deleted = True
+        return (True, "")
+
+    async def list_reports(self, **kwargs):
+        if self._deleted:
+            return [g for g in self._existing_groups
+                    if g["task_group_id"] not in kwargs.get("_deleted_ids", set())]
+        return list(self._existing_groups)
+
+
+class _StubConfigManagerWithDatasets:
+    async def read_config(self, *a, **kw): return None
+    async def query_datasets(self, *a, **kw): return []
+    async def read_configs_batch(self, ids): return {}
+
+
+class _StubEventLoggerWithLog:
+    def log_operation(self, *a, **kw): pass
+    def log_runtime(self, *a, **kw): pass
+    def log_error(self, *a, **kw): pass
+
+
+def _make_scheduler_with_stubs(report_mgr=None) -> StateScheduler:
+    return StateScheduler(
+        account_manager=_StubAccountManager(),
+        dac_manager=_StubDACManager(),
+        config_manager=_StubConfigManagerWithDatasets(),
+        report_manager=report_mgr or _StubReportManagerForDelete(),
+        detector=_StubDetector(),
+        event_logger=_StubEventLoggerWithLog(),
+        task_queue_manager=TaskQueueManager(),
+        llm_registry=_StubLLMRegistry(),
+    )
+
+
+@pytest.mark.asyncio
+class TestDeleteReportSyncsTaskQueue:
+    """BUG修复: 删除报告后仪表盘任务队列应同步清理"""
+
+    async def test_delete_task_group_removes_from_queue(self):
+        """删除任务组报告后，内存队列中对应任务应被移除"""
+        scheduler = _make_scheduler_with_stubs()
+
+        result = await scheduler.start_detection(1, {
+            "model_id": "gpt-4",
+            "detection_type": "static",
+            "dataset_ids": [1],
+        })
+        assert result["success"] is True
+        task_group_id = result["task_group_id"]
+
+        for tid in result["task_ids"]:
+            await scheduler._task_queue.update_task_status(tid, TaskStatus.COMPLETED)
+
+        queue_view = await scheduler._task_queue.get_queue_view()
+        assert any(t.metadata.get("task_group_id") == task_group_id for t in queue_view)
+
+        delete_result = await scheduler.delete_report(task_group_id, 1, "task_group")
+        assert delete_result["success"] is True
+
+        queue_view_after = await scheduler._task_queue.get_queue_view()
+        assert not any(t.metadata.get("task_group_id") == task_group_id for t in queue_view_after)
+
+    async def test_delete_single_task_removes_from_queue(self):
+        """删除单个任务报告后，内存队列中对应任务应被移除"""
+        scheduler = _make_scheduler_with_stubs()
+
+        result = await scheduler.start_detection(1, {
+            "model_id": "gpt-4",
+            "detection_type": "static",
+            "dataset_ids": [1, 2],
+        })
+        assert result["success"] is True
+        task_id = result["task_ids"][0]
+
+        await scheduler._task_queue.update_task_status(task_id, TaskStatus.COMPLETED)
+
+        delete_result = await scheduler.delete_report(task_id, 1, "task")
+        assert delete_result["success"] is True
+
+        queue_view = await scheduler._task_queue.get_queue_view()
+        assert not any(t.task_id == task_id for t in queue_view)
+
+    async def test_orphan_completed_group_cleaned_on_progress_query(self):
+        """孤儿任务组（数据库已删除但内存残留）在查询进度时应被自动清理"""
+        existing_groups = [{"task_group_id": "other-group"}]
+        report_mgr = _StubReportManagerForDelete(existing_groups=existing_groups)
+        scheduler = _make_scheduler_with_stubs(report_mgr=report_mgr)
+
+        result = await scheduler.start_detection(1, {
+            "model_id": "gpt-4",
+            "detection_type": "static",
+            "dataset_ids": [1],
+        })
+        task_group_id = result["task_group_id"]
+
+        for tid in result["task_ids"]:
+            await scheduler._task_queue.update_task_status(tid, TaskStatus.COMPLETED)
+
+        queue_view = await scheduler._task_queue.get_queue_view()
+        assert any(t.metadata.get("task_group_id") == task_group_id for t in queue_view)
+
+        progress = await scheduler.query_detection_progress()
+        assert progress["success"] is True
+
+        orphan_group_ids = [g["task_group_id"] for g in progress["groups"]]
+        assert task_group_id not in orphan_group_ids
+
+        queue_view_after = await scheduler._task_queue.get_queue_view()
+        assert not any(t.metadata.get("task_group_id") == task_group_id for t in queue_view_after)
+
+    async def test_running_group_not_cleaned_as_orphan(self):
+        """运行中的任务组不应被孤儿清理逻辑误删"""
+        existing_groups = []
+        report_mgr = _StubReportManagerForDelete(existing_groups=existing_groups)
+        scheduler = _make_scheduler_with_stubs(report_mgr=report_mgr)
+
+        result = await scheduler.start_detection(1, {
+            "model_id": "gpt-4",
+            "detection_type": "static",
+            "dataset_ids": [1],
+        })
+        task_group_id = result["task_group_id"]
+
+        progress = await scheduler.query_detection_progress()
+        assert progress["success"] is True
+
+        group_ids = [g["task_group_id"] for g in progress["groups"]]
+        assert task_group_id in group_ids
+
+    async def test_delete_report_cleanup_exception_does_not_fail_delete(self):
+        """清理任务队列异常不应导致删除报告操作失败"""
+        scheduler = _make_scheduler_with_stubs()
+
+        result = await scheduler.start_detection(1, {
+            "model_id": "gpt-4",
+            "detection_type": "static",
+            "dataset_ids": [1],
+        })
+        task_group_id = result["task_group_id"]
+
+        original_cleanup = scheduler._cleanup_task_queue_after_report_delete
+
+        async def failing_cleanup(target_id, granularity):
+            raise RuntimeError("simulated cleanup failure")
+
+        scheduler._cleanup_task_queue_after_report_delete = failing_cleanup
+
+        delete_result = await scheduler.delete_report(task_group_id, 1, "task_group")
+        assert delete_result["success"] is True
+
+    async def test_detecting_state_allows_enqueue(self):
+        """detecting 状态下 start_detection 应允许新任务入队（核心BUG修复验证）"""
+        scheduler = _make_scheduler()
+
+        result1 = await scheduler.start_detection(1, {
+            "model_id": "gpt-4",
+            "detection_type": "static",
+            "dataset_ids": [1],
+        })
+        assert result1["success"] is True
+        assert _state_val(scheduler) == "detecting"
+
+        result2 = await scheduler.start_detection(1, {
+            "model_id": "gpt-4",
+            "detection_type": "static",
+            "dataset_ids": [2],
+        })
+        assert result2["success"] is True
+        assert result2["task_group_id"] is not None
+        assert len(result2["task_ids"]) == 1
+        assert _state_val(scheduler) == "detecting"
+
+    async def test_detecting_state_multiple_enqueue(self):
+        """detecting 状态下连续多次入队均应成功"""
+        scheduler = _make_scheduler()
+
+        await scheduler.start_detection(1, {
+            "model_id": "gpt-4",
+            "detection_type": "static",
+            "dataset_ids": [1],
+        })
+
+        for i in range(3):
+            result = await scheduler.start_detection(1, {
+                "model_id": "gpt-4",
+                "detection_type": "static",
+                "dataset_ids": [10 + i],
+            })
+            assert result["success"] is True, f"第{i+1}次入队应成功"
+
+    async def test_generating_report_state_rejects_detection(self):
+        """generating_report 状态下应拒绝启动检测"""
+        scheduler = _make_scheduler()
+        scheduler._fsm.start_report()
+
+        result = await scheduler.start_detection(1, {
+            "model_id": "gpt-4",
+            "detection_type": "static",
+            "dataset_ids": [1],
+        })
+
+        assert result["success"] is False
+        assert "不允许" in result["error"]
+
+    async def test_error_state_rejects_detection(self):
+        """error 状态下应拒绝启动检测"""
+        scheduler = _make_scheduler()
+        scheduler._fsm.to_error()
+
+        result = await scheduler.start_detection(1, {
+            "model_id": "gpt-4",
+            "detection_type": "static",
+            "dataset_ids": [1],
+        })
+
+        assert result["success"] is False
+        assert "不允许" in result["error"]
+
+    async def test_configuring_state_rejects_detection(self):
+        """configuring 状态下应拒绝启动检测"""
+        scheduler = _make_scheduler()
+        scheduler._fsm.start_configuring()
+
+        result = await scheduler.start_detection(1, {
+            "model_id": "gpt-4",
+            "detection_type": "static",
+            "dataset_ids": [1],
+        })
+
+        assert result["success"] is False
+        assert "不允许" in result["error"]
+
+    async def test_idle_to_detecting_back_to_idle_then_enqueue(self):
+        """idle→detecting→idle 后应能正常再次入队"""
+        scheduler = _make_scheduler()
+
+        await scheduler.start_detection(1, {
+            "model_id": "gpt-4",
+            "detection_type": "static",
+            "dataset_ids": [1],
+        })
+        assert _state_val(scheduler) == "detecting"
+
+        scheduler._fsm.detection_done()
+        assert _state_val(scheduler) == "idle"
+
+        result = await scheduler.start_detection(1, {
+            "model_id": "gpt-4",
+            "detection_type": "static",
+            "dataset_ids": [2],
+        })
+        assert result["success"] is True
+        assert _state_val(scheduler) == "detecting"

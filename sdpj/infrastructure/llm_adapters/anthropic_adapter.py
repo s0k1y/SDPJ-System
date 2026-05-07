@@ -54,10 +54,12 @@ class AnthropicAdapter(LLMAdapter):
         使用构造时配置的 api_url、api_key、model_name，
         不允许运行时覆盖配置参数。
         """
-        if not self._api_url.endswith("/messages"):
-            url = f"{self._api_url}/v1/messages"
-        else:
+        if self._api_url.endswith("/messages"):
             url = self._api_url
+        elif self._api_url.endswith("/v1"):
+            url = f"{self._api_url}/messages"
+        else:
+            url = f"{self._api_url}/v1/messages"
 
         headers = {
             "x-api-key": self._api_key,
@@ -71,7 +73,7 @@ class AnthropicAdapter(LLMAdapter):
         }
         if system_prompt:
             payload["system"] = system_prompt
-        if temperature > 0:
+        if temperature >= 0:
             payload["temperature"] = temperature
 
         try:
@@ -84,7 +86,11 @@ class AnthropicAdapter(LLMAdapter):
             ) as resp:
                 data = await resp.json()
                 if resp.status == 200:
-                    content = data["content"][0]["text"]
+                    text_parts = [
+                        block["text"] for block in data.get("content", [])
+                        if block.get("type") == "text"
+                    ]
+                    content = "\n".join(text_parts) if text_parts else ""
                     return {
                         "success": True,
                         "content": content,

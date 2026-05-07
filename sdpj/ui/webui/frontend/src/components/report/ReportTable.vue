@@ -1,17 +1,19 @@
 <template>
   <div class="report-table">
-    <div class="table-wrapper" v-show="!loading">
+    <div class="table-wrapper">
       <table>
         <thead>
           <tr>
-            <th style="width: 22%">任务组ID / 任务ID</th>
-            <th style="width: 14%">合规率</th>
-            <th style="width: 14%">风险等级</th>
-            <th style="width: 14%">状态</th>
-            <th style="width: 36%">操作</th>
+            <th style="width: 18%">任务组ID / 任务ID</th>
+            <th style="width: 12%">模型</th>
+            <th style="width: 12%">数据集</th>
+            <th style="width: 10%">合规率</th>
+            <th style="width: 10%">风险等级</th>
+            <th style="width: 10%">状态</th>
+            <th style="width: 28%">操作</th>
           </tr>
         </thead>
-        <template v-if="flattenedRows.length > 0">
+        <template v-if="!loading && flattenedRows.length > 0">
           <template v-for="row in flattenedRows" :key="row.id">
             <tr :class="{ 'group-row': !row.isLeaf, 'task-row': row.isLeaf }">
               <td>
@@ -22,6 +24,12 @@
                   <span v-else class="file-icon">📄</span>
                   <span class="cell-mono name-text">{{ row.label }}</span>
                 </div>
+              </td>
+              <td>
+                <span v-if="!row.isLeaf" class="cell-mono">{{ row.model_id || '-' }}</span>
+              </td>
+              <td>
+                <span v-if="row.isLeaf" class="cell-mono">{{ row.dataset_name || '-' }}</span>
               </td>
               <td>
                 <span v-if="row.isLeaf">{{ row.compliance_rate != null ? row.compliance_rate.toFixed(1) + '%' : '-' }}</span>
@@ -50,7 +58,7 @@
             </tr>
           </template>
         </template>
-        <tbody v-else-if="!loading && flattenedRows.length === 0">
+        <tbody v-else-if="flattenedRows.length === 0">
           <tr>
             <td colspan="99" class="empty-row"><div class="empty-center" style="margin-right: 26%;">暂无检测报告</div></td>
           </tr>
@@ -93,6 +101,7 @@ const buildFlattenedRows = (groups) => {
       level: 0,
       expanded: isExpanded,
       label: tgId,
+      model_id: group.model_id,
       compliance_rate: group.compliance_rate,
       risk_level: group.risk_level,
       status: group.status,
@@ -105,6 +114,7 @@ const buildFlattenedRows = (groups) => {
           isLeaf: true,
           level: 1,
           label: child.task_id,
+          dataset_name: child.dataset_name,
           compliance_rate: child.compliance_rate,
           risk_level: child.risk_level,
           status: child.status,
@@ -171,6 +181,7 @@ td {
   font-size: 14px;
   padding: 10px 8px;
   vertical-align: middle;
+  white-space: nowrap;
 }
 
 .cell-mono {
@@ -182,6 +193,7 @@ td {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .name-text {
@@ -230,6 +242,8 @@ td {
   font-size: 12px;
   padding: 2px 10px;
   border-radius: 10px;
+  white-space: nowrap;
+  display: inline-block;
 }
 
 .tag-completed {

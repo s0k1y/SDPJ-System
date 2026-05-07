@@ -161,6 +161,53 @@ class SampleDB:
             await session.commit()
             return sample.sample_id
 
+    async def bulk_add_samples(self, records: list[tuple[str, str, int]], batch_size: int = 5000) -> int:
+        """批量添加检测样本
+
+        Args:
+            records: [(subtype, poc, dataset_id), ...] 列表
+            batch_size: 每批提交的行数
+
+        Returns:
+            成功插入的总行数
+        """
+        from .models import DetectionSample
+        inserted = 0
+        async with self.session_manager.get_session() as session:
+            for i in range(0, len(records), batch_size):
+                batch = records[i:i + batch_size]
+                objects = [DetectionSample(subtype=r[0], poc=r[1], dataset_id=r[2]) for r in batch]
+                session.add_all(objects)
+                await session.flush()
+                inserted += len(batch)
+            await session.commit()
+        return inserted
+
+    async def bulk_insert_samples(self, records: list[tuple[str, str, int]], batch_size: int = 5000) -> int:
+        """批量插入检测样本（原生 SQL，绕过 ORM 层）
+
+        Args:
+            records: [(subtype, poc, dataset_id), ...] 列表
+            batch_size: 每批提交的行数
+
+        Returns:
+            成功插入的总行数
+        """
+        from sqlalchemy import insert as sql_insert
+        from .models import DetectionSample
+        inserted = 0
+        async with self.session_manager.get_session() as session:
+            for i in range(0, len(records), batch_size):
+                batch = records[i:i + batch_size]
+                await session.execute(
+                    sql_insert(DetectionSample),
+                    [{"subtype": r[0], "poc": r[1], "dataset_id": r[2]} for r in batch],
+                )
+                await session.flush()
+                inserted += len(batch)
+            await session.commit()
+        return inserted
+
     async def delete_sample(self, sample_id: int) -> bool:
         """删除检测样本
 
@@ -175,6 +222,21 @@ class SampleDB:
             result = await repo.delete(sample_id)
             await session.commit()
             return result
+
+    async def delete_samples_by_dataset(self, dataset_id: int) -> int:
+        """删除指定数据集下的所有样本
+
+        Args:
+            dataset_id: 数据集 ID
+
+        Returns:
+            删除的行数
+        """
+        async with self.session_manager.get_session() as session:
+            repo = SampleRepository(session)
+            count = await repo.delete_by_dataset(dataset_id)
+            await session.commit()
+            return count
 
     async def get_samples_by_dataset(self, dataset_id: int) -> list[dict]:
         """按数据集 ID 查询所有样本
@@ -220,3 +282,43 @@ class SampleDB:
                 "dataset_id": sample.dataset_id,
                 "created_at": sample.created_at,
             }
+
+    # ==================== 系统元数据能力 ====================
+
+    async def get_system_meta(self, key: str) -> Optional[str]:
+        """查询系统元数据
+
+        Args:
+            key: 元数据键
+
+        Returns:
+            元数据值，不存在时返回 None
+        """
+        from .models import SystemMeta
+        async with self.session_manager.get_session() as session:
+            from sqlalchemy import select
+            result = await session.execute(
+                select(SystemMeta.value).where(SystemMeta.key == key)
+            )
+            row = result.scalar_one_or_none()
+            return row
+
+    async def set_system_meta(self, key: str, value: str) -> None:
+        """设置系统元数据（upsert）
+
+        Args:
+            key: 元数据键
+            value: 元数据值
+        """
+        from .models import SystemMeta
+        async with self.session_manager.get_session() as session:
+            from sqlalchemy import select
+            result = await session.execute(
+                select(SystemMeta).where(SystemMeta.key == key)
+            )
+            existing = result.scalar_one_or_none()
+            if existing is not None:
+                existing.value = value
+            else:
+                session.add(SystemMeta(key=key, value=value))
+            await session.commit()

@@ -49,8 +49,9 @@ const handleViewGroup = (report) => {
 
 const handleDownload = async (report) => {
   const reportId = report.task_group_id
+  const taskId = report.task_id || null
   try {
-    const blob = await exportReport(reportId, 'jsonl')
+    const blob = await exportReport(reportId, 'jsonl', taskId)
     if (!blob || blob.size === 0) {
       ElMessage.warning('报告暂无数据，无法导出')
       return

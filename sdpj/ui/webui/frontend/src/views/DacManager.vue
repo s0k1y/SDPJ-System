@@ -31,7 +31,7 @@
                   </td>
                 </tr>
               </tbody>
-              <tbody v-else>
+              <tbody v-else-if="!resourcesLoading && resources.length === 0">
                 <tr><td colspan="99" class="empty-row"><div class="empty-center" style="margin-right: 26%;">暂无私有资源</div></td></tr>
               </tbody>
             </table>
@@ -57,7 +57,7 @@
                   <td>{{ formatDateTime(r.created_at) }}</td>
                 </tr>
               </tbody>
-              <tbody v-else>
+              <tbody v-else-if="!sharedResourcesLoading && sharedResources.length === 0">
                 <tr><td colspan="99" class="empty-row"><div class="empty-center" style="margin-right: 24%;">暂无被授权的资源</div></td></tr>
               </tbody>
             </table>
@@ -91,7 +91,7 @@
                   </td>
                 </tr>
               </tbody>
-              <tbody v-else>
+              <tbody v-else-if="!aclLoading && aclList.length === 0">
                 <tr><td colspan="99" class="empty-row"><div class="empty-center" style="margin-right: 39%;">{{ selectedResource ? '暂无授权记录' : '请选择一个资源查看授权清单' }}</div></td></tr>
               </tbody>
             </table>

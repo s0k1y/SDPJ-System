@@ -93,6 +93,22 @@ def _build_pool(successful: list[tuple[str, int, str]]) -> list[str]:
     return pool
 
 
+def _select_cache_entries(successful: list[tuple[str, int, str]]) -> list[tuple[str, int, str]]:
+    groups: dict[str, list[tuple[str, int, str]]] = {}
+    for entry in successful:
+        groups.setdefault(entry[2], []).append(entry)
+
+    selected: list[tuple[str, int, str]] = []
+    if _DEFAULT_JAILBREAK in groups:
+        ranked = sorted(groups[_DEFAULT_JAILBREAK], key=lambda x: (-x[1], len(x[0])))
+        selected.extend(ranked[:3])
+    for st in _JAILBREAKV_SUBTYPES:
+        if st in groups:
+            max_s = max(e[1] for e in groups[st])
+            selected.append(min((e for e in groups[st] if e[1] == max_s), key=lambda x: len(x[0])))
+    return selected
+
+
 _DEFAULT_JAILBREAK_DATASETS = {"jailbreak_llm", "augmented_jailbreak", "jailbreakv_28k"}
 
 
@@ -109,7 +125,7 @@ async def select_poc_pool(
     jailbreak_dataset_ids: list[int] | None = None,
     *,
     max_rps: float = 0.5,
-    progress_callback: Callable[[int, int, int], None] | None = None,
+    progress_callback: Callable[[int, int, int, dict], None] | None = None,
     llm_callback: LLMCallCallback | None = None,
 ) -> tuple[list[str], list[tuple[str, int, str]]]:
     """Algorithm 1 Step 1: 遍历越狱数据集，按攻击手法分组选取 PoC 池
@@ -137,6 +153,7 @@ async def select_poc_pool(
     found_max: dict[str, asyncio.Event] = {st: asyncio.Event() for st in _stop_at}
     counts: dict[str, list[int]] = {st: [0] for st in _stop_at}
     locks: dict[str, asyncio.Lock] = {st: asyncio.Lock() for st in _stop_at}
+    score_counts: dict[int, int] = {s: 0 for s in range(1, 6)}
 
     async def _check(sample) -> Optional[tuple[str, int, str]]:
         poc = sample.get("poc", "")
@@ -160,11 +177,13 @@ async def select_poc_pool(
                     llm, instance, prompt_builder.JUDGE_SCORE_TEMPLATE, output_text, limiter, llm_callback,
                 )
                 score, _ = result_parser.parse_score_result(score_resp)
-                if score == 5:
+                if score >= 3:
                     async with locks[subtype]:
                         counts[subtype][0] += 1
                         if counts[subtype][0] >= _stop_at[subtype]:
                             event.set()
+                if score > 0:
+                    score_counts[score] = score_counts.get(score, 0) + 1
                 return (prepared, score, subtype) if score > 0 else None
             except LLMError as e:
                 import structlog
@@ -183,7 +202,7 @@ async def select_poc_pool(
         successful.extend(r for r in results if r is not None)
         if progress_callback is not None:
             batch_end = min(batch_start + _BATCH_SIZE, total)
-            progress_callback(batch_end, total, len(successful))
+            progress_callback(batch_end, total, len(successful), dict(score_counts))
 
     if not successful:
         return [], []
@@ -202,7 +221,8 @@ async def run_static_detection(
     task_group_id: str | None = None,
     jailbreak_dataset_ids: list[int] | None = None,
     max_rps: float = 0.5,
-    poc_progress_callback: Callable[[int, int, int], None] | None = None,
+    poc_progress_callback: Callable[[int, int, int, dict], None] | None = None,
+    task_progress_callback: Callable[[str, int, int], None] | None = None,
     force_refresh: bool = False,
     llm_callback: LLMCallCallback | None = None,
 ) -> dict:
@@ -233,7 +253,7 @@ async def run_static_detection(
         if raw_entries:
             cache_entries = [
                 {"subtype": subtype, "poc_text": poc_text, "score": score}
-                for poc_text, score, subtype in raw_entries
+                for poc_text, score, subtype in _select_cache_entries(raw_entries)
             ]
             await data_processor.save_poc_pool_cache(model_id, cache_entries, "v1")
     if not poc_pool:
@@ -260,6 +280,9 @@ async def run_static_detection(
         samples = next(
             (ds.get("samples", []) for ds in datasets if ds["dataset_id"] == ds_id), []
         )
+        sample_total = len(samples)
+        if task_progress_callback is not None:
+            task_progress_callback(task_id, 0, sample_total)
 
         async def _process(sample, _report_id=report_id):
             poc = sample.get("poc", "")
@@ -280,6 +303,9 @@ async def run_static_detection(
         for batch_start in range(0, len(samples), _BATCH_SIZE):
             batch = samples[batch_start : batch_start + _BATCH_SIZE]
             await asyncio.gather(*[_process(s) for s in batch])
+            if task_progress_callback is not None:
+                processed = min(batch_start + _BATCH_SIZE, sample_total)
+                task_progress_callback(task_id, processed, sample_total)
 
         await data_processor.update_task_status(task_id, "completed", datetime.now(timezone.utc))
 

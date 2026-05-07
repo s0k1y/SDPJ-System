@@ -49,10 +49,18 @@
                     <div class="progress-bar-bg">
                       <div class="progress-bar-fill" :style="{ width: groupPercent(row) + '%' }" :class="groupBarClass(row)"></div>
                     </div>
-                    <span class="progress-text">{{ row.progress.completed }}/{{ row.progress.total }}</span>
+                    <span class="status-tag" :class="`tag-${row.status}`">{{ getStatusText(row.status) }}</span>
                   </div>
                 </template>
-                <template v-else>-</template>
+                <template v-else>
+                  <div v-if="row.taskProgress" class="progress-info">
+                    <div class="progress-bar-bg">
+                      <div class="progress-bar-fill" :style="{ width: taskPercent(row) + '%' }" :class="taskBarClass(row)"></div>
+                    </div>
+                    <span class="progress-text">{{ row.taskProgress.processed }}/{{ row.taskProgress.total }}</span>
+                  </div>
+                  <span v-else class="status-tag" :class="`tag-${row.status}`">{{ getStatusText(row.status) }}</span>
+                </template>
               </td>
               <td>
                 <div class="action-btns">
@@ -122,6 +130,17 @@ const groupBarClass = (row) => {
   return 'bar-running'
 }
 
+const taskPercent = (row) => {
+  if (!row.taskProgress || row.taskProgress.total === 0) return 0
+  return Math.round((row.taskProgress.processed / row.taskProgress.total) * 100)
+}
+
+const taskBarClass = (row) => {
+  if (row.status === 'failed') return 'bar-failed'
+  if (row.status === 'completed') return 'bar-completed'
+  return 'bar-running'
+}
+
 const flatRows = computed(() => {
   const rows = []
   for (const g of props.groups) {
@@ -153,6 +172,7 @@ const flatRows = computed(() => {
           task_id: c.task_id,
           dataset_id: c.dataset_id || '',
           error_message: c.error_message || '',
+          taskProgress: c.progress || null,
         })
       }
     }

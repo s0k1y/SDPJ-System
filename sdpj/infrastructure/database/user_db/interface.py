@@ -116,21 +116,6 @@ class UserDBInterface(Protocol):
         """
         ...
 
-    async def update_role(self, user_id: int, new_role: str) -> bool:
-        """更新用户角色
-
-        Args:
-            user_id: 用户 ID
-            new_role: 新角色
-
-        Returns:
-            更新结果（True 表示成功）
-
-        Raises:
-            ValueError: 用户 ID 不存在时抛出
-        """
-        ...
-
     async def get_all_users(self) -> list[dict]:
         """获取所有用户列表
 

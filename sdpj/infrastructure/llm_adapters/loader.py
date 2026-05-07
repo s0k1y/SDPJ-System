@@ -61,19 +61,21 @@ def load_adapter_from_config(model_id: str, config: Union[dict, str, Path]) -> L
             raise AdapterValidationError(f"Failed to load custom adapter: {e}")
 
     # 方式 1: 内置规范（OpenAI/Anthropic）
-    api_url = config.get("api_url") or config.get("base_url")
-    api_key = config.get("api_key")
+    api_url = (config.get("api_url") or config.get("base_url") or config.get("api_endpoint") or "").strip()
+    api_key = (config.get("api_key") or "").strip()
     if not api_url or not api_key:
-        raise AdapterValidationError("config must contain 'api_url'/'base_url' and 'api_key'")
+        raise AdapterValidationError("config must contain 'api_url'/'base_url'/'api_endpoint' and 'api_key'")
 
-    model_name = config.get("model", model_id)
+    model_name = config.get("model") or config.get("model_id") or model_id
     timeout = config.get("timeout", 60)
 
     if request_format == "anthropic":
         from sdpj.infrastructure.llm_adapters.anthropic_adapter import AnthropicAdapter
+        clean_url = api_url.rstrip("/")
+        clean_url = clean_url.removesuffix("/v1/messages").removesuffix("/messages")
         return AnthropicAdapter(
             model_id=model_id,
-            api_url=api_url,
+            api_url=clean_url,
             api_key=api_key,
             model_name=model_name,
             timeout=timeout,

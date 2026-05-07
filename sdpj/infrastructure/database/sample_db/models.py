@@ -90,3 +90,38 @@ class DetectionSample(Base):
 
     def __repr__(self) -> str:
         return f"<DetectionSample(id={self.sample_id}, subtype='{self.subtype}', dataset_id={self.dataset_id})>"
+
+
+class SystemMeta(Base):
+    """系统元数据
+
+    用于存储系统级别的键值对配置信息。
+    """
+    __tablename__ = "SystemMeta"
+
+    # 主键
+    meta_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+
+    # 键（唯一约束）
+    key: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+
+    # 值
+    value: Mapped[str] = mapped_column(Text, nullable=False)
+
+    # 创建时间
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+    # 更新时间
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return f"<SystemMeta(id={self.meta_id}, key='{self.key}')>"

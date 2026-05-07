@@ -412,7 +412,7 @@ async def test_save_and_get_poc_pool_cache(result_db):
         {"subtype": "模板化越狱", "poc_text": "poc_1", "score": 5},
         {"subtype": "default_jailbreak", "poc_text": "poc_2", "score": 3},
     ]
-    count = await result_db.save_poc_pool_cache("gpt-4", entries, "v1", ttl_hours=24)
+    count = await result_db.save_poc_pool_cache("gpt-4", entries, "v1")
     assert count == 2
 
     cached = await result_db.get_poc_pool_cache("gpt-4")
@@ -465,22 +465,6 @@ async def test_invalidate_nonexistent_cache(result_db):
     """测试失效不存在的缓存返回0"""
     deleted = await result_db.invalidate_poc_pool_cache("no-such-model")
     assert deleted == 0
-
-
-@pytest.mark.asyncio
-async def test_cleanup_expired_cache(result_db):
-    """测试清理过期缓存"""
-    entries = [{"subtype": "模板化越狱", "poc_text": "poc_1", "score": 5}]
-    await result_db.save_poc_pool_cache("gpt-4", entries, "v1", ttl_hours=0)
-
-    import asyncio
-    await asyncio.sleep(0.1)
-
-    deleted = await result_db.cleanup_expired_cache()
-    assert deleted >= 1
-
-    cached = await result_db.get_poc_pool_cache("gpt-4")
-    assert cached == []
 
 
 @pytest.mark.asyncio

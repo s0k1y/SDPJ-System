@@ -61,7 +61,7 @@
                 </td>
               </tr>
             </tbody>
-            <tbody v-else>
+            <tbody v-else-if="!loading && subtypeItems.length === 0">
               <tr>
                 <td colspan="99" class="empty-row"><div class="empty-center" style="margin-right: 16%;">暂无详细数据</div></td>
               </tr>
@@ -102,6 +102,7 @@ const props = defineProps({
 })
 
 const chartData = ref(null)
+const loading = ref(true)
 const riskPieChart = ref(null)
 const subtypeBarChart = ref(null)
 
@@ -182,6 +183,7 @@ const handleResize = () => {
 
 const fetchData = async () => {
   if (!props.targetId) return
+  loading.value = true
   try {
     const res = props.granularity === 'task'
       ? await getTaskVisualization(props.targetId)
@@ -194,6 +196,8 @@ const fetchData = async () => {
     }
   } catch {
     chartData.value = null
+  } finally {
+    loading.value = false
   }
 }
 

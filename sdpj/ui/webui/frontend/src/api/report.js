@@ -34,11 +34,15 @@ export function deleteReport(targetId, granularity = 'report') {
 /**
  * 导出报告（返回文件流）
  */
-export function exportReport(taskGroupId, targetFormat = 'jsonl') {
-  return api.post('/reports/export', {
+export function exportReport(taskGroupId, targetFormat = 'jsonl', taskId = null) {
+  const data = {
     task_group_id: taskGroupId,
     target_format: targetFormat
-  }, {
+  }
+  if (taskId) {
+    data.task_id = taskId
+  }
+  return api.post('/reports/export', data, {
     responseType: 'blob'
   })
 }

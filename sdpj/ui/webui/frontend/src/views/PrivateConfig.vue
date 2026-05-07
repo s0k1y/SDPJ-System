@@ -137,14 +137,70 @@ const templates = {
     model: "gpt-4",
     request_format: "openai",
     api_key: "your-openai-api-key",
-    base_url: "https://api.openai.com",
+    base_url: "https://api.openai.com/v1",
+    timeout: 60
+  },
+  zhipu: {
+    model: "glm-4-flash",
+    request_format: "openai",
+    api_key: "your-zhipu-api-key",
+    base_url: "https://open.bigmodel.cn/api/paas/v4",
+    timeout: 60
+  },
+  deepseek: {
+    model: "deepseek-v4-flash",
+    request_format: "openai",
+    api_key: "your-deepseek-api-key",
+    base_url: "https://api.deepseek.com",
+    timeout: 60
+  },
+  deepseek_anthropic: {
+    model: "deepseek-v4-flash",
+    request_format: "anthropic",
+    api_key: "your-deepseek-api-key",
+    base_url: "https://api.deepseek.com/anthropic",
+    timeout: 60
+  },
+  qwen: {
+    model: "qwen-plus",
+    request_format: "openai",
+    api_key: "your-dashscope-api-key",
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    timeout: 60
+  },
+  ernie: {
+    model: "ernie-4.5-turbo-32k",
+    request_format: "openai",
+    api_key: "your-qianfan-api-key",
+    base_url: "https://qianfan.baidubce.com/v2",
+    timeout: 60
+  },
+  kimi: {
+    model: "kimi-k2.6",
+    request_format: "openai",
+    api_key: "your-moonshot-api-key",
+    base_url: "https://api.moonshot.cn/v1",
+    timeout: 60
+  },
+  doubao: {
+    model: "your-endpoint-id",
+    request_format: "openai",
+    api_key: "your-volcengine-api-key",
+    base_url: "https://ark.cn-beijing.volces.com/api/v3",
+    timeout: 60
+  },
+  gemini: {
+    model: "gemini-2.5-flash",
+    request_format: "openai",
+    api_key: "your-gemini-api-key",
+    base_url: "https://generativelanguage.googleapis.com/v1beta/openai",
     timeout: 60
   },
   anthropic: {
     model: "claude-3-opus-20240229",
     request_format: "anthropic",
     api_key: "your-anthropic-api-key",
-    api_url: "https://api.anthropic.com",
+    base_url: "https://api.anthropic.com",
     timeout: 60
   },
   custom: {
@@ -162,7 +218,7 @@ const templateGuides = {
   },
   anthropic: {
     title: 'Anthropic 格式适配器',
-    description: '适用于 Anthropic Claude 系列模型。必需字段：model_id、request_format、api_key、api_url、model。'
+    description: '适用于 Anthropic Claude 系列及兼容 Anthropic API 的服务。必需字段：model_id、request_format、api_key、base_url、model。注意：DeepSeek 的 Anthropic 端点 base_url 需填写 https://api.deepseek.com/anthropic。'
   },
   custom: {
     title: '系统抽象规范',

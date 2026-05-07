@@ -159,14 +159,17 @@ class StateScheduler(StateSchedulerInterface):
         if not dataset_ids:
             return {"success": False, "error": "必须指定至少一个检测数据集 (dataset_ids)"}
 
-        try:
-            old_state = self.get_system_state()
-            self._fsm.start_detection()
-            new_state = self.get_system_state()
-            self._log_state_transition(old_state, new_state, "start_detection")
-            self._notify_state()
-        except Exception:
-            return {"success": False, "error": "系统状态不允许启动检测"}
+        current_state = self.get_system_state()
+        if current_state == "idle":
+            try:
+                self._fsm.start_detection()
+                self._log_state_transition("idle", "detecting", "start_detection")
+                self._notify_state()
+            except Exception as e:
+                self._log_err("FSMError", f"start_detection 状态转换失败: {e}")
+                return {"success": False, "error": "系统状态不允许启动检测"}
+        elif current_state != "detecting":
+            return {"success": False, "error": f"系统当前状态为'{current_state}'，不允许启动检测"}
 
         task_group_id = str(uuid.uuid4())
         task_ids: list[str] = []
@@ -210,9 +213,23 @@ class StateScheduler(StateSchedulerInterface):
         jailbreak_dataset_ids = task_params.get("jailbreak_dataset_ids")
         force_refresh = task_params.get("force_refresh", False)
 
-        def _poc_progress_cb(processed: int, total: int, found: int) -> None:
+        actual_model_name = model_id
+        try:
+            config_id = int(model_id)
+            loaded = await self._config.read_config(config_id)
+            if loaded:
+                actual_model_name = loaded.get("model") or loaded.get("model_id") or model_id
+        except (ValueError, TypeError):
+            pass
+
+        def _poc_progress_cb(processed: int, total: int, found: int, score_counts: dict = None) -> None:
             asyncio.ensure_future(self._task_queue.update_poc_progress(
-                task_group_id, {"processed": processed, "total": total, "found": found}
+                task_group_id, {"processed": processed, "total": total, "found": found, "score_counts": score_counts or {}}
+            ))
+
+        def _task_progress_cb(task_id: str, processed: int, total: int) -> None:
+            asyncio.ensure_future(self._task_queue.update_task_progress(
+                task_id, processed, total
             ))
 
         def _llm_call_cb(request_info: dict, response_info: dict) -> None:
@@ -235,14 +252,14 @@ class StateScheduler(StateSchedulerInterface):
             if cancel_event.is_set():
                 raise asyncio.CancelledError()
             if detection_type == "static":
-                result = await self._detector.run_static_detection(model_id, user_id, dataset_ids, task_group_id=task_group_id, jailbreak_dataset_ids=jailbreak_dataset_ids, poc_progress_callback=_poc_progress_cb, force_refresh=force_refresh, llm_callback=_llm_call_cb)
+                result = await self._detector.run_static_detection(actual_model_name, user_id, dataset_ids, task_group_id=task_group_id, jailbreak_dataset_ids=jailbreak_dataset_ids, poc_progress_callback=_poc_progress_cb, task_progress_callback=_task_progress_cb, force_refresh=force_refresh, llm_callback=_llm_call_cb)
             elif detection_type == "dynamic":
-                static_result = await self._detector.run_static_detection(model_id, user_id, dataset_ids, task_group_id=task_group_id, jailbreak_dataset_ids=jailbreak_dataset_ids, poc_progress_callback=_poc_progress_cb, force_refresh=force_refresh, llm_callback=_llm_call_cb)
+                static_result = await self._detector.run_static_detection(actual_model_name, user_id, dataset_ids, task_group_id=task_group_id, jailbreak_dataset_ids=jailbreak_dataset_ids, poc_progress_callback=_poc_progress_cb, task_progress_callback=_task_progress_cb, force_refresh=force_refresh, llm_callback=_llm_call_cb)
                 if static_result["status"] != "completed":
                     result = static_result
                 else:
                     dynamic_result = await self._detector.run_dynamic_detection(
-                        model_id, user_id, static_result, max_iterations, llm_callback=_llm_call_cb
+                        actual_model_name, user_id, static_result, max_iterations, llm_callback=_llm_call_cb
                     )
                     result = {
                         "status": "completed",
@@ -250,12 +267,12 @@ class StateScheduler(StateSchedulerInterface):
                         "dynamic_task_group_id": dynamic_result.get("task_group_id"),
                     }
             else:
-                static_result = await self._detector.run_static_detection(model_id, user_id, dataset_ids, task_group_id=task_group_id, jailbreak_dataset_ids=jailbreak_dataset_ids, poc_progress_callback=_poc_progress_cb, force_refresh=force_refresh, llm_callback=_llm_call_cb)
+                static_result = await self._detector.run_static_detection(actual_model_name, user_id, dataset_ids, task_group_id=task_group_id, jailbreak_dataset_ids=jailbreak_dataset_ids, poc_progress_callback=_poc_progress_cb, task_progress_callback=_task_progress_cb, force_refresh=force_refresh, llm_callback=_llm_call_cb)
                 if static_result["status"] != "completed":
                     result = static_result
                 else:
                     dynamic_result = await self._detector.run_dynamic_detection(
-                        model_id, user_id, static_result, max_iterations, llm_callback=_llm_call_cb
+                        actual_model_name, user_id, static_result, max_iterations, llm_callback=_llm_call_cb
                     )
                     result = {
                         "status": "completed",
@@ -290,11 +307,15 @@ class StateScheduler(StateSchedulerInterface):
     async def execute_concurrent_tasks(self, max_concurrency: int = 3) -> dict:
         batch = await self._task_queue.dequeue_tasks(max_concurrency)
         if not batch:
-            old_state = self.get_system_state()
-            self._fsm.detection_done()
-            new_state = self.get_system_state()
-            self._log_state_transition(old_state, new_state, "detection_done")
-            self._notify_state()
+            if self.get_system_state() == "detecting":
+                try:
+                    old_state = self.get_system_state()
+                    self._fsm.detection_done()
+                    new_state = self.get_system_state()
+                    self._log_state_transition(old_state, new_state, "detection_done")
+                    self._notify_state()
+                except Exception as e:
+                    self._log_err("FSMError", f"detection_done 状态转换失败: {e}")
             return {"success": True, "tasks": [], "message": "队列为空"}
 
         async def _run(task) -> dict:
@@ -319,7 +340,7 @@ class StateScheduler(StateSchedulerInterface):
         has_pending = any(
             t.status in (TaskStatus.PENDING, TaskStatus.RUNNING) for t in queue_view
         )
-        if not has_pending:
+        if not has_pending and self.get_system_state() == "detecting":
             try:
                 old_state = self.get_system_state()
                 self._fsm.detection_done()
@@ -353,6 +374,32 @@ class StateScheduler(StateSchedulerInterface):
                 task_group_map[group_id] = []
             task_group_map[group_id].append(t)
 
+        existing_group_ids: set[str] | None = None
+        terminal_group_ids = {
+            gid for gid, tasks in task_group_map.items()
+            if all(t.status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED) for t in tasks)
+        }
+        if terminal_group_ids:
+            try:
+                reports = await self._report.list_reports()
+                existing_group_ids = {r["task_group_id"] for r in reports}
+            except Exception:
+                existing_group_ids = None
+
+        orphan_group_ids: set[str] = set()
+        if existing_group_ids is not None:
+            orphan_group_ids = terminal_group_ids - existing_group_ids
+
+        for orphan_id in orphan_group_ids:
+            orphan_tasks = task_group_map.pop(orphan_id, [])
+            for t in orphan_tasks:
+                try:
+                    await self._task_queue.remove_task(t.task_id)
+                except Exception:
+                    pass
+            if orphan_tasks:
+                self._log_rt("orphan_cleanup", f"清理孤儿任务组 {orphan_id}, 移除 {len(orphan_tasks)} 个任务")
+
         groups = []
         config_ids_to_read = []
         for group_id, tasks in task_group_map.items():
@@ -384,21 +431,32 @@ class StateScheduler(StateSchedulerInterface):
             children = []
             for t in tasks:
                 status_counts[t.status.value] = status_counts.get(t.status.value, 0) + 1
-                children.append({
+                task_prog = await self._task_queue.get_task_progress(t.task_id)
+                child = {
                     "task_id": t.task_id,
                     "status": t.status.value,
                     "dataset_id": t.dataset_id,
                     "dataset_name": dataset_name_map.get(t.dataset_id, t.dataset_id),
                     "error_message": t.error_message if t.status.value == "failed" else "",
-                })
+                }
+                if task_prog:
+                    child["progress"] = task_prog
+                children.append(child)
 
             poc_progress = await self._task_queue.get_poc_progress(group_id)
             if poc_progress:
+                sc = poc_progress.get("score_counts", {})
+                score_parts = []
+                for s in range(1, 6):
+                    cnt = sc.get(str(s), sc.get(s, 0))
+                    if cnt > 0:
+                        score_parts.append(f"{s}分{cnt}条")
+                found_info = "、".join(score_parts) if score_parts else f"有效 {poc_progress['found']} 条"
                 children.insert(0, {
                     "task_id": f"poc_{group_id}",
                     "status": "running",
                     "dataset_id": "poc_selecting",
-                    "dataset_name": f"选择PoC池 ({poc_progress['processed']}/{poc_progress['total']}，已找到 {poc_progress['found']} 条)",
+                    "dataset_name": f"构建PoC池 ({poc_progress['processed']}/{poc_progress['total']}，{found_info})",
                     "error_message": "",
                 })
                 status_counts["running"] += 1
@@ -527,7 +585,10 @@ class StateScheduler(StateSchedulerInterface):
         self._log_op(caller_user_id, "delete_report", {"target_id": target_id, "granularity": granularity})
 
         if ok:
-            await self._cleanup_task_queue_after_report_delete(target_id, granularity)
+            try:
+                await self._cleanup_task_queue_after_report_delete(target_id, granularity)
+            except Exception as e:
+                self._log_err("queue_cleanup", f"删除报告后清理任务队列失败: {e}")
 
         return {"success": ok, "message": msg}
 
@@ -550,8 +611,8 @@ class StateScheduler(StateSchedulerInterface):
                 await self._task_queue.remove_task(task.task_id)
                 self._log_rt("queue_cleaned_after_report_delete", f"删除报告后清理任务队列: 任务 {target_id}")
 
-    async def export_report(self, task_group_id: str, target_format: str, *, user_id: int | None = None) -> dict:
-        filename, content = await self._report.export_report(task_group_id, target_format, user_id=user_id)
+    async def export_report(self, task_group_id: str, target_format: str, *, user_id: int | None = None, task_id: str | None = None) -> dict:
+        filename, content = await self._report.export_report(task_group_id, target_format, user_id=user_id, task_id=task_id)
         self._log_rt("report_exported", f"报告 {task_group_id} 已导出为 {target_format}")
         return {"success": True, "filename": filename, "content": content}
 

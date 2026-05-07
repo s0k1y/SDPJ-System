@@ -16,6 +16,7 @@ class ReportDeleteRequest(BaseModel):
 class ReportExportRequest(BaseModel):
     task_group_id: str
     target_format: str = "json"
+    task_id: str | None = None
 
 
 class ReportListFilters(BaseModel):

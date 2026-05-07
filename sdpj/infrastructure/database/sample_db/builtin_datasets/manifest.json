@@ -1,0 +1,70 @@
+{
+  "attack_poc/prompt_injection/hijacking/gentelbench_goal_hijacking.jsonl": {
+    "lines": 2100,
+    "md5": "45267ab30ac097b99e38eb23a2bbe1ab"
+  },
+  "attack_poc/prompt_injection/hijacking/prompt_injection_benchmark.jsonl": {
+    "lines": 29,
+    "md5": "2b6685544065b1e7b86acac12ee85c06"
+  },
+  "attack_poc/prompt_injection/jailbreak/augmented_jailbreak.jsonl": {
+    "lines": 718,
+    "md5": "1ef37fd5c0a8d2163d63c6d459fa106d"
+  },
+  "attack_poc/prompt_injection/jailbreak/gentelbench_jailbreaking.jsonl": {
+    "lines": 89600,
+    "md5": "3edf9eb5486a4722a6bfeac8807e9e1e"
+  },
+  "attack_poc/prompt_injection/jailbreak/jailbreak_llm.jsonl": {
+    "lines": 1558,
+    "md5": "000755c4093dee89f9d290668c7b2cdc"
+  },
+  "attack_poc/prompt_injection/jailbreak/JailBreakV_28K.jsonl": {
+    "lines": 28000,
+    "md5": "13b650db89e085e27a42debeeea29179"
+  },
+  "attack_poc/prompt_injection/leaking/augmented_leaking.jsonl": {
+    "lines": 872,
+    "md5": "82acafe103f5bec59069ffd6cba4e283"
+  },
+  "attack_poc/prompt_injection/leaking/extraction_dataset.jsonl": {
+    "lines": 58,
+    "md5": "35147d891924e295cdfda3fa4b2acfb4"
+  },
+  "attack_poc/prompt_injection/leaking/gentelbench_prompt_leaking.jsonl": {
+    "lines": 530,
+    "md5": "3de6be2cd7c684ed34eb950be87af49f"
+  },
+  "attack_poc/prompt_injection/leaking/prompt_extraction_dataset.jsonl": {
+    "lines": 58,
+    "md5": "35147d891924e295cdfda3fa4b2acfb4"
+  },
+  "attack_poc/prompt_injection/leaking/prompt_leakage.jsonl": {
+    "lines": 1335,
+    "md5": "56d9cf25dd33cfe6118cd47ad6616f92"
+  },
+  "attack_poc/prompt_injection/normal/INJECAGENT.jsonl": {
+    "lines": 62,
+    "md5": "81e96df8f0056c4a236ff319b6615c66"
+  },
+  "attack_poc/prompt_injection/normal/RedTeam_2K.jsonl": {
+    "lines": 2000,
+    "md5": "87ab612e129b7eaad308f957bf625ef0"
+  },
+  "safety_benchmark/custom_benchmark/harmful_behavior.jsonl": {
+    "lines": 1482,
+    "md5": "2f1d8ce02d10246e9eb9569749b019cb"
+  },
+  "safety_benchmark/jade_db_v1/jade_db_v1.jsonl": {
+    "lines": 230,
+    "md5": "0db705c5a1747227578bffe591d885b4"
+  },
+  "safety_benchmark/jade_db_v2/jade_benchmark_easy_zh.jsonl": {
+    "lines": 1000,
+    "md5": "a951e63a5460d57499c664245dcc6d71"
+  },
+  "safety_benchmark/jade_db_v2/jade_benchmark_medium_zh.jsonl": {
+    "lines": 1000,
+    "md5": "3a6fa128958a01d8c5ea43062aa80084"
+  }
+}

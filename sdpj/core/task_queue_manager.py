@@ -26,6 +26,7 @@ class TaskQueueManager:
         self._session_manager = session_manager
         self._initialized = False
         self._poc_progress: Dict[str, dict] = {}
+        self._task_progress: Dict[str, dict] = {}
 
     async def initialize(self) -> None:
         if self._initialized:
@@ -47,8 +48,25 @@ class TaskQueueManager:
             self._initialized = True
             return
 
+        valid_group_ids: set[str] | None = None
+        try:
+            tg_ids_in_tasks: set[str] = set()
+            for row in non_terminal:
+                tg_id = row.get("task_group_id")
+                if tg_id:
+                    tg_ids_in_tasks.add(tg_id)
+            if tg_ids_in_tasks:
+                existing_groups = await result_db.list_task_groups()
+                existing_ids = {g["task_group_id"] for g in existing_groups}
+                valid_group_ids = tg_ids_in_tasks & existing_ids
+        except Exception:
+            valid_group_ids = None
+
         for row in non_terminal:
             task_id = row["task_id"]
+            tg_id = row.get("task_group_id")
+            if valid_group_ids is not None and tg_id and tg_id not in valid_group_ids:
+                continue
             status_str = row["task_status"]
             algorithm_type = row.get("algorithm_type", "static")
 
@@ -191,6 +209,18 @@ class TaskQueueManager:
     async def clear_poc_progress(self, task_group_id: str) -> None:
         async with self._lock:
             self._poc_progress.pop(task_group_id, None)
+
+    async def update_task_progress(self, task_id: str, processed: int, total: int) -> None:
+        async with self._lock:
+            self._task_progress[task_id] = {"processed": processed, "total": total}
+
+    async def get_task_progress(self, task_id: str) -> dict | None:
+        async with self._lock:
+            return self._task_progress.get(task_id)
+
+    async def clear_task_progress(self, task_id: str) -> None:
+        async with self._lock:
+            self._task_progress.pop(task_id, None)
 
     async def _persist_task(self, task: Task, task_group_id: str) -> None:
         if self._session_manager is None:

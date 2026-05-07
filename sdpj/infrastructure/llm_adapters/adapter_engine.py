@@ -76,7 +76,7 @@ class OpenAICompatibleAdapter(LLMAdapter):
             ) as resp:
                 data = await resp.json()
                 if resp.status == 200:
-                    content = data["choices"][0]["message"]["content"]
+                    content = (data.get("choices") or [{}])[0].get("message", {}).get("content") or ""
                     return {
                         "success": True,
                         "content": content,

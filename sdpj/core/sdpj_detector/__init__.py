@@ -35,12 +35,13 @@ class SDPJDetector:
         self._data_processor = data_processor
         self._llm = llm_service
 
-    async def run_static_detection(self, model_id: str, user_id: str, dataset_ids: list[int] | None = None, *, task_group_id: str | None = None, jailbreak_dataset_ids: list[int] | None = None, poc_progress_callback: Callable[[int, int, int], None] | None = None, force_refresh: bool = False, llm_callback: LLMCallCallback | None = None) -> dict:
+    async def run_static_detection(self, model_id: str, user_id: str, dataset_ids: list[int] | None = None, *, task_group_id: str | None = None, jailbreak_dataset_ids: list[int] | None = None, poc_progress_callback: Callable[[int, int, int, dict], None] | None = None, task_progress_callback: Callable[[str, int, int], None] | None = None, force_refresh: bool = False, llm_callback: LLMCallCallback | None = None) -> dict:
         return await run_static_detection(
             self._llm, self._data_processor, model_id, user_id, dataset_ids,
             task_group_id=task_group_id,
             jailbreak_dataset_ids=jailbreak_dataset_ids,
             poc_progress_callback=poc_progress_callback,
+            task_progress_callback=task_progress_callback,
             force_refresh=force_refresh,
             llm_callback=llm_callback,
         )

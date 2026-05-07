@@ -148,7 +148,7 @@ class TaskQueueManagerInterface(Protocol):
 
         Args:
             task_group_id: 任务组ID
-            progress: {"processed": int, "total": int, "found": int}
+            progress: {"processed": int, "total": int, "found": int, "score_counts": dict}
         """
         ...
 

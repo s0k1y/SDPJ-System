@@ -185,13 +185,17 @@ class ReportManager:
             return False, str(e)
 
     async def export_report(
-        self, task_group_id: str, target_format: Literal["json", "yaml", "jsonl"] = "json", *, user_id: int | None = None
+        self, task_group_id: str, target_format: Literal["json", "yaml", "jsonl"] = "json", *, user_id: int | None = None, task_id: str | None = None
     ) -> tuple[str, str]:
         denial = await self._check_report_ownership(task_group_id, user_id)
         if denial:
             return "error.json", json.dumps(denial, ensure_ascii=False)
-        aggregated = await self._data_processor.aggregate_task_group_results(task_group_id)
-        return await self._data_processor.export_report_file(aggregated, target_format)
+        aggregated = await self._data_processor.aggregate_task_group_results(task_group_id, task_id=task_id)
+        filename, content = await self._data_processor.export_report_file(aggregated, target_format)
+        if task_id:
+            base, ext = filename.rsplit(".", 1)
+            filename = f"{base}_{task_id}.{ext}"
+        return filename, content
 
     async def get_compliance_statistics(self) -> dict:
         counts = await self._data_processor.count_compliance_results()

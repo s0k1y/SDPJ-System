@@ -24,7 +24,7 @@ async def seed() -> None:
 
     from sdpj.infrastructure.database.sample_db.builtin_datasets import load_builtin_datasets
     sample_db = SampleDB(sample_sm)
-    await load_builtin_datasets(sample_db)
+    await load_builtin_datasets(sample_db, force_reload=True)
 
     print("Database tables created and builtin datasets loaded.")
 

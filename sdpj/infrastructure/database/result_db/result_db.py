@@ -5,7 +5,7 @@
 
 import uuid
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import select, func, case, and_
 from .interface import ResultDBInterface
 from .session import SessionManager
@@ -653,7 +653,7 @@ class ResultDB:
                     "score": e.score,
                     "dataset_version": e.dataset_version,
                     "created_at": e.created_at.isoformat(),
-                    "expires_at": e.expires_at.isoformat(),
+                    "expires_at": e.expires_at.isoformat() if e.expires_at else None,
                 }
                 for e in entries
             ]
@@ -664,7 +664,7 @@ class ResultDB:
         entries: list[dict],
         dataset_version: str,
     ) -> int:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         async with self.session_manager.session() as session:
             repo = PocPoolCacheRepository(session)
             await repo.delete_by_model_id(model_id)

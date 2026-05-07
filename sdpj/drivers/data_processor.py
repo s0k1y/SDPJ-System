@@ -276,37 +276,31 @@ class DataProcessor:
 
     # ==================== 检测报告数据的汇总与产出 ====================
 
-    async def aggregate_task_group_results(self, task_group_id: str) -> dict:
+    async def aggregate_task_group_results(self, task_group_id: str, task_id: str | None = None) -> dict:
         """汇总任务组下全部检测明细
 
         Args:
             task_group_id: 任务组 ID
+            task_id: 可选，仅汇总指定任务的数据
 
         Returns:
             任务组 → 任务 → 报告 → 结果明细的结构化数据
         """
-        # 获取任务组信息
         task_group = await self._result_db.get_task_group(task_group_id)
 
-        # 获取任务组下的所有任务
-        tasks = await self._result_db.list_tasks_by_group(task_group_id)
+        if task_id:
+            tasks = [t for t in await self._result_db.list_tasks_by_group(task_group_id) if t["task_id"] == task_id]
+        else:
+            tasks = await self._result_db.list_tasks_by_group(task_group_id)
 
-        # 为每个任务获取报告和结果数据
         tasks_with_reports = []
         for task in tasks:
-            task_id = task["task_id"]
-
-            # 获取任务对应的报告
-            report = await self._result_db.get_report_by_task(task_id)
-
+            tid = task["task_id"]
+            report = await self._result_db.get_report_by_task(tid)
             if report:
-                # 获取报告的结果数据
-                result_data = await self._result_db.list_result_data_by_report(
-                    report["report_id"]
-                )
-
+                result_data = await self._result_db.list_result_data_by_report(report["report_id"])
                 tasks_with_reports.append({
-                    "task_id": task_id,
+                    "task_id": tid,
                     "dataset_id": task["dataset_id"],
                     "task_status": task["task_status"],
                     "start_time": task["start_time"],
@@ -317,9 +311,8 @@ class DataProcessor:
                     }
                 })
             else:
-                # 任务没有报告
                 tasks_with_reports.append({
-                    "task_id": task_id,
+                    "task_id": tid,
                     "dataset_id": task["dataset_id"],
                     "task_status": task["task_status"],
                     "start_time": task["start_time"],
@@ -358,19 +351,28 @@ class DataProcessor:
         user_id: Optional[str] = None,
         model_id: Optional[str] = None
     ) -> list[dict]:
-        """查询检测报告列表摘要（高性能，使用 SQL 聚合查询）
-
-        Args:
-            user_id: 用户 ID 过滤条件
-            model_id: 模型 ID 过滤条件
-
-        Returns:
-            任务组列表，每组包含摘要统计和子任务列表
-        """
-        return await self._result_db.compute_reports_summary(
+        summaries = await self._result_db.compute_reports_summary(
             user_id=int(user_id) if user_id else None,
             model_id=model_id
         )
+        dataset_ids = set()
+        for group in summaries:
+            for child in group.get("children", []):
+                ds_id = child.get("dataset_id")
+                if ds_id is not None:
+                    dataset_ids.add(ds_id)
+        if dataset_ids:
+            ds_name_map = {}
+            for ds_id in dataset_ids:
+                ds_info = await self._sample_db.get_dataset_by_id(ds_id)
+                if ds_info:
+                    ds_name_map[ds_id] = ds_info.get("name", str(ds_id))
+            for group in summaries:
+                for child in group.get("children", []):
+                    ds_id = child.get("dataset_id")
+                    if ds_id is not None and ds_id in ds_name_map:
+                        child["dataset_name"] = ds_name_map[ds_id]
+        return summaries
 
     async def list_detection_reports(
         self,
