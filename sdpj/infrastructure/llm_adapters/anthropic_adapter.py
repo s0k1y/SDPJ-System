@@ -1,4 +1,5 @@
 """Anthropic 格式适配器 — 支持 Anthropic Messages API"""
+
 import aiohttp
 
 from sdpj.infrastructure.llm_adapters.base import LLMAdapter
@@ -88,10 +89,7 @@ class AnthropicAdapter(LLMAdapter):
             ) as resp:
                 data = await resp.json()
                 if resp.status == 200:
-                    text_parts = [
-                        block["text"] for block in data.get("content", [])
-                        if block.get("type") == "text"
-                    ]
+                    text_parts = [block["text"] for block in data.get("content", []) if block.get("type") == "text"]
                     content = "\n".join(text_parts) if text_parts else ""
                     return {
                         "success": True,
@@ -100,40 +98,16 @@ class AnthropicAdapter(LLMAdapter):
                         "usage": data.get("usage", {}),
                     }
                 retry_after = resp.headers.get("Retry-After") or resp.headers.get("retry-after")
-                self._raise_api_error(resp.status, data, retry_after=retry_after)
+                error_msg = data.get("error", {}).get("message", f"HTTP {resp.status}")
+                self._raise_api_error(resp.status, error_msg, retry_after=retry_after)
         except StandardizedLLMError:
             raise
         except aiohttp.ServerTimeoutError as e:
-            raise StandardizedLLMError(
-                ErrorCategory.TIMEOUT, f"Request timed out ({timeout}s)", original_error=e
-            )
-        except aiohttp.ClientResponseError as e:
-            self._raise_api_error(e.status, {}, retry_after=None)
+            raise StandardizedLLMError(ErrorCategory.TIMEOUT, f"Request timed out ({timeout}s)", original_error=e)
         except aiohttp.ClientError as e:
-            raise StandardizedLLMError(
-                ErrorCategory.NETWORK, str(e), original_error=e
-            )
+            raise StandardizedLLMError(ErrorCategory.NETWORK, str(e), original_error=e)
         except Exception as e:
-            raise StandardizedLLMError(
-                ErrorCategory.UNKNOWN, str(e), original_error=e
-            )
-
-    @staticmethod
-    def _raise_api_error(status: int, data: dict, *, retry_after: str | None = None) -> None:
-        error_msg = data.get("error", {}).get("message", f"HTTP {status}")
-        detail: dict | None = None
-        if retry_after is not None:
-            try:
-                detail = {"retry_after_seconds": float(retry_after)}
-            except (ValueError, TypeError):
-                detail = {"retry_after": retry_after}
-        if status == 401:
-            raise StandardizedLLMError(ErrorCategory.AUTH, error_msg, status_code=status, detail=detail)
-        if status == 429:
-            raise StandardizedLLMError(ErrorCategory.RATE_LIMIT, error_msg, status_code=status, detail=detail)
-        if 400 <= status < 500:
-            raise StandardizedLLMError(ErrorCategory.INVALID_REQUEST, error_msg, status_code=status, detail=detail)
-        raise StandardizedLLMError(ErrorCategory.SERVER_ERROR, error_msg, status_code=status, detail=detail)
+            raise StandardizedLLMError(ErrorCategory.UNKNOWN, str(e), original_error=e)
 
     def get_metadata(self) -> dict:
         return {

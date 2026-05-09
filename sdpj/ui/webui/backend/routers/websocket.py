@@ -1,7 +1,8 @@
 """WebSocket 路由 — 实时状态、异常与日志推送 (职责 8, 10)"""
+
 import asyncio
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
 from sdpj.control.state_scheduler_interface import StateSchedulerInterface
 from sdpj.ui.webui.backend.dependencies import get_scheduler
@@ -114,4 +115,3 @@ async def task_progress_ws(
             await asyncio.sleep(1)
     except WebSocketDisconnect:
         pass
-

@@ -1,5 +1,6 @@
 """UtilsLib 主模块"""
-from . import crypto, encoding, file, serialization, multimodal
+
+from . import crypto, encoding, file, serialization
 
 
 class UtilsLib:
@@ -23,11 +24,3 @@ class UtilsLib:
     deserialize_json = staticmethod(serialization.deserialize_json)
     serialize_yaml = staticmethod(serialization.serialize_yaml)
     deserialize_yaml = staticmethod(serialization.deserialize_yaml)
-
-    # 多模态
-    text_to_image = staticmethod(multimodal.text_to_image)
-    image_to_text = staticmethod(multimodal.image_to_text)
-    text_to_audio = staticmethod(multimodal.text_to_audio)
-    audio_to_text = staticmethod(multimodal.audio_to_text)
-    text_to_video = staticmethod(multimodal.text_to_video)
-    video_to_text = staticmethod(multimodal.video_to_text)

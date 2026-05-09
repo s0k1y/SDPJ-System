@@ -6,14 +6,16 @@
 
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Optional
+
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
-    create_async_engine,
-    async_sessionmaker,
+    AsyncEngine,
     AsyncSession,
-    AsyncEngine
+    async_sessionmaker,
+    create_async_engine,
 )
 from sqlalchemy.pool import NullPool, StaticPool
+
 from .models import Base
 
 
@@ -23,13 +25,21 @@ class SampleDBSessionManager:
     负责管理数据库引擎和会话的生命周期。
     """
 
-    def __init__(self, database_url: str = "sqlite+aiosqlite:///./data/db/sdpj.db", engine: Optional[AsyncEngine] = None):
+    def __init__(
+        self,
+        database_url: str = "sqlite+aiosqlite:///./sdpj/infrastructure/database/sdpj.db",
+        engine: Optional[AsyncEngine] = None,
+    ):
         self.database_url = database_url
         self._engine: Optional[AsyncEngine] = engine
         self._session_factory: Optional[async_sessionmaker[AsyncSession]] = None
         if engine is not None:
             self._session_factory = async_sessionmaker(
-                engine, class_=AsyncSession, expire_on_commit=False, autoflush=False, autocommit=False,
+                engine,
+                class_=AsyncSession,
+                expire_on_commit=False,
+                autoflush=False,
+                autocommit=False,
             )
 
     async def initialize(self) -> None:
@@ -45,6 +55,7 @@ class SampleDBSessionManager:
             )
 
             if "sqlite" in self.database_url:
+
                 @event.listens_for(self._engine.sync_engine, "connect")
                 def _enable_fk(dbapi_conn, connection_record):
                     cursor = dbapi_conn.cursor()
@@ -122,7 +133,9 @@ class SampleDBSessionManager:
 _session_manager: Optional[SampleDBSessionManager] = None
 
 
-def get_session_manager(database_url: str = "sqlite+aiosqlite:///./data/db/sdpj.db") -> SampleDBSessionManager:
+def get_session_manager(
+    database_url: str = "sqlite+aiosqlite:///./sdpj/infrastructure/database/sdpj.db",
+) -> SampleDBSessionManager:
     """获取全局会话管理器实例
 
     Args:

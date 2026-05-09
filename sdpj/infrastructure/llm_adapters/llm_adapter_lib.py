@@ -1,12 +1,9 @@
 """LLMAdapterLib — 大模型 API 适配库（实现 LLMAdapterLibInterface）"""
-from typing import Any
 
-from sdpj.infrastructure.llm_adapters.adapter_engine import OpenAICompatibleAdapter
 from sdpj.infrastructure.llm_adapters.base import LLMAdapter
 from sdpj.infrastructure.llm_adapters.errors import (
     AdapterAlreadyExistsError,
     AdapterNotFoundError,
-    AdapterValidationError,
     ErrorCategory,
     LLMServiceInstance,
     StandardizedLLMError,
@@ -32,6 +29,7 @@ class LLMAdapterLib:
             raise AdapterAlreadyExistsError(f"Adapter '{model_id}' already exists")
 
         import json
+
         config = json.loads(adapter_content)
         adapter = load_adapter_from_config(model_id, config)
         self._adapters[model_id] = adapter
@@ -48,7 +46,7 @@ class LLMAdapterLib:
         if model_id not in self._adapters:
             raise AdapterNotFoundError(f"Adapter '{model_id}' not found")
         if model_id in self._instances:
-            self._instances[model_id].destroy()
+            await self._instances[model_id].destroy()
             del self._instances[model_id]
         del self._adapters[model_id]
         del self._metadata[model_id]
@@ -75,8 +73,8 @@ class LLMAdapterLib:
         return instance
 
     # ===== 职责 6: 销毁服务实例 =====
-    def destroy_service_instance(self, instance: LLMServiceInstance) -> bool:
-        instance.destroy()
+    async def destroy_service_instance(self, instance: LLMServiceInstance) -> bool:
+        await instance.destroy()
         self._instances.pop(instance.model_id, None)
         return True
 
@@ -86,6 +84,7 @@ class LLMAdapterLib:
         if isinstance(exc, StandardizedLLMError):
             return exc
         import aiohttp
+
         if isinstance(exc, aiohttp.ServerTimeoutError):
             return StandardizedLLMError(ErrorCategory.TIMEOUT, str(exc), original_error=exc)
         if isinstance(exc, aiohttp.ClientResponseError):

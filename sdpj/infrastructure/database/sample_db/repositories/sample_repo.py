@@ -4,9 +4,12 @@
 """
 
 from typing import Optional
-from sqlalchemy import select, delete as sa_delete
-from sqlalchemy.ext.asyncio import AsyncSession
+
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from ..models import DetectionSample
 
 
@@ -106,6 +109,7 @@ class SampleRepository:
             匹配的所有样本列表
         """
         from ..models import Dataset
+
         stmt = (
             select(DetectionSample)
             .join(Dataset, DetectionSample.dataset_id == Dataset.dataset_id)

@@ -146,7 +146,7 @@ class TestWebUISystemManagement:
         """测试系统状态管理 (2.1.7.1)"""
         response = self.client.get("/api/status")
         assert response.status_code in [200, 500]
-        assert "status" in response.json()
+        assert "status" in response.json()["data"]
 
     def test_health_check(self):
         """测试健康检查"""
@@ -217,7 +217,7 @@ class TestWebUIAPIs:
         """测试根端点"""
         response = self.client.get("/")
         assert response.status_code in [200, 500]
-        assert "SDPJ-System" in response.json()["message"]
+        assert "SDPJ-System" in response.json()["data"]["name"]
 
     def test_api_routes_exist(self):
         """测试关键 API 路由存在"""

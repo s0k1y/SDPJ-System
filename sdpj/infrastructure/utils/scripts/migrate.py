@@ -1,4 +1,5 @@
 """数据库迁移脚本 — Alembic 命令便捷包装"""
+
 import subprocess
 import sys
 from pathlib import Path

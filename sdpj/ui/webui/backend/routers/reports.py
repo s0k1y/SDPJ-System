@@ -1,16 +1,17 @@
 """报告路由 (职责 4-7)"""
+
 from io import BytesIO
+from typing import Optional
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
-from typing import Optional
 
 from sdpj.control.state_scheduler_interface import StateSchedulerInterface
 from sdpj.ui.webui.backend.dependencies import get_scheduler
 from sdpj.ui.webui.backend.response import success_response, wrap_scheduler_result
 from sdpj.ui.webui.backend.schemas.report import (
-    ReportGenerateRequest,
-    ReportDeleteRequest,
     ReportExportRequest,
+    ReportGenerateRequest,
 )
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
@@ -30,7 +31,9 @@ async def generate(
     scheduler: StateSchedulerInterface = Depends(get_scheduler),
 ):
     user_id: int = request.state.user_id
-    return wrap_scheduler_result(await scheduler.generate_report(req.task_group_id, req.detection_type, user_id=user_id))
+    return wrap_scheduler_result(
+        await scheduler.generate_report(req.task_group_id, req.detection_type, user_id=user_id)
+    )
 
 
 @router.get("/list")

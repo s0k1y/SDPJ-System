@@ -34,6 +34,22 @@ StateScheduler / 系统状态管理及调度控制模块
    - 调用下层:TaskQueueManager 的「查询单个任务的执行状态」或「查询队列整体视图」
    - 不负责的边界:不做进度信息的可视化渲染(由 UI 层完成)
 
+4-1. 取消单个检测任务
+   - 输入:任务ID
+   - 输出:取消结果
+   - 后置条件:任务状态更新为「已取消」,若队列中无活跃任务则触发检测完成状态转换
+   - 触发场景:用户手动取消正在排队或执行中的检测任务(对应 1.spec.md 功能 1.4)
+   - 调用下层:TaskQueueManager 的「取消任务」;EventLogger 的「记录系统运行日志」
+   - 不负责的边界:不做已处于终态(已完成/已失败)任务的取消(由 TaskQueueManager 边界声明)
+
+4-2. 取消检测任务组
+   - 输入:任务组ID
+   - 输出:取消结果(含取消的子任务数量与移除的任务数量)
+   - 后置条件:任务组内所有非终态子任务被取消,已终态子任务从队列移除,关联报告被删除,若队列中无活跃任务则触发检测完成状态转换
+   - 触发场景:用户手动取消整个检测任务组(对应 1.spec.md 功能 1.4)
+   - 调用下层:TaskQueueManager 的「取消任务」与「移除任务」;ReportManager 的「删除检测报告」;EventLogger 的「记录系统运行日志」
+   - 不负责的边界:不做已终态任务的状态回退(由 TaskQueueManager 边界声明)
+
 # 报告管理调度
 5. 生成检测报告
    - 输入:已完成的检测任务组ID、检测类型(静态/动态)
@@ -57,11 +73,25 @@ StateScheduler / 系统状态管理及调度控制模块
    - 调用下层:DACManager 的「判定用户对资源是否具备访问权」做前置访问权校验;ReportManager 的「删除检测报告」;EventLogger 的「记录用户操作日志」
 
 8. 导出检测报告与可视化数据准备
-   - 输入:任务组ID、目标导出文件格式或可视化图表准备意图
+   - 输入:任务组ID、目标导出文件格式或可视化图表准备意图(可选 task_id 参数用于指定导出单任务报告)
    - 输出:可供下载的检测报告文件内容或按图表类型组织的可视化数据
    - 触发场景:用户下载历史检测报告或在 UI 层展示可视化图表(对应 1.spec.md 功能 1.5 / 1.6)
    - 调用下层:ReportManager 的「导出检测报告文件」或「准备可视化图表数据」;EventLogger 的「记录用户操作日志」
    - 不负责的边界:不做报告文件序列化的具体实现(由 ReportManager 经 DataProcessor 完成);不做图表 UI 渲染(由 UI 层完成);检测报告不在 1.spec.md 功能 2.1.8.2 列明的敏感字段范围内,不涉及 C-S 链路加密传输
+
+8-1. 准备单任务可视化数据
+   - 输入:任务ID、请求者用户ID(可选)
+   - 输出:按图表类型组织的单任务可视化数据
+   - 触发场景:用户在 UI 层查看单个检测任务的可视化结果(对应 1.spec.md 功能 1.6)
+   - 调用下层:ReportManager 的「准备单任务可视化图表数据」;EventLogger 的「记录用户操作日志」
+   - 不负责的边界:不做图表 UI 渲染(由 UI 层完成)
+
+8-2. 查询合规统计
+   - 输入:无
+   - 输出:全局合规统计数据(样本级通过/失败分布等)
+   - 触发场景:用户在 UI 层查看系统整体的合规统计视图(对应 1.spec.md 功能 1.6 / 2.1)
+   - 调用下层:ReportManager 的「获取合规统计数据」;EventLogger 的「记录用户操作日志」
+   - 不负责的边界:不做合规判断规则(由 SDPJDetector 完成);不做统计图表的 UI 渲染(由 UI 层完成)
 
 # 系统状态与日志
 9. 维护系统当前状态并向上层反馈进度与事件
@@ -95,6 +125,37 @@ StateScheduler / 系统状态管理及调度控制模块
     - 调用下层:TaskQueueManager 的「更新单个任务的执行状态」(置为「异常中断」);EventLogger 的「记录系统错误日志」
     - 不负责的边界:不做下层错误的具体分类与重试/退避决策(分别由 LLMAdapterLib 与 LLMService 完成,且属跨层,本模块仅消费上抛错误);不做异常的 UI 提示渲染(由 UI 层完成)
 
+9-1. 系统启动时初始化与恢复 (startup)
+   - 输入:无
+   - 输出:无
+   - 后置条件:数据库初始化完成、大模型注册表初始化完成、已入库适配器从数据库恢复、后台任务消费者启动、数据库日志写入器启动、日志推送订阅建立、旧日志清理完成;若启动时队列中存在待处理任务则自动恢复检测状态
+   - 触发场景:应用进程启动时(对应 1.spec.md 功能 2.1)
+   - 调用下层:PrivateConfigManager 的「初始化注册表」「检查模型可用性」「注册私有模型」;TaskQueueManager 的「初始化」与「获取队列视图」;EventLogger 的「启动数据库写入器」「订阅日志推送」「清理旧日志」
+   - 不负责的边界:不做数据库表结构与连接池的创建(由底层 ORM 模块完成)
+
+9-2. 系统关闭时资源清理 (shutdown)
+   - 输入:无
+   - 输出:无
+   - 后置条件:日志缓冲区刷新、日志推送订阅取消、后台任务消费者停止、大模型注册表关闭
+   - 触发场景:应用进程关闭时(对应 1.spec.md 功能 2.1)
+   - 调用下层:EventLogger 的「刷新缓冲区」「取消订阅日志推送」;PrivateConfigManager 的「关闭注册表」
+   - 不负责的边界:不做进程级信号处理(由部署层 Web 框架完成)
+
+9-3. 后台任务消费者管理 (start_task_consumer / stop_task_consumer)
+   - 输入:轮询间隔(秒)、最大并发度(启动时);无(停止时)
+   - 输出:消费者启动或停止结果
+   - 后置条件:启动时创建异步后台协程,定期轮询任务队列并并发执行待处理任务;停止时取消协程并等待其终止
+   - 触发场景:系统启动时自动启动;系统关闭时自动停止
+   - 调用下层:TaskQueueManager 的「按 FIFO 顺序并发取出多个待执行任务」;SDPJDetector 的检测算法执行能力
+   - 不负责的边界:不做协程调度器实现(由 asyncio 完成)
+
+9-4. LLM 调用追踪订阅 (subscribe_llm_calls / unsubscribe_llm_calls)
+   - 输入:回调函数 callback(request_info, response_info)
+   - 输出:订阅/取消订阅结果
+   - 后置条件:注册的回调在每次 LLM 调用时被触发,向订阅方推送请求与响应信息
+   - 触发场景:WebUI 或监控组件订阅 LLM 调用的实时追踪(对应 1.spec.md 功能 2.1.7.1)
+   - 不负责的边界:不做 LLM 请求/响应的具体格式化与脱敏(由 SDPJDetector 在回调触发前完成)
+
 # 用户账号调度
 13. 调度用户注册与登录
     - 输入:账号、明文密码
@@ -111,6 +172,13 @@ StateScheduler / 系统状态管理及调度控制模块
     - 调用下层:按操作类型分别调用 AccountManager 的「修改指定用户密码」「修改指定用户用户名」「账号切换」「用户登出」「用户注销」「查询指定用户资料」「列出指定用户拥有的受控资源」;EventLogger 的「记录用户操作日志」
     - 安全说明:涉及用户身份的操作（查询资料、修改密码/用户名、列出资源）所需的 user_id 由 WebUI 路由从 request.state.user_id（认证中间件写入）注入到 params，不依赖 AccountManager 内部单例状态，避免多用户并发时身份混淆
     - 不负责的边界:不持久化登录会话(登录会话由 AccountManager 在内存中维护)
+
+14-1. 获取全体用户列表
+   - 输入:无
+   - 输出:全体用户基本信息列表(user_id、username、created_at)
+   - 触发场景:管理员查看系统全体用户清单
+   - 调用下层:AccountManager 的「获取全体用户列表」
+   - 不负责的边界:不做用户敏感信息的暴露控制(由 AccountManager 完成);不做用户列表的 UI 渲染(由 UI 层完成)
 
 # 权限授权调度
 15. 调度自主访问控制相关操作
@@ -149,6 +217,35 @@ StateScheduler / 系统状态管理及调度控制模块
     - 调用下层:涉及私有资源移除前,调用 DACManager 的「判定用户对资源是否具备访问权」做前置校验;按操作类型分别调用 PrivateConfigManager 的「上传用户私有大模型适配器」「移除用户私有大模型适配器」「上传用户私有数据集」「移除用户私有数据集或其单条样本」;EventLogger 的「记录用户操作日志」
     - 不负责的边界:不做适配器入库注册的具体实现(由 PrivateConfigManager 经 LLMRegistry 完成);不做数据集/样本的具体落盘(由 PrivateConfigManager 经 DataProcessor 完成)
 
+17-2. 查询数据集详情
+   - 输入:数据集ID、用户ID(可选)
+   - 输出:数据集详情字典,若数据集不存在或无访问权限则返回 None
+   - 触发场景:用户查看某数据集的详细元信息(对应 1.spec.md 功能 1.3)
+   - 调用下层:PrivateConfigManager 的「查询可用检测数据集清单」;DACManager 的「判定用户对资源是否具备访问权」(仅私有数据集需校验)
+   - 不负责的边界:不做数据集样本内容的加载与解析(由 PrivateConfigManager 经 DataProcessor 完成)
+
+17-3. 导出数据集文件
+   - 输入:数据集ID、用户ID(可选)
+   - 输出:数据集导出文件内容(文件名与字节数据),无权限或无数据集时返回 None 或错误
+   - 触发场景:用户导出数据集文件(对应 1.spec.md 功能 1.3)
+   - 调用下层:DACManager 的「判定用户对资源是否具备访问权」(仅私有数据集);AccountManager 的「查询指定用户资料」(获取用户名);PrivateConfigManager 的「导出数据集文件」
+   - 不负责的边界:不做文件格式转换(由 PrivateConfigManager 经 DataProcessor 完成)
+
+17-4. 导入数据集文件
+   - 输入:用户ID、文件名、文件字节内容
+   - 输出:导入结果(含新数据集ID)
+   - 触发场景:用户上传自有数据集文件(对应 1.spec.md 功能 1.3 / 3.1.1.2)
+   - 调用下层:AccountManager 的「查询指定用户资料」(获取用户名);PrivateConfigManager 的「导入数据集文件」;EventLogger 的「记录用户操作日志」
+   - 不负责的边界:不做文件格式与样本内容合法性校验(由 PrivateConfigManager 经 DataProcessor 完成)
+
+17-5. 删除用户数据集
+   - 输入:数据集ID、用户ID
+   - 输出:删除结果
+   - 后置条件:仅可删除有 resource_id 的用户私有数据集,内置数据集不允许删除
+   - 触发场景:用户删除自己上传的私有数据集(对应 1.spec.md 功能 3.1.1.2)
+   - 调用下层:DACManager 的「判定用户对资源是否具备访问权」;PrivateConfigManager 的「移除数据集」;EventLogger 的「记录用户操作日志」
+   - 不负责的边界:不做内置数据集的删除操作(由 PrivateConfigManager 边界声明)
+
 # 接口契约
 19. 通过 StateSchedulerInterface 对外暴露上述能力,被 CLI / WebUI 调用(符合 4.模型依赖关系图.puml 中 CLI → StateScheduler 与 WebUI → StateScheduler 两条边)
 
@@ -156,6 +253,7 @@ StateScheduler / 系统状态管理及调度控制模块
 
 依赖模块:TaskQueueManager,EventLogger,SDPJDetector,ReportManager,PrivateConfigManager,DACManager,AccountManager
 调用接口:TaskQueueManagerInterface,EventLoggerInterface,SDPJDetectorInterface,ReportManagerInterface,PrivateConfigManagerInterface,DACManagerInterface,AccountManagerInterface
+依赖说明:LLMRegistry 相关操作(注册/注销/查询适配器信息)不再由 StateScheduler 直接导入 LLMRegistryInterface,改为通过 PrivateConfigManager 的委托方法(is_model_available、register_private_model、unregister_private_model、get_adapter_info 等)间接调用,保持 StateScheduler 仅依赖执行逻辑层 7 个模块。
 
 被依赖模块:CLI,WebUI
 应实现接口:StateSchedulerInterface
@@ -198,6 +296,26 @@ StateScheduler / 系统状态管理及调度控制模块
     - C-S 底层通信链路(HTTP/TCP 连接)由部署层 Web 框架在系统初始化时建立,StateScheduler 通过 StateSchedulerInterface 消费该链路,不负责链路的建立与维护
     - 敏感数据(账号密码、大模型API配置文件)的传输安全由 HTTPS/TLS 保障,不再做应用层加解密
     - 调用执行逻辑层其它模块
+
+3.内部辅助方法
+
+  3.1 配置可用性验证 (_verify_config_availability)
+    - 接收配置ID、用户ID和配置内容
+    - 通过 PrivateConfigManager 临时注册适配器后调用 SDPJDetector 验证连通性
+    - 验证完成后自动注销临时适配器
+    - 返回验证结果(含可用性状态与连通性详情)
+
+  3.2 适配器恢复 (_restore_adapters_from_db)
+    - 系统启动时从数据库中读取所有用户私有检测配置
+    - 检查配置中引用的模型适配器是否已注册,未注册则通过 PrivateConfigManager 恢复注册
+    - 确保系统重启后用户的私有模型适配器仍然可用
+
+  3.3 任务队列清理 (_cleanup_task_queue_after_report_delete)
+    - 在删除检测报告后同步清理任务队列中的关联任务
+    - 根据删除粒度(task_group/task/report/result_data)确定清理范围
+    - 非终态任务先取消再移除,终态任务直接移除
+    - 确保任务队列与报告数据的一致性
+
 
 
 

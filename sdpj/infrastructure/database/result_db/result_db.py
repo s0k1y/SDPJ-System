@@ -4,21 +4,22 @@
 """
 
 import uuid
-from typing import Optional
 from datetime import datetime, timezone
-from sqlalchemy import select, func, case, and_
-from .interface import ResultDBInterface
-from .session import SessionManager
+from typing import Optional
+
+from sqlalchemy import and_, case, func, select
+
+from .models import DetectionReport, DetectionTask, PocPoolCache, ResultData, TaskGroup
 from .repositories import (
-    TaskGroupRepository,
-    TaskRepository,
+    PocPoolCacheRepository,
     ReportRepository,
     ResultDataRepository,
     TargetModelRepository,
-    PocPoolCacheRepository,
+    TaskGroupRepository,
+    TaskRepository,
 )
 from .repositories.log_repo import LogRepository
-from .models import TaskGroup, DetectionTask, DetectionReport, ResultData, PocPoolCache
+from .session import SessionManager
 
 
 class ResultDB:
@@ -58,13 +59,17 @@ class ResultDB:
 
     async def create_task_group(self, user_id: int, model_id: str) -> str:
         async with self.session_manager.session() as session:
-            await TargetModelRepository(session).register(model_id)
+            model = await TargetModelRepository(session).get_by_id(model_id)
+            if model is None:
+                raise ValueError(f"被测大模型 '{model_id}' 不存在，请先注册模型")
             task_group = await TaskGroupRepository(session).create(user_id, model_id)
             return task_group.task_group_id
 
     async def create_task_group_with_id(self, task_group_id: str, user_id: int, model_id: str) -> str:
         async with self.session_manager.session() as session:
-            await TargetModelRepository(session).register(model_id)
+            model = await TargetModelRepository(session).get_by_id(model_id)
+            if model is None:
+                raise ValueError(f"被测大模型 '{model_id}' 不存在，请先注册模型")
             task_group = await TaskGroupRepository(session).create_with_id(task_group_id, user_id, model_id)
             return task_group.task_group_id
 
@@ -81,11 +86,7 @@ class ResultDB:
             task_group_repo = TaskGroupRepository(session)
             return await task_group_repo.delete(task_group_id)
 
-    async def list_task_groups(
-        self,
-        user_id: Optional[int] = None,
-        model_id: Optional[str] = None
-    ) -> list[dict]:
+    async def list_task_groups(self, user_id: Optional[int] = None, model_id: Optional[str] = None) -> list[dict]:
         """查询检测任务组列表
 
         Args:
@@ -154,6 +155,8 @@ class ResultDB:
                 existing.start_time = start_time
                 if algorithm_type:
                     existing.algorithm_type = algorithm_type
+                if metadata_json is not None:
+                    existing.metadata_json = metadata_json
                 await session.flush()
                 return existing.task_id
 
@@ -163,21 +166,17 @@ class ResultDB:
 
             if task_id is None:
                 import uuid
+
                 task_id = f"task_{uuid.uuid4().hex[:16]}"
 
             await task_repo.create(
-                task_id, task_group_id, dataset_id, task_status,
-                start_time, algorithm_type, metadata_json
+                task_id, task_group_id, dataset_id, task_status, start_time, algorithm_type, metadata_json
             )
 
             return task_id
 
     async def update_task_status(
-        self,
-        task_id: str,
-        task_status: str,
-        end_time: Optional[datetime] = None,
-        error_message: Optional[str] = None
+        self, task_id: str, task_status: str, end_time: Optional[datetime] = None, error_message: Optional[str] = None
     ) -> bool:
         """更新检测任务状态
 
@@ -268,18 +267,20 @@ class ResultDB:
             for task in tasks:
                 task_group_repo = TaskGroupRepository(session)
                 tg = await task_group_repo.get_by_id(task.task_group_id)
-                result.append({
-                    "task_id": task.task_id,
-                    "task_group_id": task.task_group_id,
-                    "dataset_id": task.dataset_id,
-                    "task_status": task.task_status,
-                    "algorithm_type": task.algorithm_type,
-                    "metadata_json": task.metadata_json,
-                    "start_time": task.start_time.isoformat() if task.start_time else None,
-                    "end_time": task.end_time.isoformat() if task.end_time else None,
-                    "user_id": tg.user_id if tg else None,
-                    "model_id": tg.model_id if tg else None,
-                })
+                result.append(
+                    {
+                        "task_id": task.task_id,
+                        "task_group_id": task.task_group_id,
+                        "dataset_id": task.dataset_id,
+                        "task_status": task.task_status,
+                        "algorithm_type": task.algorithm_type,
+                        "metadata_json": task.metadata_json,
+                        "start_time": task.start_time.isoformat() if task.start_time else None,
+                        "end_time": task.end_time.isoformat() if task.end_time else None,
+                        "user_id": tg.user_id if tg else None,
+                        "model_id": tg.model_id if tg else None,
+                    }
+                )
             return result
 
     # ==================== 检测报告级能力 ====================
@@ -304,6 +305,7 @@ class ResultDB:
 
             # 生成报告ID
             import uuid
+
             report_id = f"report_{uuid.uuid4().hex[:16]}"
 
             # 创建报告
@@ -391,10 +393,7 @@ class ResultDB:
                 "task_id": report.task_id,
             }
 
-    async def list_detection_reports(
-        self,
-        task_group_id: Optional[str] = None
-    ) -> list[dict]:
+    async def list_detection_reports(self, task_group_id: Optional[str] = None) -> list[dict]:
         """查询检测报告列表
 
         Args:
@@ -448,7 +447,7 @@ class ResultDB:
         poc: str,
         model_output: str,
         compliance_result: str,
-        iteration_count: Optional[int] = None
+        iteration_count: Optional[int] = None,
     ) -> str:
         """追加检测结果数据条目
 
@@ -473,18 +472,13 @@ class ResultDB:
 
             # 生成结果数据ID
             import uuid
+
             result_data_id = f"result_{uuid.uuid4().hex[:16]}"
 
             # 创建结果数据
             result_data_repo = ResultDataRepository(session)
             await result_data_repo.create(
-                result_data_id,
-                report_id,
-                risk_subclass,
-                poc,
-                model_output,
-                compliance_result,
-                iteration_count
+                result_data_id, report_id, risk_subclass, poc, model_output, compliance_result, iteration_count
             )
 
             return result_data_id
@@ -504,15 +498,17 @@ class ResultDB:
             for entry in entries:
                 result_data_id = f"result_{uuid.uuid4().hex[:16]}"
                 result_ids.append(result_data_id)
-                orm_objects.append(ResultData(
-                    result_data_id=result_data_id,
-                    report_id=report_id,
-                    risk_subclass=entry["risk_subclass"],
-                    poc=entry["poc"],
-                    model_output=entry["model_output"],
-                    compliance_result=entry["compliance_result"],
-                    iteration_count=entry.get("iteration_count"),
-                ))
+                orm_objects.append(
+                    ResultData(
+                        result_data_id=result_data_id,
+                        report_id=report_id,
+                        risk_subclass=entry["risk_subclass"],
+                        poc=entry["poc"],
+                        model_output=entry["model_output"],
+                        compliance_result=entry["compliance_result"],
+                        iteration_count=entry.get("iteration_count"),
+                    )
+                )
             result_data_repo = ResultDataRepository(session)
             await result_data_repo.create_batch(orm_objects)
             return result_ids
@@ -586,7 +582,7 @@ class ResultDB:
         user_id: Optional[str],
         event_type: str,
         description: str,
-        context: Optional[dict]
+        context: Optional[dict],
     ) -> None:
         """保存系统日志
 
@@ -612,7 +608,7 @@ class ResultDB:
                 user_id=user_id,
                 event_type=event_type,
                 description=description,
-                context=context
+                context=context,
             )
 
     async def query_logs(
@@ -625,7 +621,7 @@ class ResultDB:
         user_id: Optional[str] = None,
         user_ids: Optional[list[str]] = None,
         limit: int = 1000,
-        offset: int = 0
+        offset: int = 0,
     ) -> list[dict]:
         """查询系统日志
 
@@ -654,7 +650,7 @@ class ResultDB:
                 user_id=user_id,
                 user_ids=user_ids,
                 limit=limit,
-                offset=offset
+                offset=offset,
             )
 
             return [
@@ -680,7 +676,7 @@ class ResultDB:
         time_end: Optional[datetime] = None,
         source_module: Optional[str] = None,
         user_id: Optional[str] = None,
-        user_ids: Optional[list[str]] = None
+        user_ids: Optional[list[str]] = None,
     ) -> int:
         """统计系统日志数量
 
@@ -705,7 +701,7 @@ class ResultDB:
                 time_end=time_end,
                 source_module=source_module,
                 user_id=user_id,
-                user_ids=user_ids
+                user_ids=user_ids,
             )
 
     async def delete_old_logs(self, before: datetime) -> int:
@@ -749,6 +745,9 @@ class ResultDB:
     ) -> int:
         now = datetime.now(timezone.utc)
         async with self.session_manager.session() as session:
+            # 确保 TargetModel 已注册，避免外键约束失败
+            tm_repo = TargetModelRepository(session)
+            await tm_repo.register(model_id)
             repo = PocPoolCacheRepository(session)
             await repo.delete_by_model_id(model_id)
             orm_entries = [
@@ -849,13 +848,15 @@ class ResultDB:
                 )
                 subtype_rows = (await session.execute(subtype_stmt)).all()
                 for sr in subtype_rows:
-                    subtype_map.setdefault(sr.report_id, []).append({
-                        "category": sr.risk_subclass,
-                        "total": sr.total,
-                        "passed": int(sr.passed or 0),
-                        "failed": sr.total - int(sr.passed or 0),
-                        "rate": round(int(sr.passed or 0) / sr.total * 100, 2) if sr.total else 0.0,
-                    })
+                    subtype_map.setdefault(sr.report_id, []).append(
+                        {
+                            "category": sr.risk_subclass,
+                            "total": sr.total,
+                            "passed": int(sr.passed or 0),
+                            "failed": sr.total - int(sr.passed or 0),
+                            "rate": round(int(sr.passed or 0) / sr.total * 100, 2) if sr.total else 0.0,
+                        }
+                    )
 
             def _stats(total, compliant):
                 if not total:
@@ -910,17 +911,19 @@ class ResultDB:
                     g["_all_subtypes"][cat]["total"] += st["total"]
                     g["_all_subtypes"][cat]["passed"] += st["passed"]
 
-                g["children"].append({
-                    "task_id": row.task_id,
-                    "dataset_id": row.dataset_id,
-                    "report_id": row.report_id,
-                    "compliance_rate": task_stats["compliance_rate"],
-                    "risk_level": task_stats["risk_level"],
-                    "subtype_compliance": task_subtypes,
-                    "status": status,
-                    "start_time": row.start_time,
-                    "end_time": row.end_time,
-                })
+                g["children"].append(
+                    {
+                        "task_id": row.task_id,
+                        "dataset_id": row.dataset_id,
+                        "report_id": row.report_id,
+                        "compliance_rate": task_stats["compliance_rate"],
+                        "risk_level": task_stats["risk_level"],
+                        "subtype_compliance": task_subtypes,
+                        "status": status,
+                        "start_time": row.start_time,
+                        "end_time": row.end_time,
+                    }
+                )
 
             result = []
             for g in groups_map.values():
@@ -928,13 +931,15 @@ class ResultDB:
                 group_subtypes = []
                 for cat, st in g["_all_subtypes"].items():
                     failed = st["total"] - st["passed"]
-                    group_subtypes.append({
-                        "category": cat,
-                        "total": st["total"],
-                        "passed": st["passed"],
-                        "failed": failed,
-                        "rate": round(st["passed"] / st["total"] * 100, 2) if st["total"] else 0.0,
-                    })
+                    group_subtypes.append(
+                        {
+                            "category": cat,
+                            "total": st["total"],
+                            "passed": st["passed"],
+                            "failed": failed,
+                            "rate": round(st["passed"] / st["total"] * 100, 2) if st["total"] else 0.0,
+                        }
+                    )
 
                 has_running = any(c["status"] == "generating" for c in g["children"])
                 has_failed = any(c["status"] == "failed" for c in g["children"])
@@ -947,15 +952,17 @@ class ResultDB:
                 else:
                     group_status = None
 
-                result.append({
-                    "task_group_id": g["task_group_id"],
-                    "user_id": g["user_id"],
-                    "model_id": g["model_id"],
-                    "compliance_rate": group_stats["compliance_rate"],
-                    "risk_level": group_stats["risk_level"],
-                    "subtype_compliance": group_subtypes,
-                    "status": group_status,
-                    "children": g["children"],
-                })
+                result.append(
+                    {
+                        "task_group_id": g["task_group_id"],
+                        "user_id": g["user_id"],
+                        "model_id": g["model_id"],
+                        "compliance_rate": group_stats["compliance_rate"],
+                        "risk_level": group_stats["risk_level"],
+                        "subtype_compliance": group_subtypes,
+                        "status": group_status,
+                        "children": g["children"],
+                    }
+                )
 
             return result

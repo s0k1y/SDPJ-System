@@ -46,7 +46,7 @@ ReportManager / 检测报告管理模块
 
 # 检测报告导出与可视化数据准备
 7. 导出检测报告文件
-   - 输入:任务组ID、目标文件格式
+   - 输入:任务组ID、任务ID(task_id,用于精确定位要导出的子任务结果)、目标文件格式
    - 输出:可供用户下载的检测报告文件内容
    - 触发场景:用户下载历史检测报告(对应 1.spec.md 功能 1.6)
    - 调用下层:DataProcessor 的「汇总任务组下全部检测明细」与「导出检测报告文件」
@@ -59,8 +59,21 @@ ReportManager / 检测报告管理模块
    - 调用下层:DataProcessor 的「汇总任务组下全部检测明细」
    - 不负责的边界:不做图表的 UI 渲染(由 UI 层完成);不做结果明细的落盘
 
+9. 准备任务可视化数据
+   - 输入:任务ID
+   - 输出:该任务的可视化图表数据(按图表类型组织,与 prepare_visualization_data 格式一致)
+   - 触发场景:UI 层展示单个任务的检测结果可视化(对应 1.spec.md 功能 1.5)
+   - 调用下层:DataProcessor 的「按任务ID汇总检测明细」
+
+10. 获取合规统计信息
+    - 输入:任务组ID
+    - 输出:基础统计数据(安全风险率、各风险子类合规/违规计数汇总)
+    - 触发场景:报告摘要或仪表盘展示统计概览(对应 1.spec.md 功能 1.5)
+    - 调用下层:DataProcessor 的「汇总任务组下全部检测明细」
+    - 不负责的边界:仅计算基础统计指标(安全风险率、合规/违规计数),不做学术研究动态相关的复杂指标计算
+
 # 接口契约
-9. 通过 ReportManagerInterface 对外暴露上述能力,被 StateScheduler 调用(符合 4.模型依赖关系图.puml 中 StateScheduler → ReportManager 边)
+11. 通过 ReportManagerInterface 对外暴露上述能力,被 StateScheduler 调用(符合 4.模型依赖关系图.puml 中 StateScheduler → ReportManager 边)
 
 不需要的:[做检测合规判断逻辑(由 SDPJDetector 完成),把原始结果明细写入 ResultDB(由 DataProcessor 完成),做权限判定(由 DACManager 完成),做图表的 UI 渲染(由 UI 层完成),维护受控资源的 ACL(由 DACManager / UserCenter 完成)]
 
@@ -76,4 +89,4 @@ ReportManager / 检测报告管理模块
       - Security Risk Rate ≥ 0.9: 低风险
       - 0.7 ≤ Security Risk Rate < 0.9: 中风险
       - Security Risk Rate < 0.7: 高风险
-    1.2 还应该了解当前学术研究动态，计算其它相关指标
+    1.2 实现仅计算基础统计指标(安全风险率及合规/违规计数),不做复杂学术指标计算

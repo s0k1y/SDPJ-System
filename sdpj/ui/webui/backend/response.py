@@ -1,5 +1,6 @@
 """统一 API 响应格式"""
-from typing import Any, Optional
+
+from typing import Any
 
 from sdpj.infrastructure.utils.serialization import ensure_utc_datetimes
 

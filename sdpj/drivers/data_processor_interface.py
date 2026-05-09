@@ -4,9 +4,9 @@
 调用方：SDPJDetector, PrivateConfigManager, ReportManager
 """
 
-from typing import Protocol, Optional, Literal, Any, Union
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Literal, Optional, Protocol, Union
 
 
 class DataProcessorInterface(Protocol):
@@ -57,11 +57,7 @@ class DataProcessorInterface(Protocol):
         ...
 
     async def import_private_dataset(
-        self,
-        name: str,
-        risk_type: str,
-        samples: list[dict],
-        resource_id: int | None = None
+        self, name: str, risk_type: str, samples: list[dict], resource_id: int | None = None
     ) -> dict:
         """导入用户私有数据集
 
@@ -102,11 +98,21 @@ class DataProcessorInterface(Protocol):
 
     # ==================== 检测结果的持久化 ====================
 
-    async def create_task_group(
-        self,
-        user_id: str,
-        model_id: str
-    ) -> str:
+    async def register_target_model(self, model_id: str) -> dict:
+        """登记被测大模型（幂等）
+
+        确保被测大模型在数据库中已注册，用于满足外键约束。
+        已存在时直接返回，不重复创建。
+
+        Args:
+            model_id: 目标被测大模型 ID
+
+        Returns:
+            {"model_id": str}
+        """
+        ...
+
+    async def create_task_group(self, user_id: str, model_id: str) -> str:
         """开设检测任务组
 
         后置条件：
@@ -125,11 +131,7 @@ class DataProcessorInterface(Protocol):
         ...
 
     async def create_detection_task(
-        self,
-        task_group_id: str,
-        dataset_id: int,
-        task_status: str,
-        start_time: datetime
+        self, task_group_id: str, dataset_id: int, task_status: str, start_time: datetime
     ) -> str:
         """创建检测子任务
 
@@ -147,12 +149,7 @@ class DataProcessorInterface(Protocol):
         """
         ...
 
-    async def update_task_status(
-        self,
-        task_id: str,
-        task_status: str,
-        end_time: Optional[datetime] = None
-    ) -> bool:
+    async def update_task_status(self, task_id: str, task_status: str, end_time: Optional[datetime] = None) -> bool:
         """更新检测子任务状态
 
         Args:
@@ -189,7 +186,7 @@ class DataProcessorInterface(Protocol):
         poc: str,
         model_output: str,
         compliance_result: str,
-        iteration_count: Optional[int] = None
+        iteration_count: Optional[int] = None,
     ) -> str:
         """追加单条检测结果数据
 
@@ -265,11 +262,7 @@ class DataProcessorInterface(Protocol):
         """
         ...
 
-    async def list_task_groups(
-        self,
-        user_id: Optional[str] = None,
-        model_id: Optional[str] = None
-    ) -> list[dict]:
+    async def list_task_groups(self, user_id: Optional[str] = None, model_id: Optional[str] = None) -> list[dict]:
         """查询检测任务组清单
 
         Args:
@@ -284,11 +277,7 @@ class DataProcessorInterface(Protocol):
         """
         ...
 
-    async def list_reports_summary(
-        self,
-        user_id: Optional[str] = None,
-        model_id: Optional[str] = None
-    ) -> list[dict]:
+    async def list_reports_summary(self, user_id: Optional[str] = None, model_id: Optional[str] = None) -> list[dict]:
         """查询检测报告列表摘要（高性能，使用 SQL 聚合查询）
 
         避免对每个任务组单独查询并加载全部 result_data 大文本字段，
@@ -314,10 +303,7 @@ class DataProcessorInterface(Protocol):
         """
         ...
 
-    async def list_detection_reports(
-        self,
-        task_group_id: Optional[str] = None
-    ) -> list[dict]:
+    async def list_detection_reports(self, task_group_id: Optional[str] = None) -> list[dict]:
         """查询检测报告清单
 
         Args:
@@ -422,9 +408,7 @@ class DataProcessorInterface(Protocol):
         ...
 
     async def export_report_file(
-        self,
-        report_data: dict,
-        target_format: Literal["json", "yaml", "jsonl"]
+        self, report_data: dict, target_format: Literal["json", "yaml", "jsonl"]
     ) -> tuple[str, str]:
         """导出检测报告文件
 
@@ -442,11 +426,7 @@ class DataProcessorInterface(Protocol):
 
     # ==================== 多模态与多编码的样本构造及响应处理 ====================
 
-    def construct_multimodal_sample(
-        self,
-        poc: str,
-        target_modality: Literal["image", "audio", "video"]
-    ) -> bytes:
+    def construct_multimodal_sample(self, poc: str, target_modality: Literal["image", "audio", "video"]) -> bytes:
         """构造多模态检测样本
 
         Args:
@@ -462,9 +442,7 @@ class DataProcessorInterface(Protocol):
         ...
 
     def parse_multimodal_response(
-        self,
-        response_data: bytes,
-        source_modality: Literal["image", "audio", "video"]
+        self, response_data: bytes, source_modality: Literal["image", "audio", "video"]
     ) -> str:
         """解析大模型多模态响应
 
@@ -481,9 +459,7 @@ class DataProcessorInterface(Protocol):
         ...
 
     def construct_encoded_sample(
-        self,
-        poc: str,
-        encoding_type: Literal["base64", "url", "unicode_escape", "hex"]
+        self, poc: str, encoding_type: Literal["base64", "url", "unicode_escape", "hex"]
     ) -> str:
         """构造多编码检测样本
 
@@ -500,9 +476,7 @@ class DataProcessorInterface(Protocol):
         ...
 
     def decode_response_content(
-        self,
-        encoded_content: str,
-        encoding_type: Literal["base64", "url", "unicode_escape", "hex"]
+        self, encoded_content: str, encoding_type: Literal["base64", "url", "unicode_escape", "hex"]
     ) -> str:
         """还原编码响应内容
 
@@ -520,11 +494,7 @@ class DataProcessorInterface(Protocol):
 
     # ==================== 文件导入及结构化数据序列化 ====================
 
-    def read_file(
-        self,
-        file_path: Union[Path, str],
-        mode: Literal["text", "binary"] = "text"
-    ) -> Union[str, bytes]:
+    def read_file(self, file_path: Union[Path, str], mode: Literal["text", "binary"] = "text") -> Union[str, bytes]:
         """读取本地数据集/配置文件
 
         Args:
@@ -558,11 +528,7 @@ class DataProcessorInterface(Protocol):
         """
         ...
 
-    def serialize_data(
-        self,
-        data: Any,
-        format: Literal["json", "yaml"]
-    ) -> str:
+    def serialize_data(self, data: Any, format: Literal["json", "yaml"]) -> str:
         """结构化数据的序列化
 
         Args:
@@ -577,11 +543,7 @@ class DataProcessorInterface(Protocol):
         """
         ...
 
-    def deserialize_data(
-        self,
-        serialized_data: str,
-        format: Literal["json", "yaml"]
-    ) -> Any:
+    def deserialize_data(self, serialized_data: str, format: Literal["json", "yaml"]) -> Any:
         """结构化数据的反序列化
 
         Args:

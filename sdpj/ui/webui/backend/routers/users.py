@@ -1,10 +1,14 @@
 """用户管理与权限路由 (职责 12-14)"""
+
 from fastapi import APIRouter, Depends, Request
 
 from sdpj.control.state_scheduler_interface import StateSchedulerInterface
 from sdpj.ui.webui.backend.dependencies import get_scheduler
 from sdpj.ui.webui.backend.response import success_response, wrap_scheduler_result
-from sdpj.ui.webui.backend.schemas.user import AccountOperationRequest, DACOperationRequest
+from sdpj.ui.webui.backend.schemas.user import (
+    AccountOperationRequest,
+    DACOperationRequest,
+)
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -24,7 +28,9 @@ async def profile(
     request: Request,
     scheduler: StateSchedulerInterface = Depends(get_scheduler),
 ):
-    return wrap_scheduler_result(await scheduler.schedule_account_operation("get_profile", {"user_id": request.state.user_id}))
+    return wrap_scheduler_result(
+        await scheduler.schedule_account_operation("get_profile", {"user_id": request.state.user_id})
+    )
 
 
 @router.get("/resources")
@@ -32,7 +38,9 @@ async def resources(
     request: Request,
     scheduler: StateSchedulerInterface = Depends(get_scheduler),
 ):
-    return wrap_scheduler_result(await scheduler.schedule_account_operation("list_resources", {"user_id": request.state.user_id}))
+    return wrap_scheduler_result(
+        await scheduler.schedule_account_operation("list_resources", {"user_id": request.state.user_id})
+    )
 
 
 @router.post("/dac")

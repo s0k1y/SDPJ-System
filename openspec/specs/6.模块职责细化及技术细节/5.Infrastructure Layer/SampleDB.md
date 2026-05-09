@@ -32,6 +32,16 @@ SampleDB / 检测样本数据库模块
    - 输出:匹配的数据集列表(每条含数据集 ID、名称、安全风险类型、created_at)
    - 触发场景:DataProcessor 加载特定类型数据集(如静态算法步骤 1 加载 D_jailbreak)
 
+11. 按名称查询数据集（get_dataset_by_name）
+    - 输入:数据集名称
+    - 输出:数据集元信息（数据集ID、名称、安全风险类型、resource_id、created_at）；不存在时返回 None
+    - 触发场景:调用方按名称查找数据集，避免重名创建
+
+12. 查询数据集样本数量（get_sample_count_by_dataset）
+    - 输入:数据集ID
+    - 输出:该数据集下的样本总数
+    - 触发场景:前端展示数据集规模信息
+
 # 样本级能力
 6. 添加检测样本到指定数据集
    - 输入:风险具体子类 ST、漏洞概念验证数据 PoC、所属数据集 ID
@@ -54,8 +64,35 @@ SampleDB / 检测样本数据库模块
    - 输入:样本 ID
    - 输出:单条样本详情(ST、PoC、所属数据集 ID、created_at)
 
+13. 批量添加检测样本（bulk_add_samples，ORM 方式）
+    - 输入:条目列表（每条为 (subtype, poc, dataset_id) 三元组）、批次大小（默认 5000）
+    - 输出:成功插入的总行数
+    - 触发场景:DataProcessor 在上传大型私有数据集时批量写入样本，分批 flush 后统一 commit
+
+14. 批量插入检测样本（bulk_insert_samples，原生 SQL 方式）
+    - 输入:条目列表（每条为 (subtype, poc, dataset_id) 三元组）、批次大小（默认 5000）
+    - 输出:成功插入的总行数
+    - 说明:使用 SQLAlchemy 原生 insert 语句绕过 ORM 层，性能高于 bulk_add_samples，适合超大数据集
+    - 触发场景:内置数据集初始化时的大批量导入
+
+15. 按数据集 ID 删除全部样本（delete_samples_by_dataset）
+    - 输入:数据集 ID
+    - 输出:删除的样本行数
+    - 触发场景:清空某数据集的所有样本（如重新导入数据集前清理旧数据）
+
+# 系统元数据能力
+16. 查询系统元数据（get_system_meta）
+    - 输入:元数据键
+    - 输出:元数据值；不存在时返回 None
+    - 触发场景:读取系统级配置（如数据集版本号、初始化标记等）
+
+17. 设置系统元数据（set_system_meta，upsert 语义）
+    - 输入:元数据键、元数据值
+    - 输出:无（键已存在时更新值，不存在时插入新行）
+    - 触发场景:写入系统级配置
+
 # 接口契约
-10. 通过 SampleDBInterface 对外暴露上述能力,DataProcessor 是唯一调用方(符合 4.模型依赖关系图.puml 中 DataProcessor → SampleDB 边)
+18. 通过 SampleDBInterface 对外暴露上述能力,DataProcessor 是唯一调用方(符合 4.模型依赖关系图.puml 中 DataProcessor → SampleDB 边)
 
 不需要的:[维护样本版本,提供样本统计,做权限判定,做内容/编码处理,做调用方业务逻辑(分页/排序)]
 依赖模块:无
@@ -114,12 +151,13 @@ SampleDB / 检测样本数据库模块
   关联实体及基数：检测样本数据（n） ↔ 安全风险检测数据集（1） 
   语义：1个数据集包含n个检测样本数据；1个检测样本数据属于1个数据集
 在E-R图的基础上，进一步设计符合数据库规范性3NF标准的关系模型，得:
-安全风险检测数据集(数据集ID[主键], 数据集名称, 安全风险类型)
+安全风险检测数据集(数据集ID[主键], 数据集名称, 安全风险类型, 资源ID[外键_用户信息数据库模块.资源(资源ID), 可空, 用于DAC权限管理, 删除策略SET NULL])
 检测样本数据(样本ID[主键], 风险具体子类, 漏洞概念验证数据, 数据集ID)
-在此基础上进行数据表设计，得到对应的两张数据表，即可实现该模块基本功能。
+系统元数据(元数据ID[主键], 键, 值, 创建时间, 更新时间)
+在此基础上进行数据表设计，得到对应的三张数据表，即可实现该模块基本功能。
 
 # 物理结构合并
 
-SampleDB 的数据表（`Dataset`、`DetectionSample`）与 UserDB、ResultDB 的数据表合并存储于同一 SQLite 文件 `data/db/sdpj.db`。
+SampleDB 的数据表（`Dataset`、`DetectionSample`）与 UserDB、ResultDB 的数据表合并存储于同一 SQLite 文件 `sdpj/infrastructure/database/sdpj.db`。
 
 原因：ResultDB 的 `DetectionTask.dataset_id` 引用本模块的 `Dataset.dataset_id`。若两模块使用独立文件，该外键无法被 SQLite 引擎强制执行（跨文件外键约束不可用），数据完整性将崩溃。合并后由数据库引擎通过 `PRAGMA foreign_keys=ON` 统一执行所有约束。

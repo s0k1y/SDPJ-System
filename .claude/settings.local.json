@@ -1,33 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run *)",
-      "Bash(conda run *)",
-      "Bash(curl -s http://localhost:5173)",
-      "Bash(curl -s http://localhost:8000/api/datasets)",
-      "Bash(C:\\\\Users\\\\asus\\\\.conda\\\\envs\\\\SDPJ-System\\\\python.exe check_datasets.py)",
-      "Bash(curl -s http://localhost:8000/docs)",
-      "Bash(\"C:/Users/asus/.conda/envs/SDPJ-System/python.exe\" check_datasets.py)",
-      "Bash(netstat -ano)",
-      "Bash(where npm *)",
-      "Bash(npm --version)",
-      "Bash(powershell -ExecutionPolicy Bypass -File start.ps1)",
-      "Bash(curl *)",
-      "Bash(awk '{print $5}')",
-      "Bash(xargs -I {} taskkill //PID {} //F)",
-      "Bash(\"C:/Users/asus/.conda/envs/SDPJ-System/python.exe\" -m uvicorn sdpj.ui.webui.backend.app:app --host 0.0.0.0 --port 8000)",
-      "Bash(powershell *)",
-      "Bash(tasklist)",
-      "Bash(tasklist /FI \"IMAGENAME eq cmd.exe\")",
-      "Bash(wmic process *)",
-      "Bash(taskkill *)",
-      "Bash(xargs grep *)",
-      "Bash(python -m json.tool)",
-      "Bash(C:/Users/asus/.conda/envs/SDPJ-System/python.exe -m pytest tests/unit/infrastructure/llm_adapters/ -v)",
-      "Bash(C:/Users/asus/.conda/envs/SDPJ-System/python.exe -m pytest tests/unit/drivers/test_llm_service.py -v)",
-      "Bash(C:/Users/asus/.conda/envs/SDPJ-System/python.exe -m pytest tests/unit/infrastructure/database/result_db/test_result_db.py -v --tb=short)",
-      "Bash(C:/Users/asus/.conda/envs/SDPJ-System/python.exe -m pytest tests/ -v --tb=short)",
-      "Bash(C:/Users/asus/.conda/envs/SDPJ-System/python.exe -m pytest tests/unit/ -v --tb=short)"
+      "Bash(\"D:\\\\Anaconda\\\\envs\\\\SDPJ-System\\\\python.exe\" \"e:\\\\Sky毕业设计\\\\4.系统源代码\\\\SDPJ-System\\\\test_debug.py\")"
     ]
   }
 }

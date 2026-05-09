@@ -3,10 +3,9 @@
 提供 PoC 池缓存的数据访问操作。
 """
 
-import uuid
-from typing import Optional
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from ..models import PocPoolCache
 
 
@@ -17,11 +16,7 @@ class PocPoolCacheRepository:
         self.session = session
 
     async def get_by_model_id(self, model_id: str) -> list[PocPoolCache]:
-        stmt = (
-            select(PocPoolCache)
-            .where(PocPoolCache.model_id == model_id)
-            .order_by(PocPoolCache.score.desc())
-        )
+        stmt = select(PocPoolCache).where(PocPoolCache.model_id == model_id).order_by(PocPoolCache.score.desc())
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 

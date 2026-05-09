@@ -3,6 +3,7 @@ TaskQueueManager 接口定义
 
 该模块定义了任务队列管理的接口契约。
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -12,24 +13,26 @@ from typing import Protocol
 
 class TaskStatus(Enum):
     """任务状态枚举"""
-    PENDING = "pending"      # 等待中
-    RUNNING = "running"      # 进行中
+
+    PENDING = "pending"  # 等待中
+    RUNNING = "running"  # 进行中
     COMPLETED = "completed"  # 已完成
-    FAILED = "failed"        # 异常中断
+    FAILED = "failed"  # 异常中断
     CANCELLED = "cancelled"  # 已取消
 
 
 @dataclass
 class Task:
     """检测任务数据类"""
-    task_id: str              # 队列任务标识
-    user_id: str              # 用户ID
-    model_id: str             # 目标被测大模型ID
-    algorithm_type: str       # 算法类型（"static" 或 "dynamic"）
-    dataset_id: str           # 检测数据集标识
-    status: TaskStatus        # 任务状态
-    metadata: dict            # 其他业务元信息
-    error_message: str = ""   # 错误信息（仅 FAILED 状态时有值）
+
+    task_id: str  # 队列任务标识
+    user_id: str  # 用户ID
+    model_id: str  # 目标被测大模型ID
+    algorithm_type: str  # 算法类型（"static" 或 "dynamic"）
+    dataset_id: str  # 检测数据集标识
+    status: TaskStatus  # 任务状态
+    metadata: dict  # 其他业务元信息
+    error_message: str = ""  # 错误信息（仅 FAILED 状态时有值）
 
 
 class TaskQueueManagerInterface(Protocol):
@@ -175,4 +178,46 @@ class TaskQueueManagerInterface(Protocol):
 
     async def clear_dynamic_progress(self, task_group_id: str) -> None:
         """清除指定任务组的动态检测进度"""
+        ...
+
+
+class TaskPersistence(Protocol):
+    """任务持久化协议 — Core 层定义的抽象，由 Infrastructure 层实现
+
+    仅包含 TaskQueueManager 实际调用的方法，不含完整 ResultDB 接口。
+    """
+
+    async def list_non_terminal_tasks(self) -> list[dict]:
+        """查询所有非终态任务"""
+        ...
+
+    async def list_task_groups(self) -> list[dict]:
+        """查询所有任务组"""
+        ...
+
+    async def get_task_group(self, task_group_id: str) -> dict:
+        """查询单个任务组，不存在时抛出 ValueError"""
+        ...
+
+    async def create_task_group_with_id(self, task_group_id: str, user_id: int, model_id: str) -> str:
+        """使用指定ID创建任务组"""
+        ...
+
+    async def create_detection_task(
+        self,
+        task_group_id: str,
+        dataset_id: int,
+        task_status: str,
+        start_time,
+        algorithm_type: str,
+        metadata_json: dict | None,
+        task_id: str,
+    ) -> str:
+        """创建检测任务记录"""
+        ...
+
+    async def update_task_status(
+        self, task_id: str, task_status: str, end_time=None, error_message: str | None = None
+    ) -> bool:
+        """更新任务状态"""
         ...

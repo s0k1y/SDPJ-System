@@ -13,15 +13,17 @@
 
 from typing import Optional
 
-from sdpj.infrastructure.llm_adapters.llm_adapter_interface import LLMAdapterLibInterface
+from sdpj.drivers.llm_registry_interface import ModelInfo
 from sdpj.infrastructure.llm_adapters.errors import (
-    LLMServiceInstance,
+    AdapterAlreadyExistsError,
     AdapterNotFoundError,
     AdapterValidationError,
-    AdapterAlreadyExistsError,
+    LLMServiceInstance,
+)
+from sdpj.infrastructure.llm_adapters.llm_adapter_interface import (
+    LLMAdapterLibInterface,
 )
 from sdpj.infrastructure.utils.utils_interface import UtilsInterface
-from sdpj.drivers.llm_registry_interface import ModelInfo
 
 
 class LLMRegistry:
@@ -41,6 +43,7 @@ class LLMRegistry:
             adapters = self._adapter_lib.list_adapters()
         except Exception:
             return False
+        failed_models: list[str] = []
         for adapter_meta in adapters:
             model_id = adapter_meta.get("model_id")
             if not model_id:
@@ -48,8 +51,12 @@ class LLMRegistry:
             try:
                 instance = await self._adapter_lib.get_service_instance(model_id)
                 self._registry[model_id] = instance
-            except (AdapterNotFoundError, Exception):
-                continue
+            except (AdapterNotFoundError, Exception) as e:
+                failed_models.append(f"{model_id}: {e}")
+        if failed_models:
+            import sys
+            print(f"[LLMRegistry] 以下适配器初始化失败: {', '.join(failed_models)}", file=sys.stderr)
+            return False
         return True
 
     async def list_registered_models(self) -> list[ModelInfo]:
@@ -57,13 +64,15 @@ class LLMRegistry:
         for model_id in self._registry:
             try:
                 meta = self._adapter_lib.get_adapter_info(model_id)
-                result.append(ModelInfo(
-                    model_id=model_id,
-                    adapter_name=meta.get("adapter_name", "openai_compatible"),
-                    version=meta.get("version", "1.0"),
-                    description=meta.get("description", ""),
-                    supported_features=meta.get("supported_features", []),
-                ))
+                result.append(
+                    ModelInfo(
+                        model_id=model_id,
+                        adapter_name=meta.get("adapter_name", "openai_compatible"),
+                        version=meta.get("version", "1.0"),
+                        description=meta.get("description", ""),
+                        supported_features=meta.get("supported_features", []),
+                    )
+                )
             except AdapterNotFoundError:
                 result.append(ModelInfo(model_id=model_id, adapter_name="unknown", version="0.0"))
         return result
@@ -109,10 +118,17 @@ class LLMRegistry:
         except Exception as e:
             return False, f"注销失败: {e}"
 
+    def get_adapter_info(self, model_id: str) -> dict:
+        """按大模型标识查询适配器元信息"""
+        try:
+            return self._adapter_lib.get_adapter_info(model_id)
+        except AdapterNotFoundError:
+            return {}
+
     async def shutdown(self) -> bool:
         for model_id, instance in list(self._registry.items()):
             try:
-                self._adapter_lib.destroy_service_instance(instance)
+                await self._adapter_lib.destroy_service_instance(instance)
             except Exception:
                 pass
         self._registry.clear()

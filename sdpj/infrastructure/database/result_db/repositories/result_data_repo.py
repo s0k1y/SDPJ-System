@@ -4,8 +4,10 @@
 """
 
 from typing import Optional
-from sqlalchemy import select, func
+
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from ..models import ResultData
 
 
@@ -28,7 +30,7 @@ class ResultDataRepository:
         poc: str,
         model_output: str,
         compliance_result: str,
-        iteration_count: Optional[int] = None
+        iteration_count: Optional[int] = None,
     ) -> ResultData:
         """创建结果数据条目
 
@@ -50,7 +52,7 @@ class ResultDataRepository:
             poc=poc,
             model_output=model_output,
             compliance_result=compliance_result,
-            iteration_count=iteration_count
+            iteration_count=iteration_count,
         )
         self.session.add(result_data)
         await self.session.flush()

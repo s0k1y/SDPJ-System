@@ -1,4 +1,5 @@
 """OpenAI 格式适配器 — 支持所有 OpenAI Chat Completions API 兼容服务"""
+
 from sdpj.infrastructure.llm_adapters.adapter_engine import OpenAICompatibleAdapter
 
 

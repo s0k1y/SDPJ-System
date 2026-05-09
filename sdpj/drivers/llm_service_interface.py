@@ -2,7 +2,8 @@
 
 SDPJDetector 为唯一调用方 (符合 4.模型依赖关系图.puml 中 SDPJDetector → LLMService 边)。
 """
-from typing import Protocol, Dict, Any, Optional, runtime_checkable
+
+from typing import Any, Dict, Optional, Protocol, runtime_checkable
 
 from sdpj.infrastructure.llm_adapters.errors import LLMError
 
@@ -10,6 +11,7 @@ from sdpj.infrastructure.llm_adapters.errors import LLMError
 @runtime_checkable
 class LLMServiceInstanceProtocol(Protocol):
     """LLM 服务实例协议"""
+
     model_id: str
 
     @property
@@ -41,3 +43,9 @@ class LLMServiceInterface(Protocol):
     def should_retry(self, error: LLMError, attempt: int) -> bool: ...
 
     def format_error_response(self, error: LLMError) -> Dict[str, Any]: ...
+
+    async def verify_connectivity(self, service_instance, timeout: float = 30.0) -> dict:
+        """验证模型连接性，发送健康检查消息并返回结构化结果
+        返回: {"success": bool, "status": str, "model": str, "latency_ms": int, "response_preview": str}
+        """
+        ...

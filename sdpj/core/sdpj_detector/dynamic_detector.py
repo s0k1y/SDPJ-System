@@ -1,14 +1,15 @@
 """动态检测器 - SDPJ Algorithm 2 实现"""
+
 import asyncio
 from datetime import datetime, timezone
 from typing import Callable
 
 from sdpj.drivers.data_processor_interface import DataProcessorInterface
-from sdpj.drivers.llm_service_interface import LLMServiceInterface, LLMError
+from sdpj.drivers.llm_service_interface import LLMError, LLMServiceInterface
 from sdpj.infrastructure.utils.rate_limiter import RateLimiter
 
 from . import prompt_builder, result_parser
-from .static_detector import _call_llm, LLMCallCallback, _BATCH_SIZE
+from .static_detector import _BATCH_SIZE, LLMCallCallback, _call_llm
 
 DynamicProgressCallback = Callable[[int, int, float], None]
 
@@ -74,13 +75,15 @@ async def run_dynamic_detection(
         compliant_rds = []
         for rd in report.get("result_data", []):
             if rd.get("compliance_result") != "合规":
-                non_compliant_entries.append({
-                    "risk_subclass": rd.get("risk_subclass", ""),
-                    "poc": rd.get("poc", ""),
-                    "model_output": rd.get("model_output", ""),
-                    "compliance_result": rd.get("compliance_result", "违规"),
-                    "iteration_count": 0,
-                })
+                non_compliant_entries.append(
+                    {
+                        "risk_subclass": rd.get("risk_subclass", ""),
+                        "poc": rd.get("poc", ""),
+                        "model_output": rd.get("model_output", ""),
+                        "compliance_result": rd.get("compliance_result", "违规"),
+                        "iteration_count": 0,
+                    }
+                )
             else:
                 compliant_rds.append(rd)
 
@@ -149,8 +152,5 @@ async def run_dynamic_detection(
 
         await data_processor.update_task_status(dyn_task_id, "completed", datetime.now(timezone.utc))
 
-    avg_iteration_count = (
-        round(total_iterations / dynamic_sample_count, 2)
-        if dynamic_sample_count else 0.0
-    )
+    avg_iteration_count = round(total_iterations / dynamic_sample_count, 2) if dynamic_sample_count else 0.0
     return {"status": "completed", "task_group_id": task_group_id, "avg_iteration_count": avg_iteration_count}

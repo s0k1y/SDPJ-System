@@ -2,6 +2,7 @@
 
 提供日志查询、统计和清理功能。
 """
+
 import asyncio
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -11,7 +12,7 @@ async def show_log_stats():
     """显示日志统计信息"""
     from sdpj.infrastructure.database.result_db import ResultDB, SessionManager
 
-    data_dir = Path(__file__).resolve().parents[1] / "data" / "db"
+    data_dir = Path(__file__).resolve().parents[2] / "database"
     db_url = f"sqlite+aiosqlite:///{data_dir / 'sdpj.db'}"
     session_manager = SessionManager(db_url)
     result_db = ResultDB(session_manager)
@@ -57,7 +58,7 @@ async def clean_old_logs(days: int = 30):
     """
     from sdpj.infrastructure.database.result_db import ResultDB, SessionManager
 
-    data_dir = Path(__file__).resolve().parents[1] / "data" / "db"
+    data_dir = Path(__file__).resolve().parents[2] / "database"
     db_url = f"sqlite+aiosqlite:///{data_dir / 'sdpj.db'}"
     session_manager = SessionManager(db_url)
     result_db = ResultDB(session_manager)

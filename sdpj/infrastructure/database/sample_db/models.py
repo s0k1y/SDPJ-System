@@ -4,10 +4,11 @@
 """
 
 from datetime import datetime, timezone
-from typing import List
-from sqlalchemy import String, Text, DateTime, ForeignKey, UniqueConstraint, Integer
+from typing import List, Optional
+
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from typing import Optional
+
 from sdpj.infrastructure.database.base import Base
 
 
@@ -17,6 +18,7 @@ class Dataset(Base):
     对应规格文档中的实体：安全风险检测数据集
     属性：数据集ID、数据集名称、安全风险类型
     """
+
     __tablename__ = "Dataset"
 
     # 主键
@@ -29,21 +31,14 @@ class Dataset(Base):
     risk_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
 
     # 对应 UserDB Resource 表的 resource_id（内置数据集为 NULL）
-    resource_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    resource_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("Resource.resource_id", ondelete="SET NULL"), nullable=True, index=True)
 
     # 创建时间
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     # 关系：一个数据集包含多个检测样本
     samples: Mapped[List["DetectionSample"]] = relationship(
-        "DetectionSample",
-        back_populates="dataset",
-        cascade="all, delete-orphan",
-        lazy="selectin"
+        "DetectionSample", back_populates="dataset", cascade="all, delete-orphan", lazy="selectin"
     )
 
     def __repr__(self) -> str:
@@ -57,6 +52,7 @@ class DetectionSample(Base):
     属性：样本ID、风险具体子类、漏洞概念验证数据
     关系：n个检测样本数据属于1个数据集
     """
+
     __tablename__ = "DetectionSample"
 
     # 主键
@@ -70,23 +66,14 @@ class DetectionSample(Base):
 
     # 外键：所属数据集 ID
     dataset_id: Mapped[int] = mapped_column(
-        ForeignKey("Dataset.dataset_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True
+        ForeignKey("Dataset.dataset_id", ondelete="CASCADE"), nullable=False, index=True
     )
 
     # 创建时间
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     # 关系：多个样本属于一个数据集
-    dataset: Mapped["Dataset"] = relationship(
-        "Dataset",
-        back_populates="samples"
-    )
+    dataset: Mapped["Dataset"] = relationship("Dataset", back_populates="samples")
 
     def __repr__(self) -> str:
         return f"<DetectionSample(id={self.sample_id}, subtype='{self.subtype}', dataset_id={self.dataset_id})>"
@@ -97,6 +84,7 @@ class SystemMeta(Base):
 
     用于存储系统级别的键值对配置信息。
     """
+
     __tablename__ = "SystemMeta"
 
     # 主键
@@ -109,18 +97,14 @@ class SystemMeta(Base):
     value: Mapped[str] = mapped_column(Text, nullable=False)
 
     # 创建时间
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     # 更新时间
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
-        nullable=False
+        nullable=False,
     )
 
     def __repr__(self) -> str:

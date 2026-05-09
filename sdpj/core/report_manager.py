@@ -3,14 +3,17 @@
 依赖模块: DataProcessor, UserCenter (via interfaces)
 被依赖模块: StateScheduler
 """
+
 import json
-from typing import Optional, Literal
+from typing import Literal, Optional
 
 from sdpj.drivers.data_processor_interface import DataProcessorInterface
 from sdpj.drivers.user_center_interface import UserCenterInterface
 
+from .report_manager_interface import ReportManagerInterface
 
-class ReportManager:
+
+class ReportManager(ReportManagerInterface):
     """检测报告管理模块实现"""
 
     def __init__(
@@ -75,9 +78,7 @@ class ReportManager:
             }
 
         total = len(results)
-        compliant = sum(
-            1 for r in results if r.get("compliance_result", "").startswith("合规")
-        )
+        compliant = sum(1 for r in results if r.get("compliance_result", "").startswith("合规"))
         non_compliant = total - compliant
         rate = compliant / total
 
@@ -103,13 +104,15 @@ class ReportManager:
         for cat, st in subtype_stats.items():
             failed = st["total"] - st["passed"]
             st_rate = round(st["passed"] / st["total"] * 100, 2) if st["total"] else 0.0
-            subtype_compliance.append({
-                "category": cat,
-                "total": st["total"],
-                "passed": st["passed"],
-                "failed": failed,
-                "rate": st_rate,
-            })
+            subtype_compliance.append(
+                {
+                    "category": cat,
+                    "total": st["total"],
+                    "passed": st["passed"],
+                    "failed": failed,
+                    "rate": st_rate,
+                }
+            )
 
         return {
             "total": total,
@@ -121,26 +124,24 @@ class ReportManager:
             "subtype_compliance": subtype_compliance,
         }
 
-    async def list_reports(
-        self, user_id: Optional[str] = None, model_id: Optional[str] = None
-    ) -> list[dict]:
-        summaries = await self._data_processor.list_reports_summary(
-            user_id=user_id, model_id=model_id
-        )
+    async def list_reports(self, user_id: Optional[str] = None, model_id: Optional[str] = None) -> list[dict]:
+        summaries = await self._data_processor.list_reports_summary(user_id=user_id, model_id=model_id)
         result = []
         for group in summaries:
             uid = group.get("user_id")
             user_info = await self._user_center.get_user_by_id(int(uid)) if uid else None
-            result.append({
-                "task_group_id": group["task_group_id"],
-                "model_id": group.get("model_id"),
-                "user": user_info,
-                "compliance_rate": group["compliance_rate"],
-                "risk_level": group["risk_level"],
-                "subtype_compliance": group["subtype_compliance"],
-                "status": group["status"],
-                "children": group["children"],
-            })
+            result.append(
+                {
+                    "task_group_id": group["task_group_id"],
+                    "model_id": group.get("model_id"),
+                    "user": user_info,
+                    "compliance_rate": group["compliance_rate"],
+                    "risk_level": group["risk_level"],
+                    "subtype_compliance": group["subtype_compliance"],
+                    "status": group["status"],
+                    "children": group["children"],
+                }
+            )
         return result
 
     async def view_report(self, task_group_id: str, user_id: int | None = None) -> dict:
@@ -185,7 +186,12 @@ class ReportManager:
             return False, str(e)
 
     async def export_report(
-        self, task_group_id: str, target_format: Literal["json", "yaml", "jsonl"] = "json", *, user_id: int | None = None, task_id: str | None = None
+        self,
+        task_group_id: str,
+        target_format: Literal["json", "yaml", "jsonl"] = "json",
+        *,
+        user_id: int | None = None,
+        task_id: str | None = None,
     ) -> tuple[str, str]:
         denial = await self._check_report_ownership(task_group_id, user_id)
         if denial:
@@ -230,24 +236,20 @@ class ReportManager:
         dataset_comparison = []
         for ds_id, results in dataset_results.items():
             stats = self.calculate_statistics(results)
-            dataset_comparison.append({
-                "dataset_id": ds_id,
-                "total": stats["total"],
-                "compliance_rate": stats["compliance_rate"],
-                "risk_level": stats["risk_level"],
-            })
+            dataset_comparison.append(
+                {
+                    "dataset_id": ds_id,
+                    "total": stats["total"],
+                    "compliance_rate": stats["compliance_rate"],
+                    "risk_level": stats["risk_level"],
+                }
+            )
 
         total = statistics["total"]
         attack_success_rate = round(statistics["non_compliant"] / total * 100, 2) if total else 0.0
 
-        iteration_counts = [
-            r["iteration_count"] for r in all_results
-            if r.get("iteration_count") is not None
-        ]
-        avg_iteration_count = (
-            round(sum(iteration_counts) / len(iteration_counts), 2)
-            if iteration_counts else None
-        )
+        iteration_counts = [r["iteration_count"] for r in all_results if r.get("iteration_count") is not None]
+        avg_iteration_count = round(sum(iteration_counts) / len(iteration_counts), 2) if iteration_counts else None
 
         return {
             "risk_distribution": {
@@ -293,14 +295,8 @@ class ReportManager:
         statistics = self.calculate_statistics(results)
         total = statistics["total"]
         attack_success_rate = round(statistics["non_compliant"] / total * 100, 2) if total else 0.0
-        iteration_counts = [
-            r["iteration_count"] for r in results
-            if r.get("iteration_count") is not None
-        ]
-        avg_iteration_count = (
-            round(sum(iteration_counts) / len(iteration_counts), 2)
-            if iteration_counts else None
-        )
+        iteration_counts = [r["iteration_count"] for r in results if r.get("iteration_count") is not None]
+        avg_iteration_count = round(sum(iteration_counts) / len(iteration_counts), 2) if iteration_counts else None
         return {
             "risk_distribution": {
                 "type": "pie",

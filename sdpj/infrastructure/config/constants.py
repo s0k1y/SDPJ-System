@@ -1,5 +1,4 @@
 """系统常量定义"""
-from pathlib import Path
 
 APP_NAME = "SDPJ-System"
 APP_VERSION = "1.0.0"

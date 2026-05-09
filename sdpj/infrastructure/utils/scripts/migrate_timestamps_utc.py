@@ -7,15 +7,16 @@
 1. 有时区后缀的记录(如 "+00:00")：转为UTC后去掉时区信息
 2. 无时区后缀的记录：视为本地时间，根据系统时区偏移转为UTC后去掉时区信息
 """
+
 import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
 
 
 async def migrate_timestamps_to_utc():
-    from sdpj.infrastructure.database.result_db import ResultDB, SessionManager
+    from sdpj.infrastructure.database.result_db import SessionManager
 
-    data_dir = Path(__file__).resolve().parents[1] / "data" / "db"
+    data_dir = Path(__file__).resolve().parents[2] / "database"
     db_url = f"sqlite+aiosqlite:///{data_dir / 'sdpj.db'}"
     session_manager = SessionManager(db_url)
     await session_manager.initialize()
@@ -25,9 +26,7 @@ async def migrate_timestamps_to_utc():
     print(f"检测到系统本地时区偏移: UTC{'+' if offset_hours >= 0 else ''}{offset_hours:.0f}")
 
     async with session_manager.engine.begin() as conn:
-        result = await conn.exec_driver_sql(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='SystemLog'"
-        )
+        result = await conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='SystemLog'")
         if not result.fetchall():
             print("SystemLog表不存在，跳过迁移")
             return
@@ -40,9 +39,7 @@ async def migrate_timestamps_to_utc():
 
         print(f"SystemLog表共 {total} 条记录，开始迁移...")
 
-        result = await conn.exec_driver_sql(
-            "SELECT log_id, timestamp FROM SystemLog"
-        )
+        result = await conn.exec_driver_sql("SELECT log_id, timestamp FROM SystemLog")
         rows = await result.fetchall()
 
         migrated = 0
@@ -92,9 +89,7 @@ async def migrate_timestamps_to_utc():
             "SELECT name FROM sqlite_master WHERE type='table' AND name='DetectionTask'"
         )
         if result.fetchall():
-            result = await conn.exec_driver_sql(
-                "SELECT task_id, start_time, end_time FROM DetectionTask"
-            )
+            result = await conn.exec_driver_sql("SELECT task_id, start_time, end_time FROM DetectionTask")
             task_rows = await result.fetchall()
             task_migrated = 0
             for row in task_rows:

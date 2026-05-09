@@ -31,14 +31,14 @@ class TestAuthEndpoints:
     def test_public_key_endpoint(self, client):
         resp = client.get("/api/auth/public-key")
         assert resp.status_code == 200
-        assert "public_key" in resp.json()
+        assert "public_key" in resp.json()["data"]
 
 
 class TestPublicEndpoints:
     def test_health(self, client):
         resp = client.get("/health")
         assert resp.status_code == 200
-        assert resp.json()["status"] == "ok"
+        assert resp.json()["data"]["status"] == "ok"
 
     def test_root(self, client):
         resp = client.get("/")
@@ -47,7 +47,7 @@ class TestPublicEndpoints:
     def test_api_status(self, client):
         resp = client.get("/api/status")
         assert resp.status_code == 200
-        assert "status" in resp.json()
+        assert "status" in resp.json()["data"]
 
 
 class TestProtectedEndpoints:

@@ -3,10 +3,10 @@
 导出所有仓储类。
 """
 
-from .user_repo import UserRepository
-from .resource_repo import ResourceRepository
 from .acl_repo import ACLRepository
 from .private_config_repo import PrivateConfigRepository
+from .resource_repo import ResourceRepository
+from .user_repo import UserRepository
 
 __all__ = [
     "UserRepository",

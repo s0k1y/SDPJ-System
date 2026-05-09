@@ -3,28 +3,30 @@ TaskQueueManager 实现
 
 该模块实现了任务队列管理的核心功能，支持数据库持久化。
 """
+
 import asyncio
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, Optional
+from typing import Dict
 
-from .task_queue_manager_interface import Task, TaskQueueManagerInterface, TaskStatus
+from .task_queue_manager_interface import Task, TaskPersistence, TaskQueueManagerInterface, TaskStatus
 
 
-class TaskQueueManager:
+class TaskQueueManager(TaskQueueManagerInterface):
     """
     任务队列管理器
 
     负责管理检测任务的入队、出队、状态跟踪。
-    使用 asyncio.Queue 实现 FIFO 队列，同时持久化到数据库。
+    使用 asyncio.Queue 实现 FIFO 队列，同时持久化到数据库（通过注入的 TaskPersistence）。
     """
 
-    def __init__(self, session_manager=None):
+    def __init__(self, session_manager=None, persistence: TaskPersistence | None = None):
         self._queue: asyncio.Queue = asyncio.Queue()
         self._tasks: Dict[str, Task] = {}
         self._lock: asyncio.Lock = asyncio.Lock()
         self._session_manager = session_manager
+        self._persistence = persistence
         self._initialized = False
         self._poc_progress: Dict[str, dict] = {}
         self._task_progress: Dict[str, dict] = {}
@@ -33,19 +35,12 @@ class TaskQueueManager:
     async def initialize(self) -> None:
         if self._initialized:
             return
-        if self._session_manager is None:
+        if self._persistence is None:
             self._initialized = True
             return
 
-        from sdpj.infrastructure.database.result_db.result_db import ResultDB
-        from sdpj.infrastructure.database.result_db.session import SessionManager
-        if not isinstance(self._session_manager, SessionManager):
-            self._initialized = True
-            return
-
-        result_db = ResultDB(self._session_manager)
         try:
-            non_terminal = await result_db.list_non_terminal_tasks()
+            non_terminal = await self._persistence.list_non_terminal_tasks()
         except Exception:
             self._initialized = True
             return
@@ -58,7 +53,7 @@ class TaskQueueManager:
                 if tg_id:
                     tg_ids_in_tasks.add(tg_id)
             if tg_ids_in_tasks:
-                existing_groups = await result_db.list_task_groups()
+                existing_groups = await self._persistence.list_task_groups()
                 existing_ids = {g["task_group_id"] for g in existing_groups}
                 valid_group_ids = tg_ids_in_tasks & existing_ids
         except Exception:
@@ -120,7 +115,7 @@ class TaskQueueManager:
             algorithm_type=task_desc["algorithm_type"],
             dataset_id=task_desc["dataset_id"],
             status=TaskStatus.PENDING,
-            metadata=metadata
+            metadata=metadata,
         )
 
         async with self._lock:
@@ -285,17 +280,14 @@ class TaskQueueManager:
             self._dynamic_progress.pop(task_group_id, None)
 
     async def _persist_task(self, task: Task, task_group_id: str) -> None:
-        if self._session_manager is None:
+        if self._persistence is None:
             return
         try:
-            from sdpj.infrastructure.database.result_db.result_db import ResultDB
-            result_db = ResultDB(self._session_manager)
-
             try:
-                await result_db.get_task_group(task_group_id)
+                await self._persistence.get_task_group(task_group_id)
             except ValueError:
                 try:
-                    await result_db.create_task_group_with_id(
+                    await self._persistence.create_task_group_with_id(
                         task_group_id=task_group_id,
                         user_id=int(task.user_id) if task.user_id.isdigit() else 0,
                         model_id=task.model_id,
@@ -305,7 +297,7 @@ class TaskQueueManager:
 
             try:
                 dataset_id = int(task.dataset_id) if str(task.dataset_id).isdigit() else 0
-                await result_db.create_detection_task(
+                await self._persistence.create_detection_task(
                     task_group_id=task_group_id,
                     dataset_id=dataset_id,
                     task_status=task.status.value,
@@ -320,17 +312,15 @@ class TaskQueueManager:
             pass
 
     async def _persist_status(self, task_id: str, status: TaskStatus, error_message: str = "") -> None:
-        if self._session_manager is None:
+        if self._persistence is None:
             return
         try:
-            from sdpj.infrastructure.database.result_db.result_db import ResultDB
-            result_db = ResultDB(self._session_manager)
             end_time = None
             kwargs: dict = {}
             if status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED):
                 end_time = datetime.now(timezone.utc)
             if error_message:
                 kwargs["error_message"] = error_message
-            await result_db.update_task_status(task_id, status.value, end_time, **kwargs)
+            await self._persistence.update_task_status(task_id, status.value, end_time, **kwargs)
         except Exception:
             pass

@@ -3,12 +3,15 @@
 依赖模块: UserCenter (via interface)
 被依赖模块: StateScheduler
 """
+
 from typing import Optional
 
 from sdpj.drivers.user_center_interface import UserCenterInterface
 
+from .account_manager_interface import AccountManagerInterface
 
-class AccountManager:
+
+class AccountManager(AccountManagerInterface):
     """用户账号管理模块实现"""
 
     def __init__(self, user_center: UserCenterInterface):
@@ -57,53 +60,21 @@ class AccountManager:
         user = await self._user_center.get_user_by_id(user_id)
         if not user:
             return False, "用户不存在"
-        verified = await self._user_center.verify_credentials(user["username"], old_password)
+        verified, _, _ = await self._user_center.verify_credentials(user["username"], old_password)
         if not verified:
             return False, "原密码不正确"
         success = await self._user_center.update_user_password(user_id, new_password)
-        return (True, "") if success else (False, "密码更新失败")
-
-    async def change_password(self, old_password: str, new_password: str) -> tuple[bool, str]:
-        if self._current_user_id is None:
-            return False, "未登录"
-        if not new_password or len(new_password) < 6:
-            return False, "新密码长度至少6个字符"
-
-        user = await self._user_center.get_user_by_id(self._current_user_id)
-        if not user:
-            return False, "用户不存在"
-
-        verified = await self._user_center.verify_credentials(user["username"], old_password)
-        if not verified:
-            return False, "原密码不正确"
-
-        success = await self._user_center.update_user_password(self._current_user_id, new_password)
         return (True, "") if success else (False, "密码更新失败")
 
     async def switch_account(self, username: str, password: str) -> tuple[bool, Optional[int]]:
         self._current_user_id = None
         return await self.login(username, password)
 
-    async def get_current_user_profile(self) -> Optional[dict]:
-        if self._current_user_id is None:
-            return None
-        return await self._user_center.get_user_by_id(self._current_user_id)
-
     async def get_profile_for_user(self, user_id: int) -> Optional[dict]:
         return await self._user_center.get_user_by_id(user_id)
 
-    async def update_username(self, new_username: str) -> bool:
-        if self._current_user_id is None:
-            return False
-        return await self._user_center.update_username(self._current_user_id, new_username)
-
     async def update_username_for_user(self, user_id: int, new_username: str) -> bool:
         return await self._user_center.update_username(user_id, new_username)
-
-    async def list_user_resources(self) -> list[dict]:
-        if self._current_user_id is None:
-            return []
-        return await self._user_center.get_resources_by_owner(self._current_user_id)
 
     async def list_resources_for_user(self, user_id: int) -> list[dict]:
         return await self._user_center.get_resources_by_owner(user_id)
@@ -114,4 +85,3 @@ class AccountManager:
     async def list_all_users(self) -> list[dict]:
         """获取所有用户列表"""
         return await self._user_center.get_all_users()
-

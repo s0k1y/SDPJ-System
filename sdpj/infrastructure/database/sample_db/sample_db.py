@@ -4,9 +4,9 @@
 """
 
 from typing import Optional
-from .interface import SampleDBInterface
-from .session import SampleDBSessionManager
+
 from .repositories import DatasetRepository, SampleRepository
+from .session import SampleDBSessionManager
 
 
 class SampleDB:
@@ -172,10 +172,11 @@ class SampleDB:
             成功插入的总行数
         """
         from .models import DetectionSample
+
         inserted = 0
         async with self.session_manager.get_session() as session:
             for i in range(0, len(records), batch_size):
-                batch = records[i:i + batch_size]
+                batch = records[i : i + batch_size]
                 objects = [DetectionSample(subtype=r[0], poc=r[1], dataset_id=r[2]) for r in batch]
                 session.add_all(objects)
                 await session.flush()
@@ -194,11 +195,13 @@ class SampleDB:
             成功插入的总行数
         """
         from sqlalchemy import insert as sql_insert
+
         from .models import DetectionSample
+
         inserted = 0
         async with self.session_manager.get_session() as session:
             for i in range(0, len(records), batch_size):
-                batch = records[i:i + batch_size]
+                batch = records[i : i + batch_size]
                 await session.execute(
                     sql_insert(DetectionSample),
                     [{"subtype": r[0], "poc": r[1], "dataset_id": r[2]} for r in batch],
@@ -318,11 +321,11 @@ class SampleDB:
             元数据值，不存在时返回 None
         """
         from .models import SystemMeta
+
         async with self.session_manager.get_session() as session:
             from sqlalchemy import select
-            result = await session.execute(
-                select(SystemMeta.value).where(SystemMeta.key == key)
-            )
+
+            result = await session.execute(select(SystemMeta.value).where(SystemMeta.key == key))
             row = result.scalar_one_or_none()
             return row
 
@@ -334,11 +337,11 @@ class SampleDB:
             value: 元数据值
         """
         from .models import SystemMeta
+
         async with self.session_manager.get_session() as session:
             from sqlalchemy import select
-            result = await session.execute(
-                select(SystemMeta).where(SystemMeta.key == key)
-            )
+
+            result = await session.execute(select(SystemMeta).where(SystemMeta.key == key))
             existing = result.scalar_one_or_none()
             if existing is not None:
                 existing.value = value

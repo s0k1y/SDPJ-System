@@ -21,8 +21,15 @@ LLMRegistry / 大模型注册中心模块
    - 输出:是否已注册的判定结果;存在时可给出服务实例句柄
    - 触发场景:PrivateConfigManager 在写入/读取用户私有检测配置涉及指定大模型时做合法性校验(对应 1.spec.md 功能 3.1.1.2)
 
+4. 获取大模型适配器元信息
+   - 输入:大模型标识
+   - 输出:适配器元信息(如模型名称、提供商、能力描述等)
+   - 触发场景:StateScheduler 及调用方需要获取已注册大模型的详细信息,用于连通性校验或前端展示
+   - 调用下层:LLMAdapterLib 的适配器元信息查询
+   - 错误情形:指定标识未注册时透传下层错误
+
 # 用户上传注册
-4. 注册用户上传的私有大模型
+5. 注册用户上传的私有大模型
    - 输入:用户上传的适配器配置文件内容（JSON）、目标大模型标识
    - 输出:注册结果(含新登记的大模型标识)
    - 后置条件:适配器配置已入库且对应服务实例已写入本模块注册表
@@ -32,7 +39,7 @@ LLMRegistry / 大模型注册中心模块
    - 不负责的边界:不做调用方权限判定(由 DACManager 完成)
 
 # 用户移除注销
-5. 注销用户移除的私有大模型
+6. 注销用户移除的私有大模型
    - 输入:目标大模型标识
    - 输出:移除结果
    - 后置条件:对应服务实例已从注册表中清除,适配器配置制品已从 LLMAdapterLib 库中移除
@@ -40,7 +47,7 @@ LLMRegistry / 大模型注册中心模块
    - 调用下层:LLMAdapterLib 的「移除已入库的私有大模型 API 适配器」(该动作在下层触发服务实例销毁)
 
 # 关闭时销毁
-6. 关闭期批量销毁全部服务实例
+7. 关闭期批量销毁全部服务实例
    - 输入:无
    - 输出:销毁完成状态
    - 后置条件:注册表清空;下层持有的服务实例资源全部释放
@@ -48,7 +55,7 @@ LLMRegistry / 大模型注册中心模块
    - 调用下层:对当前注册表中的每个服务实例调用 LLMAdapterLib 的「销毁大模型 API 调用服务实例」
 
 # 接口契约
-7. 通过 LLMRegistryInterface 对外暴露上述能力,PrivateConfigManager 为唯一调用方(符合 4.模型依赖关系图.puml 中 PrivateConfigManager → LLMRegistry 边)
+8. 通过 LLMRegistryInterface 对外暴露上述能力,PrivateConfigManager 为唯一调用方(符合 4.模型依赖关系图.puml 中 PrivateConfigManager → LLMRegistry 边)
 
 不需要的:[不实际发起大模型 API 调用(由 LLMService 经 LLMAdapterLib 完成),不维护适配器配置制品的具体内容(仅在注册表中维护大模型标识与服务实例的映射),不做调用方权限判定(由 DACManager 完成),不做 API 密钥/鉴权凭据管理,不做被测大模型的使用情况统计]
 依赖模块:LLMAdapterLib,UtilsLib,调用接口:LLMAdapterInterface,UtilsInterface

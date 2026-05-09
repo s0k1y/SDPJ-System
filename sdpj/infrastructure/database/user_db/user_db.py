@@ -5,14 +5,13 @@
 
 from typing import Optional
 
-from .interface import UserDBInterface
-from .session import UserDBSessionManager
 from .repositories import (
-    UserRepository,
-    ResourceRepository,
     ACLRepository,
     PrivateConfigRepository,
+    ResourceRepository,
+    UserRepository,
 )
+from .session import UserDBSessionManager
 
 
 class UserDB:
@@ -94,8 +93,8 @@ class UserDB:
             return [
                 {
                     "user_id": u.user_id,
-                "username": u.username,
-                "created_at": u.created_at.isoformat() if u.created_at else None
+                    "username": u.username,
+                    "created_at": u.created_at.isoformat() if u.created_at else None,
                 }
                 for u in users
             ]
@@ -140,13 +139,15 @@ class UserDB:
             for acl in acls:
                 if acl.resource is not None:
                     owner_user = await user_repo.get_by_id(acl.resource.owner_user_id)
-                    result.append({
-                        "resource_id": acl.resource.resource_id,
-                        "resource_type": acl.resource.resource_type,
-                        "owner_user_id": acl.resource.owner_user_id,
-                        "owner_username": owner_user.username if owner_user else None,
-                        "created_at": acl.resource.created_at,
-                    })
+                    result.append(
+                        {
+                            "resource_id": acl.resource.resource_id,
+                            "resource_type": acl.resource.resource_type,
+                            "owner_user_id": acl.resource.owner_user_id,
+                            "owner_username": owner_user.username if owner_user else None,
+                            "created_at": acl.resource.created_at,
+                        }
+                    )
             return result
 
     async def get_resource_by_id(self, resource_id: int) -> Optional[dict]:

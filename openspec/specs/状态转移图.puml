@@ -1,0 +1,21 @@
+@startuml
+state "Idle" as idle
+state "Detecting" as detecting
+state "GeneratingReport" as generating_report
+state "Configuring" as configuring
+state "Error" as error
+
+[*] --> idle
+
+idle --> detecting : startDetection
+detecting --> idle : detectionCompleted
+idle --> generating_report : generateReport
+generating_report --> idle : reportCompleted
+idle --> configuring : configureSystem
+configuring --> idle : configurationCompleted
+idle --> error : systemError
+detecting --> error : systemError
+generating_report --> error : systemError
+configuring --> error : systemError
+error --> idle : recover
+@enduml

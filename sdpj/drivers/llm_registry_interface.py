@@ -13,7 +13,7 @@ LLMRegistryInterface - 大模型注册中心接口定义
 被依赖模块: PrivateConfigManager
 """
 
-from typing import Protocol, List, Dict, Any, Optional, Tuple
+from typing import Any, Dict, List, Optional, Protocol, Tuple
 
 
 class ModelInfo:
@@ -25,7 +25,7 @@ class ModelInfo:
         adapter_name: str,
         version: str,
         description: str = "",
-        supported_features: List[str] = None
+        supported_features: List[str] = None,
     ):
         """
         初始化大模型信息
@@ -50,7 +50,7 @@ class ModelInfo:
             "adapter_name": self.adapter_name,
             "version": self.version,
             "description": self.description,
-            "supported_features": self.supported_features
+            "supported_features": self.supported_features,
         }
 
 
@@ -100,11 +100,7 @@ class LLMRegistryInterface(Protocol):
         """
         ...
 
-    async def register_private_model(
-        self,
-        adapter_content: str,
-        model_id: str
-    ) -> Tuple[bool, str, str]:
+    async def register_private_model(self, adapter_content: str, model_id: str) -> Tuple[bool, str, str]:
         """
         注册用户上传的私有大模型
 
@@ -146,6 +142,17 @@ class LLMRegistryInterface(Protocol):
 
         触发场景:
             用户移除私有大模型适配器
+        """
+        ...
+
+    def get_adapter_info(self, model_id: str) -> dict:
+        """按大模型标识查询适配器元信息
+
+        Args:
+            model_id: 大模型标识
+
+        Returns:
+            dict: 适配器元信息（包含 max_rps, max_concurrency 等字段）
         """
         ...
 

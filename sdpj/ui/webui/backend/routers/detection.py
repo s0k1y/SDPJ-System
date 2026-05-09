@@ -1,14 +1,19 @@
 """检测路由 (职责 1-3)"""
-from fastapi import APIRouter, Depends, Request, UploadFile, File
+
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 
 from sdpj.control.state_scheduler_interface import StateSchedulerInterface
 from sdpj.ui.webui.backend.dependencies import get_scheduler
-from sdpj.ui.webui.backend.response import success_response, error_response, wrap_scheduler_result
+from sdpj.ui.webui.backend.response import (
+    error_response,
+    success_response,
+    wrap_scheduler_result,
+)
 from sdpj.ui.webui.backend.schemas.detection import (
-    DetectionStartRequest,
-    ConcurrentRunRequest,
     CancelTaskRequest,
+    ConcurrentRunRequest,
     ConfigOperationRequest,
+    DetectionStartRequest,
     PrivateResourceRequest,
 )
 
@@ -58,7 +63,7 @@ async def cancel_task(
         return wrap_scheduler_result(await scheduler.cancel_task_group(req.task_group_id))
     if req.task_id:
         return wrap_scheduler_result(await scheduler.cancel_task(req.task_id))
-    return error_response(message="必须提供 task_id 或 task_group_id")
+    raise HTTPException(status_code=400, detail="必须提供 task_id 或 task_group_id")
 
 
 @router.get("/datasets")
@@ -101,19 +106,18 @@ async def export_dataset(
         if "error" in dataset_file and "content" not in dataset_file:
             return error_response(message=dataset_file["error"])
 
-        content = dataset_file['content']
+        content = dataset_file["content"]
         if isinstance(content, str):
-            content = content.encode('utf-8')
+            content = content.encode("utf-8")
 
         return Response(
             content=content,
-            media_type='application/octet-stream',
-            headers={
-                'Content-Disposition': f'attachment; filename="{dataset_file["filename"]}"'
-            }
+            media_type="application/octet-stream",
+            headers={"Content-Disposition": f'attachment; filename="{dataset_file["filename"]}"'},
         )
     except Exception as e:
         import traceback
+
         print(f"导出数据集错误: {e}")
         print(traceback.format_exc())
         return error_response(message=str(e))
@@ -143,11 +147,7 @@ async def import_dataset(
     try:
         content = await file.read()
 
-        result = await scheduler.import_dataset_file(
-            user_id=user_id,
-            filename=file.filename,
-            content=content
-        )
+        result = await scheduler.import_dataset_file(user_id=user_id, filename=file.filename, content=content)
 
         if result.get("success"):
             return success_response(data={"dataset_id": result.get("dataset_id")}, message="导入成功")
@@ -155,6 +155,7 @@ async def import_dataset(
             return error_response(message=result.get("error", "导入失败"))
     except Exception as e:
         import traceback
+
         print(f"导入数据集错误: {e}")
         print(traceback.format_exc())
         return error_response(message=str(e))

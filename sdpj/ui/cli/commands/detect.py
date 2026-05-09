@@ -1,7 +1,9 @@
 """检测交互命令 (职责 1-3)"""
+
 import asyncio
 import pathlib
 import threading
+
 import click
 
 from sdpj.ui.cli.utils import output
@@ -10,16 +12,19 @@ from sdpj.ui.cli.utils import output
 @click.group("detect")
 def detect_group():
     """检测任务管理"""
-    pass
 
 
 @detect_group.command("start")
 @click.option("--model-id", required=True, help="目标被测大模型标识")
-@click.option("--type", "detection_type", default="static",
-              type=click.Choice(["static", "dynamic"]), help="检测类型")
+@click.option("--type", "detection_type", default="static", type=click.Choice(["static", "dynamic"]), help="检测类型")
 @click.option("--dataset", "dataset_ids", multiple=True, type=int, help="检测数据集ID (可多选)")
-@click.option("--jailbreak-dataset", "jailbreak_dataset_ids", multiple=True, type=int,
-              help="用于PoC池构建的越狱数据集ID (可多选，仅 --force-refresh 时有效)")
+@click.option(
+    "--jailbreak-dataset",
+    "jailbreak_dataset_ids",
+    multiple=True,
+    type=int,
+    help="用于PoC池构建的越狱数据集ID (可多选，仅 --force-refresh 时有效)",
+)
 @click.option("--config-id", type=int, default=None, help="私有检测配置标识")
 @click.option("--max-iter", default=3, type=int, help="动态算法最大迭代次数")
 @click.option("--force-refresh", is_flag=True, default=False, help="强制重新构建PoC池缓存")
@@ -197,9 +202,7 @@ def dataset_import(ctx, file_path):
     user_id = ctx.obj.require_login()
     p = pathlib.Path(file_path)
     content = p.read_bytes()
-    result = asyncio.run(ctx.obj.scheduler.import_dataset_file(
-        user_id=user_id, filename=p.name, content=content
-    ))
+    result = asyncio.run(ctx.obj.scheduler.import_dataset_file(user_id=user_id, filename=p.name, content=content))
     if result.get("success"):
         output.success(f"导入成功, 数据集ID: {result.get('dataset_id')}")
     else:

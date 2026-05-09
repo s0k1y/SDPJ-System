@@ -3,16 +3,18 @@ EventLogger 接口定义
 
 该模块定义了事件与日志管理的接口契约。
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Protocol
+from typing import Callable, Protocol
 
 
 class LogLevel(Enum):
     """日志级别枚举"""
+
     DEBUG = "debug"
     INFO = "info"
     WARN = "warn"
@@ -21,23 +23,25 @@ class LogLevel(Enum):
 
 class LogCategory(Enum):
     """日志类别枚举"""
+
     OPERATION = "operation"  # 操作日志
-    RUNTIME = "runtime"      # 运行日志
-    ERROR = "error"          # 错误日志
+    RUNTIME = "runtime"  # 运行日志
+    ERROR = "error"  # 错误日志
 
 
 @dataclass
 class LogEntry:
     """日志条目数据类"""
-    log_id: str              # 日志条目标识
-    category: LogCategory    # 日志类别
-    level: LogLevel          # 日志级别
-    timestamp: datetime      # 时间戳
-    source_module: str       # 事件来源模块
-    user_id: str | None      # 操作者用户ID（操作日志专用）
-    event_type: str          # 事件类型/操作类型/错误类型
-    description: str         # 事件描述/错误描述
-    context: dict            # 操作上下文/关键参数
+
+    log_id: str  # 日志条目标识
+    category: LogCategory  # 日志类别
+    level: LogLevel  # 日志级别
+    timestamp: datetime  # 时间戳
+    source_module: str  # 事件来源模块
+    user_id: str | None  # 操作者用户ID（操作日志专用）
+    event_type: str  # 事件类型/操作类型/错误类型
+    description: str  # 事件描述/错误描述
+    context: dict  # 操作上下文/关键参数
 
 
 class EventLoggerInterface(Protocol):
@@ -47,13 +51,7 @@ class EventLoggerInterface(Protocol):
     该接口定义了日志记录和查询的核心能力，被 StateScheduler 调用。
     """
 
-    def log_operation(
-        self,
-        user_id: str,
-        operation_type: str,
-        context: dict,
-        timestamp: datetime | None = None
-    ) -> str:
+    def log_operation(self, user_id: str, operation_type: str, context: dict, timestamp: datetime | None = None) -> str:
         """
         记录用户操作日志
 
@@ -69,11 +67,7 @@ class EventLoggerInterface(Protocol):
         ...
 
     def log_runtime(
-        self,
-        source_module: str,
-        event_type: str,
-        description: str,
-        timestamp: datetime | None = None
+        self, source_module: str, event_type: str, description: str, timestamp: datetime | None = None
     ) -> str:
         """
         记录系统运行日志
@@ -90,11 +84,7 @@ class EventLoggerInterface(Protocol):
         ...
 
     def log_error(
-        self,
-        source_module: str,
-        error_type: str,
-        description: str,
-        timestamp: datetime | None = None
+        self, source_module: str, error_type: str, description: str, timestamp: datetime | None = None
     ) -> str:
         """
         记录系统错误日志
@@ -163,4 +153,24 @@ class EventLoggerInterface(Protocol):
         Returns:
             设置成功返回 True
         """
+        ...
+
+    def subscribe_logs(self, callback: Callable[[dict], None]) -> None:
+        """订阅日志推送，callback 接收日志字典"""
+        ...
+
+    def unsubscribe_logs(self, callback: Callable[[dict], None]) -> None:
+        """取消日志订阅"""
+        ...
+
+    async def start_db_writer(self) -> None:
+        """启动异步数据库写入循环"""
+        ...
+
+    async def cleanup_old_logs(self, max_age_days: int = 7) -> int:
+        """删除超过 max_age_days 天的旧日志，返回删除条数"""
+        ...
+
+    async def flush(self) -> None:
+        """等待内存日志队列排空并取消数据库写入任务"""
         ...

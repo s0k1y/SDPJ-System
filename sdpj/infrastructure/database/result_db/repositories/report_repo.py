@@ -4,9 +4,11 @@
 """
 
 from typing import Optional
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
 from ..models import DetectionReport, DetectionTask
 
 
@@ -31,10 +33,7 @@ class ReportRepository:
         Returns:
             创建的报告对象
         """
-        report = DetectionReport(
-            report_id=report_id,
-            task_id=task_id
-        )
+        report = DetectionReport(report_id=report_id, task_id=task_id)
         self.session.add(report)
         await self.session.flush()
         return report

@@ -2,7 +2,8 @@
 
 被依赖模块: StateScheduler
 """
-from typing import Protocol, Optional, Literal
+
+from typing import Literal, Optional, Protocol
 
 
 class PrivateConfigManagerInterface(Protocol):
@@ -32,9 +33,7 @@ class PrivateConfigManagerInterface(Protocol):
         """查询可用检测数据集清单"""
         ...
 
-    async def upload_adapter(
-        self, adapter_content: str, model_id: str, user_id: int
-    ) -> tuple[bool, str, int | None]:
+    async def upload_adapter(self, adapter_content: str, model_id: str, user_id: int) -> tuple[bool, str, int | None]:
         """上传用户私有大模型适配器"""
         ...
 
@@ -42,9 +41,7 @@ class PrivateConfigManagerInterface(Protocol):
         """移除用户私有大模型适配器"""
         ...
 
-    async def upload_dataset(
-        self, name: str, risk_type: str, samples: list[dict], user_id: int
-    ) -> tuple[bool, dict]:
+    async def upload_dataset(self, name: str, risk_type: str, samples: list[dict], user_id: int) -> tuple[bool, dict]:
         """上传用户私有数据集"""
         ...
 
@@ -59,3 +56,23 @@ class PrivateConfigManagerInterface(Protocol):
     async def import_config(self, file_content: str, user_id: int) -> tuple[bool, int | None]:
         """导入用户私有检测配置"""
         ...
+
+    async def import_dataset_file(self, user_id: int, filename: str, content: bytes, username: str) -> dict:
+        """导入用户数据集文件
+        Returns: {"success": bool, "dataset_id": int | None, "error": str | None}
+        """
+        ...
+
+    async def export_dataset_file(self, dataset_id: int, username: str | None = None) -> dict | None:
+        """导出数据集文件
+        Returns: {"content": str, "filename": str} 或 None
+        """
+        ...
+
+    # LLMRegistry 委托方法（供 StateScheduler 通过本模块间接调用）
+    async def initialize_registry(self) -> bool: ...
+    async def shutdown_registry(self) -> bool: ...
+    async def is_model_available(self, model_id: str) -> tuple[bool, any]: ...
+    def get_adapter_info(self, model_id: str) -> dict: ...
+    async def register_private_model(self, adapter_content: str, model_id: str) -> tuple[bool, str, str]: ...
+    async def unregister_private_model(self, model_id: str) -> tuple[bool, str]: ...

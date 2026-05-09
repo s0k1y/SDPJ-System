@@ -3,10 +3,12 @@
 提供系统日志的 CRUD 操作。
 """
 
-from typing import Optional
 from datetime import datetime
-from sqlalchemy import select, and_, func
+from typing import Optional
+
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from ..models import SystemLog
 
 
@@ -34,7 +36,7 @@ class LogRepository:
         user_id: Optional[str],
         event_type: str,
         description: str,
-        context: Optional[dict]
+        context: Optional[dict],
     ) -> SystemLog:
         """创建日志记录
 
@@ -61,7 +63,7 @@ class LogRepository:
             user_id=user_id,
             event_type=event_type,
             description=description,
-            context=context
+            context=context,
         )
         self.session.add(log)
         await self.session.flush()
@@ -77,7 +79,7 @@ class LogRepository:
         user_id: Optional[str] = None,
         user_ids: Optional[list[str]] = None,
         limit: int = 1000,
-        offset: int = 0
+        offset: int = 0,
     ) -> list[SystemLog]:
         """按条件查询日志
 
@@ -129,7 +131,7 @@ class LogRepository:
         time_end: Optional[datetime] = None,
         source_module: Optional[str] = None,
         user_id: Optional[str] = None,
-        user_ids: Optional[list[str]] = None
+        user_ids: Optional[list[str]] = None,
     ) -> int:
         """按条件统计日志数量
 

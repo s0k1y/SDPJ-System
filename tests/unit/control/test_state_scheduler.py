@@ -17,6 +17,10 @@ class _StubDACManager:
 class _StubConfigManager:
     async def read_config(self, *a, **kw): return None
     async def query_datasets(self, *a, **kw): return []
+    async def is_model_available(self, model_id): return (True, None)
+    async def initialize_registry(self): pass
+    async def shutdown_registry(self): pass
+    async def register_private_model(self, *a, **kw): return (True, None, None)
 
 class _StubReportManager:
     pass
@@ -29,13 +33,6 @@ class _StubEventLogger:
     def log_runtime(self, *a, **kw): pass
     def log_error(self, *a, **kw): pass
 
-class _StubLLMRegistry:
-    async def is_model_available(self, model_id):
-        return (True, None)
-    async def initialize(self): pass
-    async def shutdown(self): pass
-    async def register_private_model(self, *a, **kw): return (True, None, None)
-
 
 def _make_scheduler() -> StateScheduler:
     return StateScheduler(
@@ -46,7 +43,6 @@ def _make_scheduler() -> StateScheduler:
         detector=_StubDetector(),
         event_logger=_StubEventLogger(),
         task_queue_manager=TaskQueueManager(),
-        llm_registry=_StubLLMRegistry(),
     )
 
 
@@ -93,6 +89,10 @@ class _StubConfigManagerWithDatasets:
     async def read_config(self, *a, **kw): return None
     async def query_datasets(self, *a, **kw): return []
     async def read_configs_batch(self, ids): return {}
+    async def is_model_available(self, model_id): return (True, None)
+    async def initialize_registry(self): pass
+    async def shutdown_registry(self): pass
+    async def register_private_model(self, *a, **kw): return (True, None, None)
 
 
 class _StubEventLoggerWithLog:
@@ -110,7 +110,6 @@ def _make_scheduler_with_stubs(report_mgr=None) -> StateScheduler:
         detector=_StubDetector(),
         event_logger=_StubEventLoggerWithLog(),
         task_queue_manager=TaskQueueManager(),
-        llm_registry=_StubLLMRegistry(),
     )
 
 

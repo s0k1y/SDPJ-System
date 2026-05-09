@@ -1,4 +1,5 @@
 """通用 OpenAI 兼容格式适配器引擎"""
+
 import aiohttp
 
 from sdpj.infrastructure.llm_adapters.base import LLMAdapter
@@ -20,7 +21,15 @@ class OpenAICompatibleAdapter(LLMAdapter):
     - 提供统一的错误处理和超时控制
     """
 
-    def __init__(self, model_id: str, base_url: str, api_key: str, model_name: str | None = None, max_rps: float = 0.5, max_concurrency: int = 3):
+    def __init__(
+        self,
+        model_id: str,
+        base_url: str,
+        api_key: str,
+        model_name: str | None = None,
+        max_rps: float = 0.5,
+        max_concurrency: int = 3,
+    ):
         super().__init__(model_id=model_id, max_rps=max_rps, max_concurrency=max_concurrency)
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
@@ -84,53 +93,23 @@ class OpenAICompatibleAdapter(LLMAdapter):
                         "usage": data.get("usage", {}),
                     }
                 retry_after = resp.headers.get("Retry-After") or resp.headers.get("retry-after")
-                self._raise_api_error(resp.status, data, retry_after=retry_after)
+                if resp.status == 401:
+                    error_msg = "Authentication failed"
+                elif resp.status == 429:
+                    error_msg = "Rate limit exceeded"
+                elif 400 <= resp.status < 500:
+                    error_msg = f"Client error {resp.status}"
+                else:
+                    error_msg = f"Server error {resp.status}"
+                self._raise_api_error(resp.status, error_msg, retry_after=retry_after, extra_detail=data)
         except StandardizedLLMError:
             raise
         except aiohttp.ServerTimeoutError as e:
-            raise StandardizedLLMError(
-                ErrorCategory.TIMEOUT, f"Request timed out ({timeout}s)", original_error=e
-            )
-        except aiohttp.ClientResponseError as e:
-            self._raise_api_error(e.status, {}, retry_after=None)
+            raise StandardizedLLMError(ErrorCategory.TIMEOUT, f"Request timed out ({timeout}s)", original_error=e)
         except aiohttp.ClientError as e:
-            raise StandardizedLLMError(
-                ErrorCategory.NETWORK, str(e), original_error=e
-            )
+            raise StandardizedLLMError(ErrorCategory.NETWORK, str(e), original_error=e)
         except Exception as e:
-            raise StandardizedLLMError(
-                ErrorCategory.UNKNOWN, str(e), original_error=e
-            )
-
-    @staticmethod
-    def _raise_api_error(status: int, data: dict, *, retry_after: str | None = None) -> None:
-        detail: dict | None = None
-        if retry_after is not None:
-            try:
-                detail = {"retry_after_seconds": float(retry_after)}
-            except (ValueError, TypeError):
-                detail = {"retry_after": retry_after}
-        if status == 401:
-            raise StandardizedLLMError(
-                ErrorCategory.AUTH, "Authentication failed", status_code=status, detail=detail
-            )
-        if status == 429:
-            raise StandardizedLLMError(
-                ErrorCategory.RATE_LIMIT, "Rate limit exceeded", status_code=status, detail=detail
-            )
-        if 400 <= status < 500:
-            raise StandardizedLLMError(
-                ErrorCategory.INVALID_REQUEST,
-                f"Client error {status}",
-                status_code=status,
-                detail=detail or data,
-            )
-        raise StandardizedLLMError(
-            ErrorCategory.SERVER_ERROR,
-            f"Server error {status}",
-            status_code=status,
-            detail=detail or data,
-        )
+            raise StandardizedLLMError(ErrorCategory.UNKNOWN, str(e), original_error=e)
 
     def get_metadata(self) -> dict:
         return {

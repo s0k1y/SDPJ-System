@@ -1,4 +1,5 @@
 """基于令牌桶的异步请求速率控制器"""
+
 import asyncio
 import time
 
@@ -16,6 +17,8 @@ class RateLimiter:
     """
 
     def __init__(self, max_rps: float = 0.5):
+        if max_rps <= 0:
+            raise ValueError("max_rps must be positive")
         self._rate = max_rps
         self._tokens = max_rps
         self._max_tokens = max_rps

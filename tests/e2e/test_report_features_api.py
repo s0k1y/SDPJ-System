@@ -218,8 +218,8 @@ class TestReportFeaturesFullWorkflow:
         if stats_response.status_code == 200:
             stats_data = stats_response.json()
             # 验证统计数据结构
-            assert "total" in stats_data
-            assert "compliance_rate" in stats_data
+            assert "total" in stats_data["data"]
+            assert "compliance_rate" in stats_data["data"]
 
         # 5. 查看可视化数据（假设有 task_group_id）
         viz_response = self.client.get("/api/reports/visualization/test_tg_id")

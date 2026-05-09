@@ -1,15 +1,17 @@
 """测试数据生成脚本 — 填充开发/测试用种子数据"""
+
 import asyncio
-import sys
 from pathlib import Path
 
 
 async def seed() -> None:
+    from sdpj.infrastructure.database.result_db import (
+        SessionManager as ResultDBSessionManager,
+    )
     from sdpj.infrastructure.database.sample_db import SampleDB, SampleDBSessionManager
-    from sdpj.infrastructure.database.result_db import ResultDB, SessionManager as ResultDBSessionManager
-    from sdpj.infrastructure.database.user_db import UserDB, UserDBSessionManager
+    from sdpj.infrastructure.database.user_db import UserDBSessionManager
 
-    data_dir = Path(__file__).resolve().parents[4] / "data" / "db"
+    data_dir = Path(__file__).resolve().parents[2] / "database"
     data_dir.mkdir(parents=True, exist_ok=True)
 
     # 使用统一的数据库文件
@@ -22,7 +24,10 @@ async def seed() -> None:
     await result_sm.create_tables()
     await user_sm.create_tables()
 
-    from sdpj.infrastructure.database.sample_db.builtin_datasets import load_builtin_datasets
+    from sdpj.infrastructure.database.sample_db.builtin_datasets import (
+        load_builtin_datasets,
+    )
+
     sample_db = SampleDB(sample_sm)
     await load_builtin_datasets(sample_db, force_reload=True)
 

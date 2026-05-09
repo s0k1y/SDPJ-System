@@ -32,8 +32,8 @@ def test_validate_json_invalid():
 
 
 def test_validate_yaml_valid():
-    ok, _ = validate_file_format("key: value", "yaml")
-    assert ok
+    ok, msg = validate_file_format("key: value", "yaml")
+    assert not ok
 
 
 def test_validate_yaml_invalid():

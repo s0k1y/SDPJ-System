@@ -2,7 +2,8 @@
 
 被依赖模块: CLI, WebUI
 """
-from typing import Callable, Protocol, Optional, Any
+
+from typing import Callable, Optional, Protocol
 
 
 class StateSchedulerInterface(Protocol):
@@ -64,9 +65,7 @@ class StateSchedulerInterface(Protocol):
         """查询检测报告列表"""
         ...
 
-    async def delete_report(
-        self, target_id: str, caller_user_id: int, granularity: str = "task_group"
-    ) -> dict:
+    async def delete_report(self, target_id: str, caller_user_id: int, granularity: str = "task_group") -> dict:
         """删除检测报告"""
         ...
 
@@ -162,9 +161,7 @@ class StateSchedulerInterface(Protocol):
 
     # ── 用户账号调度 (职责 13-14) ──
 
-    async def schedule_user_auth(
-        self, username: str, password: str, action: str
-    ) -> dict:
+    async def schedule_user_auth(self, username: str, password: str, action: str) -> dict:
         """调度用户注册与登录"""
         ...
 
@@ -196,7 +193,7 @@ class StateSchedulerInterface(Protocol):
         - export: 导出配置 (params: config_id, format)
         - import: 导入配置 (params: file_content)
         - verify: 验证配置可用性 (params: config_id)
-          返回 {"success": bool, "result": {"status": "ok"|"auth_failed"|"unreachable"|"format_mismatch"|"timeout"|"config_error"|"unknown_error", ...}}
+          返回 {"success": bool, "result": { "status": "ok"|"auth_failed"|...  }}
         """
         ...
 
@@ -220,8 +217,6 @@ class StateSchedulerInterface(Protocol):
         """删除用户数据集（仅允许删除 user_datasets 下的数据集）"""
         ...
 
-    async def schedule_private_resource_operation(
-        self, operation: str, params: dict
-    ) -> dict:
+    async def schedule_private_resource_operation(self, operation: str, params: dict) -> dict:
         """调度用户私有大模型适配器与私有数据集的上传与移除"""
         ...

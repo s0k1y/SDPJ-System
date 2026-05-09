@@ -3,10 +3,12 @@
 提供检测任务的数据访问操作。
 """
 
-from typing import Optional
 from datetime import datetime
+from typing import Optional
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from ..models import DetectionTask
 
 
@@ -34,7 +36,7 @@ class TaskRepository:
             algorithm_type=algorithm_type,
             metadata_json=metadata_json,
             start_time=start_time,
-            end_time=None
+            end_time=None,
         )
         self.session.add(task)
         await self.session.flush()
@@ -53,9 +55,7 @@ class TaskRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_by_group_and_dataset(
-        self, task_group_id: str, dataset_id: int
-    ) -> Optional[DetectionTask]:
+    async def get_by_group_and_dataset(self, task_group_id: str, dataset_id: int) -> Optional[DetectionTask]:
         stmt = select(DetectionTask).where(
             DetectionTask.task_group_id == task_group_id,
             DetectionTask.dataset_id == dataset_id,
@@ -77,11 +77,7 @@ class TaskRepository:
         return list(result.scalars().all())
 
     async def update_status(
-        self,
-        task_id: str,
-        task_status: str,
-        end_time: Optional[datetime] = None,
-        error_message: Optional[str] = None
+        self, task_id: str, task_status: str, end_time: Optional[datetime] = None, error_message: Optional[str] = None
     ) -> bool:
         """更新任务状态
 
@@ -117,8 +113,6 @@ class TaskRepository:
         return True
 
     async def list_non_terminal(self) -> list[DetectionTask]:
-        stmt = select(DetectionTask).where(
-            DetectionTask.task_status.in_(["pending", "running"])
-        )
+        stmt = select(DetectionTask).where(DetectionTask.task_status.in_(["pending", "running"]))
         result = await self.session.execute(stmt)
         return list(result.scalars().all())

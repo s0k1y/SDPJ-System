@@ -1,19 +1,39 @@
 """FastAPI 应用组装"""
+
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
-
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
-from sdpj.ui.webui.backend.middleware.cors import setup_cors
+from sdpj.core.secure_comm_manager import SecureCommManager
 from sdpj.ui.webui.backend.middleware.auth import AuthMiddleware
-from sdpj.ui.webui.backend.response import success_response, error_response, wrap_scheduler_result
+from sdpj.ui.webui.backend.middleware.cors import setup_cors
+from sdpj.ui.webui.backend.response import success_response
 from sdpj.ui.webui.backend.routers import auth, detection, reports, users, websocket
+
+SYSTEM_USERNAME = "SDPJ-System"
+SYSTEM_USER_IDS = (None, "0", "system")
+
+# 安全通信管理器（单例）
+_secure_comm = SecureCommManager()
+
+
+class _SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """安全响应头中间件，由 SecureCommManager 提供头部配置"""
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        for header_name, header_value in _secure_comm.get_security_headers().items():
+            response.headers[header_name] = header_value
+        return response
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from sdpj.ui.webui.backend.dependencies import get_scheduler
+
     scheduler = get_scheduler()
     await scheduler.startup()
     yield
@@ -24,9 +44,11 @@ def create_app() -> FastAPI:
     app = FastAPI(title="SDPJ-System API", version="1.0.0", lifespan=lifespan)
 
     from sdpj.infrastructure.config.settings import get_settings
+
     setup_cors(app)
+    app.add_middleware(_SecurityHeadersMiddleware)
     app.add_middleware(AuthMiddleware)
-    app.add_middleware(SessionMiddleware, secret_key=get_settings().resolve_secret_key())
+    app.add_middleware(SessionMiddleware, secret_key=get_settings().resolve_secret_key(), same_site="lax", https_only=True)
 
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):
@@ -52,6 +74,7 @@ def create_app() -> FastAPI:
     @app.get("/api/status")
     async def status():
         from sdpj.ui.webui.backend.dependencies import get_scheduler
+
         return success_response(data={"status": get_scheduler().get_system_state()})
 
     @app.get("/api/logs")
@@ -61,7 +84,7 @@ def create_app() -> FastAPI:
         source_module: str = None,
         user_id: str = None,
         page: int = 1,
-        page_size: int = 20
+        page_size: int = 20,
     ):
         from sdpj.ui.webui.backend.dependencies import get_scheduler
 
@@ -73,8 +96,8 @@ def create_app() -> FastAPI:
         if source_module:
             filters["source_module"] = source_module
 
-        if user_id == "SDPJ-System":
-            filters["user_ids"] = [None, "0", "system"]
+        if user_id == SYSTEM_USERNAME:
+            filters["user_ids"] = list(SYSTEM_USER_IDS)
         elif user_id:
             filters["user_id"] = user_id
 
@@ -90,10 +113,10 @@ def create_app() -> FastAPI:
 
         for log in logs_data:
             uid = log.get("user_id")
-            if uid and uid not in (None, "0", "system"):
+            if uid and uid not in SYSTEM_USER_IDS:
                 log["username"] = user_map.get(str(uid), f"User#{uid}")
             else:
-                log["username"] = "SDPJ-System"
+                log["username"] = SYSTEM_USERNAME
 
         return success_response(data={"logs": logs_data, "total": total})
 
@@ -105,7 +128,7 @@ def create_app() -> FastAPI:
         all_logs = result.get("logs", [])
         unique_user_ids = set()
         for log in all_logs:
-            if log.get("user_id") and log["user_id"] not in ("0", "system", None):
+            if log.get("user_id") and log["user_id"] not in SYSTEM_USER_IDS:
                 unique_user_ids.add(str(log["user_id"]))
 
         all_users = await get_scheduler().list_all_users()
@@ -121,4 +144,14 @@ app = create_app()
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("sdpj.ui.webui.backend.app:app", host="0.0.0.0", port=8000, reload=True)
+
+    from sdpj.infrastructure.config.settings import get_settings
+
+    settings = get_settings()
+    uvicorn.run(
+        "sdpj.ui.webui.backend.app:app",
+        host=settings.api_host,
+        port=settings.api_port,
+        reload=True,
+        **_secure_comm.get_ssl_kwargs(),
+    )

@@ -1,4 +1,5 @@
 """UtilsLib 数据校验工具"""
+
 from typing import Any
 
 
@@ -63,11 +64,10 @@ def validate_data(data: Any, schema: dict) -> tuple[bool, str]:
             return False, f"字符串长度 {len(data)} 超过最大限制 {max_len}"
 
     elif expected_type in ("int", "float"):
-        target = int if expected_type == "int" else float
         if not isinstance(data, (int, float)):
             return False, f"期望 {expected_type}，实际为 {type(data).__name__}"
         if expected_type == "int" and not isinstance(data, int):
-            return False, f"期望 int，实际为 float"
+            return False, "期望 int，实际为 float"
         min_val = schema.get("min_value")
         max_val = schema.get("max_value")
         if min_val is not None and data < min_val:

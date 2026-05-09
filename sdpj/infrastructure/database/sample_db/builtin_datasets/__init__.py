@@ -1,12 +1,13 @@
 """内置数据集加载器
 
 优化策略：
-1. system_meta 标记：二次启动直接跳过，零文件读取
+1. 增量检测：二次启动时逐文件检查MD5，仅重新加载变化的文件
 2. manifest.json 预计算清单：替代运行时逐行计数
 3. 单次遍历：合并计数和解析为一次文件读取
 4. asyncio.to_thread：文件 I/O 不阻塞事件循环
 5. 原生 SQL 批量插入：绕过 ORM 层提升写入性能
 """
+
 import asyncio
 import hashlib
 import json
@@ -63,20 +64,15 @@ def _compute_file_md5(file_path: Path) -> str:
 async def load_builtin_datasets(sample_db, force_reload: bool = False) -> None:
     """加载内置数据集，保留完整的目录层级结构
 
-    优化流程：
-    1. 若 system_meta 中 builtin_datasets_loaded=True 且非强制重载，直接返回
+    增量加载流程：
+    1. 若非强制重载，逐文件检查：数据库行数与文件行数一致则跳过
     2. 对每个 jsonl 文件：
        a. 优先从 manifest.json 获取行数（MD5 校验）
        b. manifest 不可用时回退单次遍历计数+解析
        c. 幂等检查：已存在且行数一致则跳过
-       d. 使用原生 SQL 批量插入
-    3. 全部加载完成后写入 system_meta 标记
+       d. 行数不一致时删除旧样本重新插入
+       e. 使用原生 SQL 批量插入
     """
-    if not force_reload:
-        loaded = await sample_db.get_system_meta(_LOADED_KEY)
-        if loaded == "True":
-            return
-
     manifest = _load_manifest()
 
     for jsonl_file in sorted(_BASE.rglob("*.jsonl")):
@@ -107,9 +103,10 @@ async def load_builtin_datasets(sample_db, force_reload: bool = False) -> None:
             if existing is None:
                 continue
             dataset_id = existing["dataset_id"]
-            sample_count = await sample_db.get_sample_count_by_dataset(dataset_id)
-            if sample_count == file_line_count:
-                continue
+            if not force_reload:
+                sample_count = await sample_db.get_sample_count_by_dataset(dataset_id)
+                if sample_count == file_line_count:
+                    continue
             await sample_db.delete_samples_by_dataset(dataset_id)
 
         if records is None:
@@ -119,5 +116,3 @@ async def load_builtin_datasets(sample_db, force_reload: bool = False) -> None:
 
         if records:
             await sample_db.bulk_insert_samples(records)
-
-    await sample_db.set_system_meta(_LOADED_KEY, "True")

@@ -4,9 +4,9 @@
 """
 
 from .interface import UserDBInterface
-from .user_db import UserDB
+from .models import AccessControl, PrivateConfig, Resource, User
 from .session import UserDBSessionManager
-from .models import User, Resource, AccessControl, PrivateConfig
+from .user_db import UserDB
 
 __all__ = [
     "UserDBInterface",

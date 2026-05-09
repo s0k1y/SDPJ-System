@@ -1,15 +1,16 @@
 """LLM 适配器错误定义与服务实例"""
+
 from enum import Enum
 from typing import Any
 
 
 class LLMError(Exception):
     """LLM 错误基类"""
-    pass
 
 
 class ErrorCategory(Enum):
     """标准化错误分类（对应规格职责 7）"""
+
     NETWORK = "network_error"
     AUTH = "auth_error"
     RATE_LIMIT = "rate_limit_error"
@@ -31,6 +32,14 @@ class StandardizedLLMError(LLMError):
         detail: Any = None,
     ):
         self.category = category
+        # 空消息防护：避免日志和下游丢失错误上下文
+        if not message or not message.strip():
+            if original_error is not None:
+                message = f"{category.value}: {type(original_error).__name__}({original_error!r})"
+            elif status_code is not None:
+                message = f"{category.value}: HTTP {status_code}"
+            else:
+                message = f"{category.value}: (no detail available)"
         self.message = message
         self.original_error = original_error
         self.status_code = status_code
@@ -51,17 +60,14 @@ class StandardizedLLMError(LLMError):
 
 class AdapterNotFoundError(Exception):
     """适配器未找到"""
-    pass
 
 
 class AdapterValidationError(Exception):
     """适配器校验失败"""
-    pass
 
 
 class AdapterAlreadyExistsError(Exception):
     """同标识适配器已存在"""
-    pass
 
 
 class LLMServiceInstance:
@@ -86,6 +92,8 @@ class LLMServiceInstance:
             **adapter_kwargs,
         )
 
-    def destroy(self) -> None:
+    async def destroy(self) -> None:
         self._active = False
+        if self.adapter is not None:
+            await self.adapter.close()
         self.adapter = None

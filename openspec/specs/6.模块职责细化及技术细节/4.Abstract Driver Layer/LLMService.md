@@ -24,28 +24,38 @@ LLMService / 大模型服务接口模块
    - 触发场景:SDPJDetector 对每条样本完成一次独立注入并读取响应(对应 1.spec.md 功能 1.1 / 1.2)
    - 不负责的边界:不在调用间保留任何上下文或会话状态
 
+# 连通性校验
+4. 校验大模型连通性
+   - 输入:目标大模型标识
+   - 输出:连通性校验结果(含可达性判定及状态描述)
+   - 触发场景:SDPJDetector 在执行检测前验证目标大模型服务可达,避免检测中途因网络不可达而失败
+   - 调用下层:通过 LLMAdapterLib 获取服务实例并发起试探性调用;必要时解析 HTTP 状态码字符串以判定连通性状态
+   - 错误情形:目标模型未注册、网络不可达、服务返回非预期状态码等均返回不可达判定及详细原因描述
+
 # 重试与错误处理
-4. 基于标准化错误的重试与退避决策
-   - 输入:LLMAdapterLib 已做标准化的错误语义(网络错误、限流错误等可恢复类别)
+5. 基于标准化错误的重试与退避决策
+   - 输入:LLMAdapterLib 已做标准化的错误语义(网络错误、限流错误等可恢复类别),误差类型为 StandardizedLLMError
    - 输出:重试/放弃/向上返回错误的决策结果
    - 触发场景:大模型 API 调用过程中发生可恢复异常时(对应 1.spec.md 功能 1.1 / 1.2 的异常路径)
    - 调用下层:由 LLMAdapterLib 的「统一大模型 API 调用错误」前置提供错误语义
    - 不负责的边界:不自行识别原生异常分类(由 LLMAdapterLib 完成);不做鉴权凭据管理
+   - 实现说明:本模块维护两套重试逻辑——公开方法 `should_retry` 供调用方直接进行重试决策判定,私有方法 `_should_retry` 面向 tenacity 重试框架提供谓词回调,两者判定标准一致但接口形态不同
 
-5. 不可恢复错误的向上反馈
-   - 输入:LLMAdapterLib 已做标准化的错误语义(鉴权错误、参数错误、模型内部错误等)
-   - 输出:向上返回的结构化错误结果
+6. 不可恢复错误的向上反馈
+   - 输入:LLMAdapterLib 已做标准化的错误语义(鉴权错误、参数错误、模型内部错误等),误差类型为 StandardizedLLMError
+   - 输出:抛出异常(不可恢复错误以异常形式向上传播,供调用方统一捕获处理)
    - 触发场景:经过重试策略判定后仍无法完成调用,或错误分类本身不可恢复
+   - 实现说明:规范原要求"向上返回结构化错误结果",实际实现在不可恢复错误时抛出异常而非返回结果。调用方需以异常捕获方式处理此路径。`format_error_response` 方法仍可用于将 StandardizedLLMError 格式化为结构化错误描述供日志或响应体使用。
 
 # 响应回传
-6. 将模型原始响应回传给调用方
+7. 将模型原始响应回传给调用方
    - 输入:模型原始响应
    - 输出:向 SDPJDetector 返回的响应内容
    - 触发场景:单次调用成功完成后
    - 不负责的边界:不做响应内容的业务语义解析与合规判断(由 SDPJDetector 完成);不做编码/多模态还原(由 DataProcessor 借 UtilsLib 完成)
 
 # 接口契约
-7. 通过 LLMServiceInterface 对外暴露上述能力,SDPJDetector 为唯一调用方(符合 4.模型依赖关系图.puml 中 SDPJDetector → LLMService 边)
+8. 通过 LLMServiceInterface 对外暴露上述能力,SDPJDetector 为唯一调用方(符合 4.模型依赖关系图.puml 中 SDPJDetector → LLMService 边)
 
 不需要的:[不维护多轮对话历史(API 调用无记忆性,每次为独立新会话),不入库/销毁大模型 API 适配器(由 LLMRegistry 与 LLMAdapterLib 完成),不记录 API 调用日志(由 EventLogger 完成),不做鉴权凭据持久化,不做响应内容业务语义解析(由 SDPJDetector 完成),不做响应的编码/多模态还原(由 DataProcessor 借 UtilsLib 完成)]
 依赖模块:LLMAdapterLib,UtilsLib,调用接口:LLMAdapterInterface,UtilsInterface

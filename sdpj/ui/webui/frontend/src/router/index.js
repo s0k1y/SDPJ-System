@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../store'
+import { checkSession } from '../api/auth'
 
 const routes = [
   {
@@ -29,11 +30,38 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore()
+
+  // 需要认证但本地无用户信息 → 跳转登录
   if (to.path !== '/login' && !authStore.isAuthenticated) {
     next('/login')
-  } else if (to.path === '/login' && authStore.isAuthenticated) {
+    return
+  }
+
+  // 已认证但尚未通过服务端校验 → 调用 /api/auth/me 验证
+  if (authStore.isAuthenticated && !authStore.sessionValidated) {
+    try {
+      const res = await checkSession()
+      if (res && res.success) {
+        // 服务端校验通过，更新本地用户信息
+        authStore.setUser(res.data)
+        // 校验通过后继续正常导航逻辑
+      } else {
+        authStore.logout()
+        next('/login')
+        return
+      }
+    } catch {
+      // 401 或网络错误，拦截器已处理清除，保险起见也登出
+      authStore.logout()
+      next('/login')
+      return
+    }
+  }
+
+  // 已认证且已校验 → 正常放行
+  if (to.path === '/login' && authStore.isAuthenticated) {
     next('/dashboard')
   } else {
     next()

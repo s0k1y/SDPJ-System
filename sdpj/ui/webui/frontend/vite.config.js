@@ -3,10 +3,19 @@ import vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
+import fs from 'fs'
+import path from 'path'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const backendPort = env.VITE_BACKEND_PORT || '8000'
+
+  // 证书路径：项目根目录/certs/
+  const projectRoot = path.resolve(__dirname, '..', '..', '..', '..')
+  const certPath = path.join(projectRoot, 'certs', 'cert.pem')
+  const keyPath = path.join(projectRoot, 'certs', 'key.pem')
+
+  const hasCerts = fs.existsSync(certPath) && fs.existsSync(keyPath)
 
   return {
     plugins: [
@@ -37,14 +46,22 @@ export default defineConfig(({ mode }) => {
       }
     },
     server: {
+      https: hasCerts
+        ? {
+            cert: fs.readFileSync(certPath),
+            key: fs.readFileSync(keyPath),
+          }
+        : undefined,
       proxy: {
         '/api': {
-          target: `http://localhost:${backendPort}`,
-          changeOrigin: true
+          target: `https://127.0.0.1:${backendPort}`,
+          changeOrigin: true,
+          secure: false, // 信任自签名证书
         },
         '/ws': {
-          target: `ws://localhost:${backendPort}`,
+          target: `wss://127.0.0.1:${backendPort}`,
           ws: true,
+          secure: false,
           configure: (proxy) => {
             proxy.on('error', () => {})
             proxy.on('close', () => {})

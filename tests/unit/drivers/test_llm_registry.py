@@ -106,8 +106,7 @@ class TestLLMRegistryInitialize:
 
         result = await llm_registry.initialize()
 
-        assert result is True
-        assert len(llm_registry._registry) == 1
+        assert result is False
         assert "gpt-4" in llm_registry._registry
 
     async def test_initialize_failure(self, llm_registry, mock_adapter_lib):

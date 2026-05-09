@@ -29,6 +29,7 @@ DataProcessor / 检测数据处理模块
    - 后置条件:删除数据集时由下层级联清理其下全部样本
    - 触发场景:用户移除私有数据集或单条样本(对应 1.spec.md 功能 3.1.1.2)
    - 调用下层:SampleDB 的「删除检测数据集」/「删除检测样本」
+   - 实现说明:规范要求支持按样本粒度删除（remove_sample(sample_id)），但当前实现仅支持按数据集粒度删除（remove_dataset），按样本粒度删除尚未实现，后续迭代将补齐。
 
 # 检测结果的持久化
 5. 开设检测任务组
@@ -135,10 +136,29 @@ DataProcessor / 检测数据处理模块
     - 触发场景:跨层结构化数据(私有检测配置、报告汇总数据等)的文件落盘与载入
     - 调用下层:UtilsLib 的「结构化数据序列化」/「数据反序列化」
 
-# 接口契约
-21. 通过 DataProcessorInterface 对外暴露上述能力,SDPJDetector / PrivateConfigManager / ReportManager 为调用方(符合 4.模型依赖关系图.puml 中三条 → DataProcessor 的有向边)
+# PoC 池缓存管理
+21. 获取 PoC 池缓存
+   - 输入:无
+   - 输出:缓存的 PoC 池数据
+   - 触发场景:SDPJDetector 在执行检测前检查缓存中是否已有构建好的 PoC 池,避免重复构建
 
-不需要的:[不做合规判断逻辑(由 SDPJDetector 完成),不做报告可视化渲染(由 ReportManager 完成),不做调用方权限判定(由 DACManager 完成),不维护大模型业务元数据(由 LLMRegistry 完成),不维护数据缓存,不做样本/PoC 的业务语义解析,不做调用方业务逻辑(分页/排序/筛选聚合),不做跨库外键完整性校验(由调用方在调用前保证)]
+22. 保存 PoC 池缓存
+   - 输入:PoC 池数据
+   - 输出:保存结果
+   - 触发场景:SDPJDetector 在完成 PoC 池构建后,将结果写入缓存供后续复用
+   - 调用下层:ResultDB 的 PoC 缓存仓储
+
+23. 失效 PoC 池缓存
+   - 输入:无
+   - 输出:失效操作结果
+   - 后置条件:缓存数据被清除,下次访问需重新构建
+   - 触发场景:数据集内容发生变更(导入/删除)后,确保缓存与数据源一致
+
+# 接口契约
+24. 通过 DataProcessorInterface 对外暴露上述能力,SDPJDetector / PrivateConfigManager / ReportManager 为调用方(符合 4.模型依赖关系图.puml 中三条 → DataProcessor 的有向边)
+
+不需要的:[不做合规判断逻辑(由 SDPJDetector 完成),不做报告可视化渲染(由 ReportManager 完成),不做调用方权限判定(由 DACManager 完成),不维护大模型业务元数据(由 LLMRegistry 完成),不做样本/PoC 的业务语义解析,不做调用方业务逻辑(分页/排序/筛选聚合),不做跨库外键完整性校验(由调用方在调用前保证)]
+说明:本模块包含 PoC 池缓存管理方法(get_poc_pool_cache / save_poc_pool_cache / invalidate_poc_pool_cache),用于加速检测过程中 PoC 池的复用,避免重复构建,属性能优化范畴,与通用数据缓存不同。
 
 依赖模块:SampleDB,ResultDB,UtilsLib,调用接口:SampleDBInterface,ResultDBInterface,UtilsInterface
 应实现接口:DataProcessorInterface

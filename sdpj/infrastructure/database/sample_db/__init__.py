@@ -5,9 +5,9 @@
 
 from .interface import SampleDBInterface
 from .models import Base, Dataset, DetectionSample
-from .session import SampleDBSessionManager, get_session_manager
-from .sample_db import SampleDB
 from .repositories import DatasetRepository, SampleRepository
+from .sample_db import SampleDB
+from .session import SampleDBSessionManager, get_session_manager
 
 __all__ = [
     "SampleDBInterface",

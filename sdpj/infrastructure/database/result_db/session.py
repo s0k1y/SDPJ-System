@@ -3,17 +3,19 @@
 提供异步数据库会话的创建和管理。
 """
 
-from typing import AsyncGenerator, Optional
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from typing import AsyncGenerator, Optional
+
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
-    create_async_engine,
-    async_sessionmaker,
+    AsyncEngine,
     AsyncSession,
-    AsyncEngine
+    async_sessionmaker,
+    create_async_engine,
 )
-from sqlalchemy.pool import NullPool, StaticPool
+from sqlalchemy.pool import StaticPool
+
 from .models import Base
 
 
@@ -48,6 +50,7 @@ class SessionManager:
             )
 
             if "sqlite" in self.database_url:
+
                 @event.listens_for(self.engine.sync_engine, "connect")
                 def _set_pragmas(dbapi_conn, connection_record):
                     cursor = dbapi_conn.cursor()
@@ -57,16 +60,13 @@ class SessionManager:
                     cursor.execute("PRAGMA synchronous=NORMAL")
                     cursor.close()
 
-            self.async_session_maker = async_sessionmaker(
-                self.engine,
-                class_=AsyncSession,
-                expire_on_commit=False
-            )
+            self.async_session_maker = async_sessionmaker(self.engine, class_=AsyncSession, expire_on_commit=False)
 
     async def create_tables(self) -> None:
-        from sdpj.infrastructure.database.user_db.models import User  # noqa
-        from sdpj.infrastructure.database.sample_db.models import Dataset  # noqa
         from sdpj.infrastructure.database.result_db.models import SystemLog  # noqa
+        from sdpj.infrastructure.database.sample_db.models import Dataset  # noqa
+        from sdpj.infrastructure.database.user_db.models import User  # noqa
+
         if self.engine is None:
             await self.initialize()
         async with self.engine.begin() as conn:
@@ -77,22 +77,16 @@ class SessionManager:
     async def _migrate_detection_task(self, conn) -> None:
         """为 DetectionTask 表补充 algorithm_type、metadata_json 和 error_message 列"""
         try:
-            result = await conn.exec_driver_sql(
-                "PRAGMA table_info('DetectionTask')"
-            )
+            result = await conn.exec_driver_sql("PRAGMA table_info('DetectionTask')")
             columns = {row[1] for row in await result.fetchall()}
             if "algorithm_type" not in columns:
                 await conn.exec_driver_sql(
                     "ALTER TABLE DetectionTask ADD COLUMN algorithm_type VARCHAR(20) NOT NULL DEFAULT 'static'"
                 )
             if "metadata_json" not in columns:
-                await conn.exec_driver_sql(
-                    "ALTER TABLE DetectionTask ADD COLUMN metadata_json JSON"
-                )
+                await conn.exec_driver_sql("ALTER TABLE DetectionTask ADD COLUMN metadata_json JSON")
             if "error_message" not in columns:
-                await conn.exec_driver_sql(
-                    "ALTER TABLE DetectionTask ADD COLUMN error_message TEXT"
-                )
+                await conn.exec_driver_sql("ALTER TABLE DetectionTask ADD COLUMN error_message TEXT")
         except Exception:
             pass
 
@@ -112,7 +106,7 @@ class SessionManager:
 
             local_offset = datetime.now().astimezone().utcoffset()
             if local_offset is None:
-                local_offset = __import__('datetime').timedelta(0)
+                local_offset = __import__("datetime").timedelta(0)
 
             for table_name, ts_columns in [
                 ("SystemLog", ["timestamp"]),
@@ -130,9 +124,7 @@ class SessionManager:
                 if total == 0:
                     continue
 
-                pk_result = await conn.exec_driver_sql(
-                    f"PRAGMA table_info('{table_name}')"
-                )
+                pk_result = await conn.exec_driver_sql(f"PRAGMA table_info('{table_name}')")
                 pk_col = None
                 for col_info in await pk_result.fetchall():
                     if col_info[5]:
@@ -159,12 +151,8 @@ class SessionManager:
                                 (new_ts, pk_val),
                             )
 
-            await conn.exec_driver_sql(
-                "CREATE TABLE _utc_migrated (done INTEGER NOT NULL DEFAULT 1)"
-            )
-            await conn.exec_driver_sql(
-                "INSERT INTO _utc_migrated (done) VALUES (1)"
-            )
+            await conn.exec_driver_sql("CREATE TABLE _utc_migrated (done INTEGER NOT NULL DEFAULT 1)")
+            await conn.exec_driver_sql("INSERT INTO _utc_migrated (done) VALUES (1)")
         except Exception:
             pass
 

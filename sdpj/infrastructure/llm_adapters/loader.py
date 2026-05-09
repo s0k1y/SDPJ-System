@@ -1,4 +1,5 @@
 """JSON 配置加载器 — 根据 request_format 创建对应适配器实例"""
+
 import json
 from pathlib import Path
 from typing import Union
@@ -49,6 +50,7 @@ def load_adapter_from_config(model_id: str, config: Union[dict, str, Path]) -> L
         try:
             module_name, class_name = adapter_class_name.rsplit(".", 1)
             import importlib
+
             module = importlib.import_module(module_name)
             adapter_class = getattr(module, class_name)
 
@@ -56,8 +58,8 @@ def load_adapter_from_config(model_id: str, config: Union[dict, str, Path]) -> L
             if not issubclass(adapter_class, LLMAdapter):
                 raise AdapterValidationError(f"{adapter_class_name} must inherit from LLMAdapter")
 
-            _META_KEYS = {"request_format", "adapter_class", "max_rps", "max_concurrency"}
-            filtered_config = {k: v for k, v in config.items() if k not in _META_KEYS}
+            _meta_keys = {"request_format", "adapter_class", "max_rps", "max_concurrency"}
+            filtered_config = {k: v for k, v in config.items() if k not in _meta_keys}
             return adapter_class(model_id=model_id, max_rps=max_rps, max_concurrency=max_concurrency, **filtered_config)
         except (ImportError, AttributeError, TypeError) as e:
             raise AdapterValidationError(f"Failed to load custom adapter: {e}")
@@ -73,6 +75,7 @@ def load_adapter_from_config(model_id: str, config: Union[dict, str, Path]) -> L
 
     if request_format == "anthropic":
         from sdpj.infrastructure.llm_adapters.anthropic_adapter import AnthropicAdapter
+
         clean_url = api_url.rstrip("/")
         clean_url = clean_url.removesuffix("/v1/messages").removesuffix("/messages")
         return AnthropicAdapter(
@@ -87,6 +90,7 @@ def load_adapter_from_config(model_id: str, config: Union[dict, str, Path]) -> L
 
     # 默认使用 OpenAI 兼容格式
     from sdpj.infrastructure.llm_adapters.openai_adapter import OpenAIAdapter
+
     return OpenAIAdapter(
         model_id=model_id,
         base_url=api_url.rstrip("/").removesuffix("/chat/completions"),

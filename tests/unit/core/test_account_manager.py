@@ -63,25 +63,26 @@ class TestLogout:
 
 @pytest.mark.asyncio
 class TestChangePassword:
-    async def test_not_logged_in(self):
-        ok, msg = await AccountManager(AsyncMock()).change_password("old", "newpass123")
-        assert not ok and "未登录" in msg
+    async def test_user_not_found(self):
+        mgr = AccountManager(_uc(
+            get_user_by_id=lambda uid: None,
+        ))
+        ok, msg = await mgr.change_password_for_user(0, "old", "newpass123")
+        assert not ok
 
     async def test_wrong_old_password(self):
         mgr = AccountManager(_uc(
-            verify_credentials=lambda u, p: None,
             get_user_by_id=lambda uid: {"username": "alice"},
+            verify_credentials=lambda u, p: (False, None, "密码错误"),
         ))
-        mgr._current_user_id = 1
-        ok, _ = await mgr.change_password("wrong", "newpass123")
+        ok, _ = await mgr.change_password_for_user(1, "wrong", "newpass123")
         assert not ok
 
     async def test_success(self):
         mgr = AccountManager(_uc(
-            verify_credentials=lambda u, p: 1,
             get_user_by_id=lambda uid: {"username": "alice"},
+            verify_credentials=lambda u, p: (True, 1, ""),
             update_user_password=lambda uid, pw: True,
         ))
-        mgr._current_user_id = 1
-        ok, _ = await mgr.change_password("old", "newpass123")
+        ok, _ = await mgr.change_password_for_user(1, "old", "newpass123")
         assert ok

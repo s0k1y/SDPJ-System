@@ -1,7 +1,11 @@
 """LLMAdapterLib 接口定义（对应规格职责 1-8）"""
+
 from typing import Protocol
 
-from sdpj.infrastructure.llm_adapters.errors import LLMServiceInstance, StandardizedLLMError
+from sdpj.infrastructure.llm_adapters.errors import (
+    LLMServiceInstance,
+    StandardizedLLMError,
+)
 
 
 class LLMAdapterLibInterface(Protocol):
@@ -32,7 +36,7 @@ class LLMAdapterLibInterface(Protocol):
         """获取大模型 API 调用服务实例"""
         ...
 
-    def destroy_service_instance(self, instance: LLMServiceInstance) -> bool:
+    async def destroy_service_instance(self, instance: LLMServiceInstance) -> bool:
         """销毁服务实例"""
         ...
 

@@ -4,10 +4,12 @@
 """
 
 from typing import Optional
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
+
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import noload
+
 from ..models import Dataset, DetectionSample
 
 
@@ -93,11 +95,7 @@ class DatasetRepository:
             .scalar_subquery()
             .label("sample_count")
         )
-        stmt = (
-            select(Dataset, count_subq)
-            .options(noload(Dataset.samples))
-            .order_by(Dataset.created_at.desc())
-        )
+        stmt = select(Dataset, count_subq).options(noload(Dataset.samples)).order_by(Dataset.created_at.desc())
         result = await self.session.execute(stmt)
         rows = result.all()
         return [
@@ -147,6 +145,11 @@ class DatasetRepository:
         Returns:
             匹配的数据集列表
         """
-        stmt = select(Dataset).options(noload(Dataset.samples)).where(Dataset.risk_type == risk_type).order_by(Dataset.created_at.desc())
+        stmt = (
+            select(Dataset)
+            .options(noload(Dataset.samples))
+            .where(Dataset.risk_type == risk_type)
+            .order_by(Dataset.created_at.desc())
+        )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())

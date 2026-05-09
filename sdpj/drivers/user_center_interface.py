@@ -4,7 +4,7 @@ UserCenter 模块对外暴露的接口契约，定义用户管理中心的所有
 调用方：PrivateConfigManager, ReportManager, AccountManager, DACManager
 """
 
-from typing import Protocol, Optional
+from typing import Optional, Protocol
 
 
 class UserCenterInterface(Protocol):
@@ -133,7 +133,7 @@ class UserCenterInterface(Protocol):
 
     # ==================== 凭据校验 ====================
 
-    async def verify_credentials(self, username: str, password: str) -> Optional[int]:
+    async def verify_credentials(self, username: str, password: str) -> tuple[bool, Optional[int], str]:
         """登录凭据校验
 
         Args:
@@ -141,7 +141,7 @@ class UserCenterInterface(Protocol):
             password: 明文密码
 
         Returns:
-            校验通过时返回用户 ID，失败时返回 None
+            (是否成功, 用户ID或None, 错误消息)
 
         触发场景:
             用户登录（对应 1.spec.md 功能 3.1.1.1）

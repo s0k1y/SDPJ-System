@@ -2,7 +2,8 @@
 
 被依赖模块: StateScheduler
 """
-from typing import Protocol, Optional, Literal
+
+from typing import Literal, Optional, Protocol
 
 
 class ReportManagerInterface(Protocol):
@@ -20,9 +21,7 @@ class ReportManagerInterface(Protocol):
         """计算报告统计指标"""
         ...
 
-    async def list_reports(
-        self, user_id: Optional[str] = None, model_id: Optional[str] = None
-    ) -> list[dict]:
+    async def list_reports(self, user_id: Optional[str] = None, model_id: Optional[str] = None) -> list[dict]:
         """查询检测报告列表"""
         ...
 
@@ -55,7 +54,11 @@ class ReportManagerInterface(Protocol):
         ...
 
     async def export_report(
-        self, task_group_id: str, target_format: Literal["json", "yaml", "jsonl"] = "json", *, user_id: int | None = None
+        self,
+        task_group_id: str,
+        target_format: Literal["json", "yaml", "jsonl"] = "json",
+        *,
+        user_id: int | None = None,
     ) -> tuple[str, str]:
         """导出检测报告文件
 

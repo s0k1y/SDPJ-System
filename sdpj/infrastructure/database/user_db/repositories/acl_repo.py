@@ -4,10 +4,11 @@
 """
 
 from typing import Optional
-from sqlalchemy import select, delete, and_
-from sqlalchemy.orm import joinedload
-from sqlalchemy.ext.asyncio import AsyncSession
+
+from sqlalchemy import and_, delete, select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from ..models import AccessControl
 
@@ -80,13 +81,15 @@ class ACLRepository:
         Returns:
             该资源下全部访问控制项列表
         """
-        stmt = select(AccessControl).options(joinedload(AccessControl.grantee)).where(AccessControl.resource_id == resource_id)
+        stmt = (
+            select(AccessControl)
+            .options(joinedload(AccessControl.grantee))
+            .where(AccessControl.resource_id == resource_id)
+        )
         result = await self._session.execute(stmt)
         return list(result.scalars().unique().all())
 
-    async def get_by_resource_and_grantee(
-        self, resource_id: int, grantee_user_id: int
-    ) -> Optional[AccessControl]:
+    async def get_by_resource_and_grantee(self, resource_id: int, grantee_user_id: int) -> Optional[AccessControl]:
         """按资源 ID 和被授权用户 ID 查询访问控制项
 
         Args:
@@ -97,10 +100,7 @@ class ACLRepository:
             访问控制项对象，不存在时返回 None
         """
         stmt = select(AccessControl).where(
-            and_(
-                AccessControl.resource_id == resource_id,
-                AccessControl.grantee_user_id == grantee_user_id
-            )
+            and_(AccessControl.resource_id == resource_id, AccessControl.grantee_user_id == grantee_user_id)
         )
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
@@ -144,7 +144,7 @@ class ACLRepository:
         """批量查询用户在指定资源中有访问权限的资源 ID 集合
 
         拥有者自动有权限，此外检查 ACL 表
-        
+
         Args:
             user_id: 用户 ID
             resource_ids: 待检查的资源 ID 列表
@@ -155,6 +155,7 @@ class ACLRepository:
         if not resource_ids:
             return set()
         from ..models import Resource
+
         owner_stmt = select(Resource.resource_id).where(
             Resource.resource_id.in_(resource_ids),
             Resource.owner_user_id == user_id,

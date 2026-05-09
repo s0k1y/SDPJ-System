@@ -15,8 +15,24 @@ $pythonExe = "D:\Anaconda\envs\SDPJ-System\python.exe"
 $backendPort = 8000
 $frontendPort = 5173
 
+# --- Init SSL Certificates (via SecureCommManager) ---
+Write-Host "[Init] Ensuring SSL certificates via SecureCommManager..." -ForegroundColor Yellow
+$certInfo = & $pythonExe -c "from sdpj.core.secure_comm_manager import SecureCommManager; m = SecureCommManager(); cert, key = m.ensure_certificates(); print(f'{cert}|{key}')"
+if ($LASTEXITCODE -eq 0 -and $certInfo) {
+    $parts = $certInfo -split '\|'
+    $certPath = $parts[0]
+    $keyPath = $parts[1]
+    Write-Host "[Init] SSL certificates ready" -ForegroundColor Green
+} else {
+    Write-Host "[Init] WARNING: Failed to get certificate paths, falling back to certs/" -ForegroundColor Red
+    $certDir = Join-Path $scriptRoot "certs"
+    $certPath = Join-Path $certDir "cert.pem"
+    $keyPath = Join-Path $certDir "key.pem"
+}
+Write-Host ""
+
 # --- Init Database ---
-$dbPath = "data\db\sdpj.db"
+$dbPath = "sdpj\infrastructure\database\sdpj.db"
 if (-not (Test-Path $dbPath)) {
     Write-Host "[Init] Database not found, initializing..." -ForegroundColor Yellow
     & $pythonExe -m sdpj.infrastructure.utils.scripts.seed_data
@@ -82,8 +98,9 @@ Write-Host ""
 # --- Step 2: Start backend ---
 Write-Host "[2/3] Starting backend service on port $backendPort..." -ForegroundColor Yellow
 
-# Use cmd /k so the window stays open on error (prevents flash-close)
-$backendArgs = "/k cd /d `"$scriptRoot`" && $pythonExe -m uvicorn sdpj.ui.webui.backend.app:app --host 0.0.0.0 --port $backendPort"
+# SSL certificates are managed by SecureCommManager internally.
+# Use "python -m sdpj.ui.webui.backend.app" (not "python -m uvicorn") so SSL kwargs are auto-injected.
+$backendArgs = "/k cd /d `"$scriptRoot`" && $pythonExe -m sdpj.ui.webui.backend.app"
 Start-Process cmd.exe -ArgumentList $backendArgs -WindowStyle Normal
 Start-Sleep -Seconds 5
 Write-Host "[2/3] Backend service started" -ForegroundColor Green
@@ -111,9 +128,9 @@ Write-Host "========================================" -ForegroundColor Green
 Write-Host "  Startup Complete!" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "  Backend API:  http://localhost:$backendPort" -ForegroundColor Cyan
-Write-Host "  Frontend:     http://localhost:$frontendPort" -ForegroundColor Cyan
-Write-Host "  API Docs:     http://localhost:$backendPort/docs" -ForegroundColor Cyan
+Write-Host "  Backend API:  https://localhost:$backendPort" -ForegroundColor Cyan
+Write-Host "  Frontend:     https://localhost:$frontendPort" -ForegroundColor Cyan
+Write-Host "  API Docs:     https://localhost:$backendPort/docs" -ForegroundColor Cyan
 Write-Host ""
 
 Write-Host "Tips:" -ForegroundColor Yellow

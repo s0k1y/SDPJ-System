@@ -1,12 +1,13 @@
 """数据库迁移脚本 - 添加系统日志表"""
+
 import asyncio
 from pathlib import Path
 
 
 async def migrate():
-    from sdpj.infrastructure.database.result_db import ResultDB, SessionManager
+    from sdpj.infrastructure.database.result_db import SessionManager
 
-    data_dir = Path(__file__).resolve().parents[1] / "data" / "db"
+    data_dir = Path(__file__).resolve().parents[2] / "database"
     data_dir.mkdir(parents=True, exist_ok=True)
 
     db_url = f"sqlite+aiosqlite:///{data_dir / 'sdpj.db'}"

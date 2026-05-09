@@ -7,12 +7,12 @@
 被依赖模块：SDPJDetector, PrivateConfigManager, ReportManager
 """
 
-from typing import Optional, Literal, Any, Union
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Literal, Optional, Union
 
-from sdpj.infrastructure.database.sample_db.interface import SampleDBInterface
 from sdpj.infrastructure.database.result_db.interface import ResultDBInterface
+from sdpj.infrastructure.database.sample_db.interface import SampleDBInterface
 from sdpj.infrastructure.utils.utils_interface import UtilsInterface
 
 
@@ -65,29 +65,29 @@ class DataProcessor:
         samples_by_dataset: dict[int, list[dict]] = {}
         for sample in all_samples:
             ds_id = sample["dataset_id"]
-            samples_by_dataset.setdefault(ds_id, []).append({
-                "sample_id": sample["sample_id"],
-                "subtype": sample["subtype"],
-                "poc": sample["poc"],
-            })
+            samples_by_dataset.setdefault(ds_id, []).append(
+                {
+                    "sample_id": sample["sample_id"],
+                    "subtype": sample["subtype"],
+                    "poc": sample["poc"],
+                }
+            )
 
         result = []
         for dataset in datasets:
             dataset_id = dataset["dataset_id"]
-            result.append({
-                "dataset_id": dataset_id,
-                "dataset_name": dataset["name"],
-                "samples": samples_by_dataset.get(dataset_id, []),
-            })
+            result.append(
+                {
+                    "dataset_id": dataset_id,
+                    "dataset_name": dataset["name"],
+                    "samples": samples_by_dataset.get(dataset_id, []),
+                }
+            )
 
         return result
 
     async def import_private_dataset(
-        self,
-        name: str,
-        risk_type: str,
-        samples: list[dict],
-        resource_id: int | None = None
+        self, name: str, risk_type: str, samples: list[dict], resource_id: int | None = None
     ) -> dict:
         """导入用户私有数据集
 
@@ -107,16 +107,11 @@ class DataProcessor:
         sample_ids = []
         for sample in samples:
             sample_id = await self._sample_db.add_sample(
-                subtype=sample["subtype"],
-                poc=sample["poc"],
-                dataset_id=dataset_id
+                subtype=sample["subtype"], poc=sample["poc"], dataset_id=dataset_id
             )
             sample_ids.append(sample_id)
 
-        return {
-            "dataset_id": dataset_id,
-            "sample_ids": sample_ids
-        }
+        return {"dataset_id": dataset_id, "sample_ids": sample_ids}
 
     async def remove_dataset(self, dataset_id: int) -> bool:
         """移除私有数据集
@@ -129,7 +124,9 @@ class DataProcessor:
         """
         return await self._sample_db.delete_dataset(dataset_id)
 
-    async def add_dataset_record(self, name: str, sample_count: int, file_path: str, risk_type: str = "custom", resource_id: int | None = None) -> int:
+    async def add_dataset_record(
+        self, name: str, sample_count: int, file_path: str, risk_type: str = "custom", resource_id: int | None = None
+    ) -> int:
         """添加数据集记录到数据库
 
         Args:
@@ -142,18 +139,15 @@ class DataProcessor:
         Returns:
             数据集 ID
         """
-        dataset_id = await self._sample_db.create_dataset(
-            name=name,
-            risk_type=risk_type,
-            resource_id=resource_id
-        )
+        dataset_id = await self._sample_db.create_dataset(name=name, risk_type=risk_type, resource_id=resource_id)
 
         import json
         from pathlib import Path
+
         p = Path(file_path)
         if p.exists() and p.is_file():
             try:
-                with open(p, 'r', encoding='utf-8') as f:
+                with open(p, "r", encoding="utf-8") as f:
                     for line in f:
                         line = line.strip()
                         if line:
@@ -162,11 +156,7 @@ class DataProcessor:
                                 subtype = data.get("subtype", "unknown")
                                 poc = data.get("poc", "")
                                 if poc:
-                                    await self._sample_db.add_sample(
-                                        subtype=subtype,
-                                        poc=poc,
-                                        dataset_id=dataset_id
-                                    )
+                                    await self._sample_db.add_sample(subtype=subtype, poc=poc, dataset_id=dataset_id)
                             except json.JSONDecodeError:
                                 continue
             except Exception:
@@ -176,6 +166,10 @@ class DataProcessor:
 
     # ==================== 检测结果的持久化 ====================
 
+    async def register_target_model(self, model_id: str) -> dict:
+        """登记被测大模型（幂等）"""
+        return await self._result_db.register_target_model(model_id)
+
     async def create_task_group(self, user_id: str, model_id: str) -> str:
         """开设检测任务组（若被测大模型未登记则先行入表）"""
         await self._result_db.register_target_model(model_id)
@@ -183,11 +177,7 @@ class DataProcessor:
         return task_group_id
 
     async def create_detection_task(
-        self,
-        task_group_id: str,
-        dataset_id: int,
-        task_status: str,
-        start_time: datetime
+        self, task_group_id: str, dataset_id: int, task_status: str, start_time: datetime
     ) -> str:
         """创建检测子任务
 
@@ -202,19 +192,11 @@ class DataProcessor:
         """
         # 将 dataset_id 转换为字符串以符合 ResultDB 接口
         task_id = await self._result_db.create_detection_task(
-            task_group_id=task_group_id,
-            dataset_id=dataset_id,
-            task_status=task_status,
-            start_time=start_time
+            task_group_id=task_group_id, dataset_id=dataset_id, task_status=task_status, start_time=start_time
         )
         return task_id
 
-    async def update_task_status(
-        self,
-        task_id: str,
-        task_status: str,
-        end_time: Optional[datetime] = None
-    ) -> bool:
+    async def update_task_status(self, task_id: str, task_status: str, end_time: Optional[datetime] = None) -> bool:
         """更新检测子任务状态
 
         Args:
@@ -225,11 +207,7 @@ class DataProcessor:
         Returns:
             更新结果
         """
-        return await self._result_db.update_task_status(
-            task_id=task_id,
-            task_status=task_status,
-            end_time=end_time
-        )
+        return await self._result_db.update_task_status(task_id=task_id, task_status=task_status, end_time=end_time)
 
     async def create_detection_report(self, task_id: str) -> str:
         """创建检测报告条目
@@ -249,7 +227,7 @@ class DataProcessor:
         poc: str,
         model_output: str,
         compliance_result: str,
-        iteration_count: Optional[int] = None
+        iteration_count: Optional[int] = None,
     ) -> str:
         """追加单条检测结果数据
 
@@ -270,7 +248,7 @@ class DataProcessor:
             poc=poc,
             model_output=model_output,
             compliance_result=compliance_result,
-            iteration_count=iteration_count
+            iteration_count=iteration_count,
         )
 
     async def append_result_data_batch(
@@ -314,39 +292,39 @@ class DataProcessor:
             tid = task["task_id"]
             report = report_by_task.get(tid)
             if report:
-                tasks_with_reports.append({
-                    "task_id": tid,
-                    "dataset_id": task["dataset_id"],
-                    "task_status": task["task_status"],
-                    "start_time": task["start_time"],
-                    "end_time": task.get("end_time"),
-                    "report": {
-                        "report_id": report["report_id"],
-                        "result_data": result_data_by_report.get(report["report_id"], [])
+                tasks_with_reports.append(
+                    {
+                        "task_id": tid,
+                        "dataset_id": task["dataset_id"],
+                        "task_status": task["task_status"],
+                        "start_time": task["start_time"],
+                        "end_time": task.get("end_time"),
+                        "report": {
+                            "report_id": report["report_id"],
+                            "result_data": result_data_by_report.get(report["report_id"], []),
+                        },
                     }
-                })
+                )
             else:
-                tasks_with_reports.append({
-                    "task_id": tid,
-                    "dataset_id": task["dataset_id"],
-                    "task_status": task["task_status"],
-                    "start_time": task["start_time"],
-                    "end_time": task.get("end_time"),
-                    "report": None
-                })
+                tasks_with_reports.append(
+                    {
+                        "task_id": tid,
+                        "dataset_id": task["dataset_id"],
+                        "task_status": task["task_status"],
+                        "start_time": task["start_time"],
+                        "end_time": task.get("end_time"),
+                        "report": None,
+                    }
+                )
 
         return {
             "task_group_id": task_group_id,
             "user_id": task_group["user_id"],
             "model_id": task_group["model_id"],
-            "tasks": tasks_with_reports
+            "tasks": tasks_with_reports,
         }
 
-    async def list_task_groups(
-        self,
-        user_id: Optional[str] = None,
-        model_id: Optional[str] = None
-    ) -> list[dict]:
+    async def list_task_groups(self, user_id: Optional[str] = None, model_id: Optional[str] = None) -> list[dict]:
         """查询检测任务组清单
 
         Args:
@@ -356,19 +334,11 @@ class DataProcessor:
         Returns:
             任务组元信息列表
         """
-        return await self._result_db.list_task_groups(
-            user_id=int(user_id) if user_id else None,
-            model_id=model_id
-        )
+        return await self._result_db.list_task_groups(user_id=int(user_id) if user_id else None, model_id=model_id)
 
-    async def list_reports_summary(
-        self,
-        user_id: Optional[str] = None,
-        model_id: Optional[str] = None
-    ) -> list[dict]:
+    async def list_reports_summary(self, user_id: Optional[str] = None, model_id: Optional[str] = None) -> list[dict]:
         summaries = await self._result_db.compute_reports_summary(
-            user_id=int(user_id) if user_id else None,
-            model_id=model_id
+            user_id=int(user_id) if user_id else None, model_id=model_id
         )
         dataset_ids = set()
         for group in summaries:
@@ -389,10 +359,7 @@ class DataProcessor:
                         child["dataset_name"] = ds_name_map[ds_id]
         return summaries
 
-    async def list_detection_reports(
-        self,
-        task_group_id: Optional[str] = None
-    ) -> list[dict]:
+    async def list_detection_reports(self, task_group_id: Optional[str] = None) -> list[dict]:
         """查询检测报告清单
 
         Args:
@@ -401,9 +368,7 @@ class DataProcessor:
         Returns:
             报告元信息列表
         """
-        return await self._result_db.list_detection_reports(
-            task_group_id=task_group_id
-        )
+        return await self._result_db.list_detection_reports(task_group_id=task_group_id)
 
     async def delete_task_group(self, task_group_id: str) -> bool:
         """删除检测任务组及其关联结果
@@ -490,9 +455,7 @@ class DataProcessor:
         return await self._result_db.count_compliance_results()
 
     async def export_report_file(
-        self,
-        report_data: dict,
-        target_format: Literal["json", "yaml", "jsonl"]
+        self, report_data: dict, target_format: Literal["json", "yaml", "jsonl"]
     ) -> tuple[str, str]:
         if target_format == "jsonl":
             lines = []
@@ -512,11 +475,7 @@ class DataProcessor:
 
     # ==================== 多模态与多编码的样本构造及响应处理 ====================
 
-    def construct_multimodal_sample(
-        self,
-        poc: str,
-        target_modality: Literal["image", "audio", "video"]
-    ) -> bytes:
+    def construct_multimodal_sample(self, poc: str, target_modality: Literal["image", "audio", "video"]) -> bytes:
         if target_modality == "image":
             return self._utils.text_to_image(poc)
         if target_modality == "audio":
@@ -526,9 +485,7 @@ class DataProcessor:
         raise NotImplementedError(f"模态 '{target_modality}' 暂未支持")
 
     def parse_multimodal_response(
-        self,
-        response_data: bytes,
-        source_modality: Literal["image", "audio", "video"]
+        self, response_data: bytes, source_modality: Literal["image", "audio", "video"]
     ) -> str:
         if source_modality == "image":
             return self._utils.image_to_text(response_data)
@@ -539,26 +496,18 @@ class DataProcessor:
         raise NotImplementedError(f"模态 '{source_modality}' 暂未支持")
 
     def construct_encoded_sample(
-        self,
-        poc: str,
-        encoding_type: Literal["base64", "url", "unicode_escape", "hex"]
+        self, poc: str, encoding_type: Literal["base64", "url", "unicode_escape", "hex"]
     ) -> str:
         return self._utils.encode_text(poc, encoding_type)
 
     def decode_response_content(
-        self,
-        encoded_content: str,
-        encoding_type: Literal["base64", "url", "unicode_escape", "hex"]
+        self, encoded_content: str, encoding_type: Literal["base64", "url", "unicode_escape", "hex"]
     ) -> str:
         return self._utils.decode_text(encoded_content, encoding_type)
 
     # ==================== 文件导入及结构化数据序列化 ====================
 
-    def read_file(
-        self,
-        file_path: Union[Path, str],
-        mode: Literal["text", "binary"] = "text"
-    ) -> Union[str, bytes]:
+    def read_file(self, file_path: Union[Path, str], mode: Literal["text", "binary"] = "text") -> Union[str, bytes]:
         return self._utils.read_file(str(file_path), mode)
 
     def validate_file_format(
@@ -569,20 +518,12 @@ class DataProcessor:
         text = content if isinstance(content, str) else content.decode("utf-8")
         return self._utils.validate_file_format(text, expected_format)
 
-    def serialize_data(
-        self,
-        data: Any,
-        format: Literal["json", "yaml"]
-    ) -> str:
+    def serialize_data(self, data: Any, format: Literal["json", "yaml"]) -> str:
         if format == "json":
             return self._utils.serialize_json(data)
         return self._utils.serialize_yaml(data)
 
-    def deserialize_data(
-        self,
-        serialized_data: str,
-        format: Literal["json", "yaml"]
-    ) -> Any:
+    def deserialize_data(self, serialized_data: str, format: Literal["json", "yaml"]) -> Any:
         if format == "json":
             return self._utils.deserialize_json(serialized_data)
         return self._utils.deserialize_yaml(serialized_data)
@@ -598,9 +539,7 @@ class DataProcessor:
         entries: list[dict],
         dataset_version: str,
     ) -> int:
-        return await self._result_db.save_poc_pool_cache(
-            model_id, entries, dataset_version
-        )
+        return await self._result_db.save_poc_pool_cache(model_id, entries, dataset_version)
 
     async def invalidate_poc_pool_cache(self, model_id: str) -> int:
         return await self._result_db.invalidate_poc_pool_cache(model_id)

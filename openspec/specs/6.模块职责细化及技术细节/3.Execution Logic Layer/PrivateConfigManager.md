@@ -7,7 +7,8 @@ PrivateConfigManager / 用户私有检测配置管理模块
    - 输出:tuple[bool, int | None]，成功时返回新创建的私有检测配置ID(同时作为 UserCenter 中对应受控资源的资源ID)，失败时返回 None
    - 后置条件:对应受控资源已在 UserCenter 登记,ACL 承载点已建立;配置内容已落盘到 UserCenter 维护的私有配置内容存储中
    - 触发场景:用户创建一份私有检测配置文件(对应 1.spec.md 功能 3.1.1.2);该配置是 1.spec.md 功能 1.3(选择检测数据集)的输入之一
-   - 调用下层:UserCenter 的「登记受控资源」建立 ACL 承载点;UserCenter 的「写入用户私有检测配置内容」持久化配置内容;LLMRegistry 的「按标识校验大模型是否可用」确认被测大模型可用
+   - 调用下层:UserCenter 的「登记受控资源」建立 ACL 承载点;UserCenter 的「写入用户私有检测配置内容」持久化配置内容
+   - 说明:私有检测配置中的被测大模型标识可能是用户新注册的私有模型(尚未在 LLMRegistry 中注册),因此不在 create_config 阶段校验大模型可用性;可用性校验延迟到检测启动时由 SDPJDetector 完成
    - 不负责的边界:不做权限判定(由 DACManager 在调用前完成)
 
 2. 读取用户私有检测配置
@@ -21,7 +22,8 @@ PrivateConfigManager / 用户私有检测配置管理模块
    - 输入:私有检测配置ID、更新后的配置内容
    - 输出:修改结果
    - 触发场景:用户编辑已有的私有检测配置(对应 1.spec.md 功能 3.1.1.2)
-   - 调用下层:UserCenter 的「更新用户私有检测配置内容」写入新内容;若修改涉及被测大模型标识,追加调用 LLMRegistry 的「按标识校验大模型是否可用」确认有效
+   - 调用下层:UserCenter 的「更新用户私有检测配置内容」写入新内容
+   - 说明:与 create_config 一致,修改时不再校验被测大模型可用性,由 SDPJDetector 在检测启动时完成
 
 4. 删除用户私有检测配置
    - 输入:私有检测配置ID
@@ -64,7 +66,7 @@ PrivateConfigManager / 用户私有检测配置管理模块
    - 输出:新创建的数据集ID(同时作为 UserCenter 中对应受控资源的资源ID)及各新增样本ID
    - 后置条件:数据集已由 DataProcessor 写入 SampleDB;对应受控资源已在 UserCenter 登记,ACL 承载点已建立
    - 触发场景:用户上传私有数据集(对应 1.spec.md 功能 3.1.1.2)
-   - 调用下层:DataProcessor 的「预校验上传文件格式」做文件格式预校验;DataProcessor 的「导入用户私有数据集」写入样本;UserCenter 的「登记受控资源」建立 ACL 承载点
+   - 调用下层:DataProcessor 的「导入用户私有数据集」写入样本;UserCenter 的「登记受控资源」建立 ACL 承载点
 
 9. 移除用户私有数据集
    - 输入:数据集ID
@@ -85,10 +87,74 @@ PrivateConfigManager / 用户私有检测配置管理模块
     - 输入:用户上传的私有检测配置文件内容、所属用户ID
     - 输出:新创建的私有检测配置ID
     - 触发场景:用户导入此前导出的私有检测配置文件(对应 1.spec.md 功能 3.1.1.2)
-    - 调用下层:DataProcessor 的「预校验上传文件格式」与「结构化数据的序列化与反序列化」;UserCenter 的「登记受控资源」建立 ACL 承载点;UserCenter 的「写入用户私有检测配置内容」持久化解析出的配置内容;若配置涉及被测大模型,追加调用 LLMRegistry 的「按标识校验大模型是否可用」
+    - 调用下层:DataProcessor 的「预校验上传文件格式」与「结构化数据的序列化与反序列化」;UserCenter 的「登记受控资源」建立 ACL 承载点;UserCenter 的「写入用户私有检测配置内容」持久化解析出的配置内容
+   - 说明:导入时不再校验被测大模型可用性,由 SDPJDetector 在检测启动时完成
+
+# 私有数据集的导入导出
+12. 导入私有数据集文件
+    - 输入:数据集文件内容、元信息(名称、安全风险类型)、所属用户ID
+    - 输出:新创建的数据集ID及各新增样本ID
+    - 触发场景:用户从本地文件导入私有数据集(对应 1.spec.md 功能 3.1.1.2)
+    - 调用下层:DataProcessor 的「导入用户私有数据集」写入样本;UserCenter 的「登记受控资源」建立 ACL 承载点
+
+13. 导出私有数据集文件
+    - 输入:数据集ID、目标文件格式
+    - 输出:可供用户下载的数据集文件内容
+    - 触发场景:用户导出私有数据集以备份或跨账号复用(对应 1.spec.md 功能 3.1.1.2)
+    - 调用下层:DataProcessor 的「导出数据集文件」
+
+# 批量操作
+14. 批量读取用户私有检测配置
+    - 输入:配置ID列表
+    - 输出:各配置ID对应的配置内容字典
+    - 触发场景:上层批量加载多个私有检测配置时减少逐条查询的往返开销
+    - 调用下层:对每个配置ID依次调用 UserCenter 的「读取用户私有检测配置内容」
+
+# 自定义数据集管理
+15. 添加自定义数据集
+    - 输入:用户ID（关联到其他用户的私有数据集以创建新的数据集实例）
+    - 输出:新创建的数据集ID
+    - 触发场景:用户基于已有数据集创建自定义变体(对应 1.spec.md 功能 3.1.1.2)
+
+# LLMRegistry 委托方法
+16. 初始化 LLMRegistry
+    - 输入:无
+    - 输出:初始化结果
+    - 调用下层:LLMRegistry 的「初始化注册表」
+    - 触发场景:系统启动时由 PrivateConfigManager 代理完成 LLMRegistry 的初始化
+
+17. 关闭 LLMRegistry
+    - 输入:无
+    - 输出:关闭结果
+    - 调用下层:LLMRegistry 的「关闭注册表」
+    - 触发场景:系统关闭时释放注册表资源
+
+18. 查询大模型是否可用
+    - 输入:大模型标识
+    - 输出:是否可用的布尔判定
+    - 调用下层:LLMRegistry 的「按标识校验大模型是否可用」
+    - 触发场景:检测启动前校验被测大模型是否已在系统中注册
+
+19. 获取适配器信息
+    - 输入:大模型标识
+    - 输出:适配器元信息(配置参数、速率限制建议等)
+    - 调用下层:LLMRegistry 的「获取适配器信息」
+    - 触发场景:StateScheduler 启动检测前获取适配器建议的 max_rps、max_concurrency 等参数
+
+20. 注册私有模型
+    - 输入:大模型标识、适配器配置
+    - 输出:注册结果
+    - 调用下层:LLMRegistry 的「注册私有模型」
+    - 触发场景:用户注册新的私有模型适配器
+
+21. 注销私有模型
+    - 输入:大模型标识
+    - 输出:注销结果
+    - 调用下层:LLMRegistry 的「注销私有模型」
+    - 触发场景:用户移除私有模型适配器
 
 # 接口契约
-13. 通过 PrivateConfigManagerInterface 对外暴露上述能力,被 StateScheduler 调用(符合 4.模型依赖关系图.puml 中 StateScheduler → PrivateConfigManager 边)
+22. 通过 PrivateConfigManagerInterface 对外暴露上述能力,被 StateScheduler 调用(符合 4.模型依赖关系图.puml 中 StateScheduler → PrivateConfigManager 边)
 
 不需要的:[做权限判定(由 DACManager 完成),做密码/凭据管理(由 AccountManager / UserCenter 完成),做大模型 API 的实际调用(由 SDPJDetector 经 LLMService 完成),做适配器/数据集/配置文件的格式校验具体实现(由 UtilsLib 完成),做检测合规判断(由 SDPJDetector 完成)]
 

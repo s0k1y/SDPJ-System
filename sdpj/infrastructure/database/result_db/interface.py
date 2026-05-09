@@ -4,8 +4,8 @@
 DataProcessor 是唯一调用方。
 """
 
-from typing import Protocol, Optional
 from datetime import datetime
+from typing import Optional, Protocol
 
 
 class ResultDBInterface(Protocol):
@@ -46,11 +46,7 @@ class ResultDBInterface(Protocol):
 
     # ==================== 检测任务组级能力 ====================
 
-    async def create_task_group(
-        self,
-        user_id: int,
-        model_id: str
-    ) -> str:
+    async def create_task_group(self, user_id: int, model_id: str) -> str:
         """创建检测任务组
 
         Args:
@@ -78,11 +74,7 @@ class ResultDBInterface(Protocol):
         """
         ...
 
-    async def list_task_groups(
-        self,
-        user_id: Optional[int] = None,
-        model_id: Optional[str] = None
-    ) -> list[dict]:
+    async def list_task_groups(self, user_id: Optional[int] = None, model_id: Optional[str] = None) -> list[dict]:
         """查询检测任务组列表
 
         Args:
@@ -114,11 +106,7 @@ class ResultDBInterface(Protocol):
     # ==================== 检测任务级能力 ====================
 
     async def create_detection_task(
-        self,
-        task_group_id: str,
-        dataset_id: int,
-        task_status: str,
-        start_time: datetime
+        self, task_group_id: str, dataset_id: int, task_status: str, start_time: datetime
     ) -> str:
         """创建检测任务
 
@@ -136,12 +124,7 @@ class ResultDBInterface(Protocol):
         """
         ...
 
-    async def update_task_status(
-        self,
-        task_id: str,
-        task_status: str,
-        end_time: Optional[datetime] = None
-    ) -> bool:
+    async def update_task_status(self, task_id: str, task_status: str, end_time: Optional[datetime] = None) -> bool:
         """更新检测任务状态
 
         Args:
@@ -261,10 +244,7 @@ class ResultDBInterface(Protocol):
         """
         ...
 
-    async def list_detection_reports(
-        self,
-        task_group_id: Optional[str] = None
-    ) -> list[dict]:
+    async def list_detection_reports(self, task_group_id: Optional[str] = None) -> list[dict]:
         """查询检测报告列表
 
         Args:
@@ -298,7 +278,7 @@ class ResultDBInterface(Protocol):
         poc: str,
         model_output: str,
         compliance_result: str,
-        iteration_count: Optional[int] = None
+        iteration_count: Optional[int] = None,
     ) -> str:
         """追加检测结果数据条目
 

@@ -269,10 +269,21 @@ const clearAllFilters = () => {
 
 let ws = null
 let wsReconnectTimer = null
+let pollTimer = null
+let wsConnected = false
 
 function connectLogWs() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws'
   ws = new WebSocket(`${proto}://${location.host}/ws/logs`)
+
+  ws.onopen = () => {
+    wsConnected = true
+    // WebSocket 连接成功，停止轮询
+    if (pollTimer) {
+      clearInterval(pollTimer)
+      pollTimer = null
+    }
+  }
 
   ws.onmessage = (event) => {
     const msg = JSON.parse(event.data)
@@ -295,12 +306,24 @@ function connectLogWs() {
   }
 
   ws.onclose = () => {
+    wsConnected = false
+    // 降级为轮询
+    startPolling()
     wsReconnectTimer = setTimeout(connectLogWs, 5000)
   }
 
   ws.onerror = () => {
     ws.close()
   }
+}
+
+function startPolling() {
+  if (pollTimer) return
+  pollTimer = setInterval(() => {
+    if (!wsConnected) {
+      fetchLogs()
+    }
+  }, 5000)
 }
 
 onMounted(() => {
@@ -313,6 +336,10 @@ onUnmounted(() => {
   if (wsReconnectTimer) {
     clearTimeout(wsReconnectTimer)
     wsReconnectTimer = null
+  }
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
   }
   if (ws) {
     ws.onclose = null

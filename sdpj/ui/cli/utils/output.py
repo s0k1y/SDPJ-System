@@ -1,4 +1,5 @@
 """CLI 输出格式化工具"""
+
 import click
 
 

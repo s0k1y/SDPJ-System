@@ -5,7 +5,8 @@
 
 所有状态定义集中于此，StateScheduler 导入 SystemStateMachine 来跟踪系统当前状态。
 """
-from statemachine import StateMachine, State
+
+from statemachine import State, StateMachine
 
 
 class SystemStateMachine(StateMachine):

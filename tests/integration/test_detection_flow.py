@@ -6,17 +6,21 @@ from sdpj.control.state_scheduler import StateScheduler
 
 
 def _make_scheduler(**overrides):
-    llm_reg = AsyncMock()
-    llm_reg.is_model_available = AsyncMock(return_value=(True, MagicMock()))
+    config = AsyncMock()
+    config.is_model_available = AsyncMock(return_value=(True, MagicMock()))
+    config.initialize_registry = AsyncMock(return_value=True)
+    config.shutdown_registry = AsyncMock(return_value=True)
+    config.register_private_model = AsyncMock(return_value=(True, "m", ""))
+    config.read_config = AsyncMock(return_value=None)
+    config.query_datasets = AsyncMock(return_value=[])
     defaults = dict(
         account_manager=AsyncMock(),
         dac_manager=AsyncMock(),
-        config_manager=AsyncMock(),
+        config_manager=config,
         report_manager=AsyncMock(),
         detector=AsyncMock(),
         event_logger=MagicMock(),
         task_queue_manager=AsyncMock(),
-        llm_registry=llm_reg,
     )
     defaults.update(overrides)
     return StateScheduler(**defaults)

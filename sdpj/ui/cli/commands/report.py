@@ -1,5 +1,7 @@
 """报告交互命令 (职责 4-7)"""
+
 import asyncio
+
 import click
 
 from sdpj.ui.cli.utils import output
@@ -8,13 +10,11 @@ from sdpj.ui.cli.utils import output
 @click.group("report")
 def report_group():
     """检测报告管理"""
-    pass
 
 
 @report_group.command("generate")
 @click.argument("task_group_id")
-@click.option("--type", "detection_type", default="static",
-              type=click.Choice(["static", "dynamic"]), help="检测类型")
+@click.option("--type", "detection_type", default="static", type=click.Choice(["static", "dynamic"]), help="检测类型")
 @click.pass_context
 def generate(ctx, task_group_id, detection_type):
     """生成检测报告"""
@@ -54,17 +54,13 @@ def list_reports(ctx, model_id):
     if not reports:
         output.info("暂无报告")
         return
-    rows = [
-        [str(r.get("task_group_id", "")), r.get("model_id", ""), r.get("status", "")]
-        for r in reports
-    ]
+    rows = [[str(r.get("task_group_id", "")), r.get("model_id", ""), r.get("status", "")] for r in reports]
     output.table(["任务组ID", "模型", "状态"], rows)
 
 
 @report_group.command("delete")
 @click.argument("target_id")
-@click.option("--granularity", default="task_group",
-              type=click.Choice(["task_group", "task", "report", "result_data"]))
+@click.option("--granularity", default="task_group", type=click.Choice(["task_group", "task", "report", "result_data"]))
 @click.pass_context
 def delete(ctx, target_id, granularity):
     """删除检测报告"""
@@ -78,8 +74,9 @@ def delete(ctx, target_id, granularity):
 
 @report_group.command("export")
 @click.argument("task_group_id")
-@click.option("--format", "target_format", default="json",
-              type=click.Choice(["json", "yaml", "jsonl"]), help="导出格式")
+@click.option(
+    "--format", "target_format", default="json", type=click.Choice(["json", "yaml", "jsonl"]), help="导出格式"
+)
 @click.option("--output", "output_path", default=None, help="输出文件路径")
 @click.pass_context
 def export(ctx, task_group_id, target_format, output_path):

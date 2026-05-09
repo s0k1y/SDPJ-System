@@ -52,7 +52,7 @@ AccountManager / 用户账号管理模块
    - 输出:切换结果(通过时附带新登录用户ID)
    - 后置条件:清除旧登录会话,建立新登录会话
    - 触发场景:用户在账号管理中切换登录账号(对应 1.spec.md 功能 3.1.1.2)
-   - 调用下层:UserCenter 的「按账号查询用户信息」与「登录凭据校验」
+   - 实现方式:仅调用 login() 完成凭据校验与会话建立，不单独查询用户信息
 
 8. 查询指定用户资料
    - 输入:用户ID
@@ -76,8 +76,21 @@ AccountManager / 用户账号管理模块
    - 安全说明:user_id 由调用方从请求上下文注入
    - 不负责的边界:不做受控资源内容管理(由 PrivateConfigManager 完成);不做授权判定(由 DACManager 完成)
 
+11. 列出分享给指定用户的资源
+   - 输入:用户ID
+   - 输出:通过 DAC 授权给该用户的全部受控资源列表(每条含资源ID、资源类型、资源拥有者信息)
+   - 触发场景:用户查看他人分享给自己的资源列表(对应 1.spec.md 功能 3.1.2)
+   - 调用下层:UserCenter 的「按被授权用户查询资源清单」
+   - 安全说明:user_id 由调用方从请求上下文注入
+
+12. 列出系统中全部用户
+   - 输入:无(或管理员凭证)
+   - 输出:系统中全部注册用户的列表(每条含用户ID、账号)
+   - 触发场景:管理员查看系统用户列表；DAC 授权时查询可授权的目标用户
+   - 调用下层:UserCenter 的「列出全部用户」
+
 # 接口契约
-11. 通过 AccountManagerInterface 对外暴露上述能力,被 StateScheduler 调用(符合 4.模型依赖关系图.puml 中 StateScheduler → AccountManager 边)
+13. 通过 AccountManagerInterface 对外暴露上述能力,被 StateScheduler 调用(符合 4.模型依赖关系图.puml 中 StateScheduler → AccountManager 边)
 
 不需要的:[做密码哈希(由 UserCenter 完成),做账号格式与密码强度的具体规则规范(可在本模块做前置校验,但规则的工程化沉淀属于配置层),做受控资源内容管理(由 PrivateConfigManager 完成),做权限授予与判定(由 DACManager 完成),持久化登录会话到外部存储(仅本模块内存态)]
 

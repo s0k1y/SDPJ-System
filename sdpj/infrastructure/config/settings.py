@@ -1,4 +1,5 @@
 """全局配置 — 基于 pydantic-settings，从环境变量 / .env 文件加载"""
+
 from pathlib import Path
 from typing import Literal
 
@@ -22,6 +23,7 @@ def _load_or_generate_secret_key() -> str:
     if key_path.exists():
         return key_path.read_text().strip()
     import secrets
+
     key = secrets.token_hex(SECRET_KEY_BYTES)
     key_path.parent.mkdir(parents=True, exist_ok=True)
     key_path.write_text(key)
@@ -37,7 +39,7 @@ class Settings(BaseSettings):
 
     env: Literal["development", "test", "production"] = "development"
     debug: bool = True
-    db_url: str = "sqlite+aiosqlite:///./data/db/sdpj.db"
+    db_url: str = "sqlite+aiosqlite:///./sdpj/infrastructure/database/sdpj.db"
     secret_key: str = ""
     adapters_dir: str = "~/.sdpj/adapters/"
     log_level: str = "INFO"

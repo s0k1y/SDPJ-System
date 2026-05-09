@@ -3,10 +3,13 @@
 依赖模块: UserCenter (via interface)
 被依赖模块: StateScheduler
 """
+
 from sdpj.drivers.user_center_interface import UserCenterInterface
 
+from .dac_manager_interface import DACManagerInterface
 
-class DACManager:
+
+class DACManager(DACManagerInterface):
     """自主访问控制管理"""
 
     def __init__(self, user_center: UserCenterInterface):
@@ -18,9 +21,7 @@ class DACManager:
             return None
         return resource.get("owner_user_id")
 
-    async def grant_access(
-        self, resource_id: int, target_username: str, caller_user_id: int
-    ) -> tuple[bool, str]:
+    async def grant_access(self, resource_id: int, target_username: str, caller_user_id: int) -> tuple[bool, str]:
         owner_id = await self._get_resource_owner(resource_id)
         if owner_id is None:
             return False, "资源不存在"
@@ -66,9 +67,7 @@ class DACManager:
             return set()
         return await self._user_center.get_accessible_resource_ids(user_id, resource_ids)
 
-    async def get_access_list(
-        self, resource_id: int, caller_user_id: int
-    ) -> tuple[bool, list[dict]]:
+    async def get_access_list(self, resource_id: int, caller_user_id: int) -> tuple[bool, list[dict]]:
         owner_id = await self._get_resource_owner(resource_id)
         if owner_id is None:
             return False, []

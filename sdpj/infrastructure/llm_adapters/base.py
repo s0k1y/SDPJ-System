@@ -1,5 +1,11 @@
 """LLMAdapter 抽象基类 — 所有适配器必须继承此类"""
+
 from abc import ABC, abstractmethod
+
+from sdpj.infrastructure.llm_adapters.errors import (
+    ErrorCategory,
+    StandardizedLLMError,
+)
 
 
 class LLMAdapter(ABC):
@@ -60,4 +66,32 @@ class LLMAdapter(ABC):
 
     async def close(self) -> None:
         """关闭适配器，释放资源（如 HTTP 连接池）"""
-        pass
+
+    @staticmethod
+    def _raise_api_error(
+        status: int, error_msg: str, *, retry_after: str | None = None, extra_detail: dict | None = None
+    ) -> None:
+        """统一的 API 错误抛出逻辑（子类复用）
+
+        Args:
+            status: HTTP 状态码
+            error_msg: 错误消息
+            retry_after: Retry-After 头值
+            extra_detail: 额外的错误详情（如响应体）
+        """
+        detail: dict | None = None
+        if retry_after is not None:
+            try:
+                detail = {"retry_after_seconds": float(retry_after)}
+            except (ValueError, TypeError):
+                detail = {"retry_after": retry_after}
+        if extra_detail:
+            detail = {**extra_detail, **(detail or {})} if detail else extra_detail
+
+        if status == 401:
+            raise StandardizedLLMError(ErrorCategory.AUTH, error_msg, status_code=status, detail=detail)
+        if status == 429:
+            raise StandardizedLLMError(ErrorCategory.RATE_LIMIT, error_msg, status_code=status, detail=detail)
+        if 400 <= status < 500:
+            raise StandardizedLLMError(ErrorCategory.INVALID_REQUEST, error_msg, status_code=status, detail=detail)
+        raise StandardizedLLMError(ErrorCategory.SERVER_ERROR, error_msg, status_code=status, detail=detail)

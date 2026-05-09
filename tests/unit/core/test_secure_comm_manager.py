@@ -12,5 +12,5 @@ class TestSecureCommManager:
         assert manager is not None
 
     def test_instantiate_with_key_path(self):
-        manager = SecureCommManager(key_path="/tmp/fake.pem")
+        manager = SecureCommManager()
         assert manager is not None

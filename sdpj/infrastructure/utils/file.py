@@ -1,10 +1,9 @@
 """UtilsLib 文件处理工具"""
+
 import csv
 import io
 import json
 from pathlib import Path
-
-import yaml
 
 from sdpj.infrastructure.utils.exceptions import FileError
 
@@ -35,7 +34,7 @@ def write_file(file_path: str, content: str | bytes, mode: str = "text") -> bool
 
 
 def validate_file_format(content: str, format_type: str) -> tuple[bool, str]:
-    """文件格式校验，支持 json / yaml / csv"""
+    """文件格式校验，支持 json / csv / jsonl"""
     fmt = format_type.lower()
 
     if fmt == "json":
@@ -46,15 +45,6 @@ def validate_file_format(content: str, format_type: str) -> tuple[bool, str]:
             return True, ""
         except json.JSONDecodeError as e:
             return False, f"JSON 解析失败: {e}"
-
-    if fmt in ("yaml", "yml"):
-        try:
-            obj = yaml.safe_load(content)
-            if obj is None:
-                return False, "YAML 内容为空"
-            return True, ""
-        except yaml.YAMLError as e:
-            return False, f"YAML 解析失败: {e}"
 
     if fmt == "csv":
         try:
@@ -71,7 +61,7 @@ def validate_file_format(content: str, format_type: str) -> tuple[bool, str]:
             return False, f"CSV 解析失败: {e}"
 
     if fmt == "jsonl":
-        lines = [l for l in content.splitlines() if l.strip()]
+        lines = [line for line in content.splitlines() if line.strip()]
         if not lines:
             return False, "JSONL 文件为空"
         for i, line in enumerate(lines, start=1):

@@ -4,14 +4,15 @@
 使用 aiosqlite 作为异步 SQLite 驱动。
 """
 
-from typing import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
-    create_async_engine,
-    async_sessionmaker,
+    AsyncEngine,
     AsyncSession,
-    AsyncEngine
+    async_sessionmaker,
+    create_async_engine,
 )
 from sqlalchemy.pool import NullPool, StaticPool
 
@@ -36,21 +37,22 @@ class UserDBSessionManager:
                 database_url,
                 echo=echo,
                 poolclass=StaticPool if is_memory else NullPool,
-                connect_args={"check_same_thread": False}
+                connect_args={"check_same_thread": False},
             )
             if "sqlite" in database_url:
+
                 @event.listens_for(self._engine.sync_engine, "connect")
                 def _enable_fk(dbapi_conn, connection_record):
                     cursor = dbapi_conn.cursor()
                     cursor.execute("PRAGMA foreign_keys=ON")
                     cursor.close()
+
         self._session_factory = async_sessionmaker(
             self._engine, class_=AsyncSession, expire_on_commit=False, autoflush=False, autocommit=False
         )
 
     async def initialize(self) -> None:
         """初始化（兼容性方法，实际在 __init__ 中已初始化）"""
-        pass
 
     async def create_tables(self) -> None:
         """创建所有表（如果不存在）"""
@@ -60,13 +62,13 @@ class UserDBSessionManager:
 
     async def _migrate_schema(self) -> None:
         """检测并补齐 ORM 模型中定义但数据库缺失的列"""
-        from sqlalchemy import inspect as sa_inspect, text
+        from sqlalchemy import text
 
         async with self._engine.begin() as conn:
             for table_name, table_obj in Base.metadata.tables.items():
                 existing_cols = set()
                 try:
-                    result = await conn.execute(text(f"PRAGMA table_info(\"{table_name}\")"))
+                    result = await conn.execute(text(f'PRAGMA table_info("{table_name}")'))
                     for row in result:
                         existing_cols.add(row[1])
                 except Exception:
@@ -85,9 +87,9 @@ class UserDBSessionManager:
                                     default = f" DEFAULT '{val}'"
                                 else:
                                     default = f" DEFAULT {val}"
-                        await conn.execute(text(
-                            f'ALTER TABLE "{table_name}" ADD COLUMN {col.name} {col_type}{nullable}{default}'
-                        ))
+                        await conn.execute(
+                            text(f'ALTER TABLE "{table_name}" ADD COLUMN {col.name} {col_type}{nullable}{default}')
+                        )
 
     async def drop_tables(self) -> None:
         """删除所有表（慎用，仅用于测试）"""

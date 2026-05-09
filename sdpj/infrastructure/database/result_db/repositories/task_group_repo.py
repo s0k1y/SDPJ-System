@@ -5,8 +5,10 @@
 
 import uuid
 from typing import Optional
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from ..models import TaskGroup
 
 
@@ -23,21 +25,13 @@ class TaskGroupRepository:
 
     async def create(self, user_id: int, model_id: str) -> TaskGroup:
         task_group_id = f"tg_{uuid.uuid4().hex[:16]}"
-        task_group = TaskGroup(
-            task_group_id=task_group_id,
-            user_id=user_id,
-            model_id=model_id
-        )
+        task_group = TaskGroup(task_group_id=task_group_id, user_id=user_id, model_id=model_id)
         self.session.add(task_group)
         await self.session.flush()
         return task_group
 
     async def create_with_id(self, task_group_id: str, user_id: int, model_id: str) -> TaskGroup:
-        task_group = TaskGroup(
-            task_group_id=task_group_id,
-            user_id=user_id,
-            model_id=model_id
-        )
+        task_group = TaskGroup(task_group_id=task_group_id, user_id=user_id, model_id=model_id)
         self.session.add(task_group)
         await self.session.flush()
         return task_group
@@ -55,11 +49,7 @@ class TaskGroupRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def list_all(
-        self,
-        user_id: Optional[int] = None,
-        model_id: Optional[str] = None
-    ) -> list[TaskGroup]:
+    async def list_all(self, user_id: Optional[int] = None, model_id: Optional[str] = None) -> list[TaskGroup]:
         """查询任务组列表
 
         Args:

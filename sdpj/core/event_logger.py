@@ -3,12 +3,13 @@ EventLogger 实现
 
 该模块实现了事件与日志管理的核心功能。
 """
+
 import asyncio
 import uuid
 from collections import deque
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Callable
 
 import structlog
 
@@ -81,13 +82,7 @@ class EventLogger(EventLoggerInterface):
                 ts = ts.replace(tzinfo=timezone.utc)
         return ts
 
-    def log_operation(
-        self,
-        user_id: str,
-        operation_type: str,
-        context: dict,
-        timestamp: datetime | None = None
-    ) -> str:
+    def log_operation(self, user_id: str, operation_type: str, context: dict, timestamp: datetime | None = None) -> str:
         """
         记录用户操作日志
 
@@ -112,18 +107,14 @@ class EventLogger(EventLoggerInterface):
             user_id=user_id,
             event_type=operation_type,
             description=operation_type,
-            context=context
+            context=context,
         )
 
         self._add_log(entry)
         return log_id
 
     def log_runtime(
-        self,
-        source_module: str,
-        event_type: str,
-        description: str,
-        timestamp: datetime | None = None
+        self, source_module: str, event_type: str, description: str, timestamp: datetime | None = None
     ) -> str:
         """
         记录系统运行日志
@@ -149,18 +140,14 @@ class EventLogger(EventLoggerInterface):
             user_id=None,
             event_type=event_type,
             description=description,
-            context={}
+            context={},
         )
 
         self._add_log(entry)
         return log_id
 
     def log_error(
-        self,
-        source_module: str,
-        error_type: str,
-        description: str,
-        timestamp: datetime | None = None
+        self, source_module: str, error_type: str, description: str, timestamp: datetime | None = None
     ) -> str:
         """
         记录系统错误日志
@@ -186,7 +173,7 @@ class EventLogger(EventLoggerInterface):
             user_id=None,
             event_type=error_type,
             description=description,
-            context={}
+            context={},
         )
 
         self._add_log(entry)
@@ -201,7 +188,7 @@ class EventLogger(EventLoggerInterface):
         time_end: datetime | None = None,
         source_module: str | None = None,
         user_id: str | None = None,
-        user_ids: list[str] | None = None
+        user_ids: list[str] | None = None,
     ) -> bool:
         if category is not None and entry.category != category:
             return False
@@ -256,10 +243,7 @@ class EventLogger(EventLoggerInterface):
 
         memory_matches: list[LogEntry] = []
         for entry in self._logs:
-            if not self._filter_entry(
-                entry, category, level, ts_start, ts_end,
-                source_module, user_id, user_ids
-            ):
+            if not self._filter_entry(entry, category, level, ts_start, ts_end, source_module, user_id, user_ids):
                 continue
             memory_matches.append(entry)
 
@@ -271,13 +255,18 @@ class EventLogger(EventLoggerInterface):
             if self._result_db is not None and "database" in self._output_targets:
                 try:
                     db_entries = await self._query_from_db(
-                        category, level, time_start, time_end,
-                        source_module, user_id, user_ids,
-                        limit=page_size, offset=offset
+                        category,
+                        level,
+                        time_start,
+                        time_end,
+                        source_module,
+                        user_id,
+                        user_ids,
+                        limit=page_size,
+                        offset=offset,
                     )
                     db_total = await self._count_from_db(
-                        category, level, time_start, time_end,
-                        source_module, user_id, user_ids
+                        category, level, time_start, time_end, source_module, user_id, user_ids
                     )
                 except Exception as e:
                     self._logger.error(f"从数据库查询日志失败: {e}")
@@ -286,7 +275,7 @@ class EventLogger(EventLoggerInterface):
             memory_only = [e for e in memory_matches if e.log_id not in db_ids]
             memory_only.sort(
                 key=lambda e: e.timestamp.replace(tzinfo=timezone.utc) if e.timestamp.tzinfo is None else e.timestamp,
-                reverse=True
+                reverse=True,
             )
 
             total = db_total + len(memory_only)
@@ -309,8 +298,7 @@ class EventLogger(EventLoggerInterface):
             if self._result_db is not None and "database" in self._output_targets:
                 try:
                     db_entries = await self._query_from_db(
-                        category, level, time_start, time_end,
-                        source_module, user_id, user_ids
+                        category, level, time_start, time_end, source_module, user_id, user_ids
                     )
                     for entry in db_entries:
                         if entry.log_id not in seen_ids:
@@ -321,7 +309,7 @@ class EventLogger(EventLoggerInterface):
 
             results.sort(
                 key=lambda e: e.timestamp.replace(tzinfo=timezone.utc) if e.timestamp.tzinfo is None else e.timestamp,
-                reverse=True
+                reverse=True,
             )
             return results, len(results)
 
@@ -335,7 +323,7 @@ class EventLogger(EventLoggerInterface):
         user_id: str | None,
         user_ids: list[str] | None = None,
         limit: int = 1000,
-        offset: int = 0
+        offset: int = 0,
     ) -> list[LogEntry]:
         """从数据库查询日志（异步）"""
         logs = await self._result_db.query_logs(
@@ -347,7 +335,7 @@ class EventLogger(EventLoggerInterface):
             user_id=user_id,
             user_ids=user_ids,
             limit=limit,
-            offset=offset
+            offset=offset,
         )
 
         return [
@@ -360,7 +348,7 @@ class EventLogger(EventLoggerInterface):
                 user_id=log["user_id"],
                 event_type=log["event_type"],
                 description=log["description"],
-                context=log["context"] or {}
+                context=log["context"] or {},
             )
             for log in logs
         ]
@@ -373,7 +361,7 @@ class EventLogger(EventLoggerInterface):
         time_end: datetime | None,
         source_module: str | None,
         user_id: str | None,
-        user_ids: list[str] | None = None
+        user_ids: list[str] | None = None,
     ) -> int:
         """从数据库统计日志数量（异步）"""
         return await self._result_db.count_logs(
@@ -383,7 +371,7 @@ class EventLogger(EventLoggerInterface):
             time_end=time_end,
             source_module=source_module,
             user_id=user_id,
-            user_ids=user_ids
+            user_ids=user_ids,
         )
 
     def set_log_level(self, level: LogLevel) -> bool:
@@ -439,7 +427,7 @@ class EventLogger(EventLoggerInterface):
         Returns:
             删除的日志数量
         """
-        marker = Path("./data/db/.last_log_cleanup")
+        marker = Path("./sdpj/infrastructure/database/.last_log_cleanup")
         now = datetime.now(timezone.utc)
 
         if marker.exists():
@@ -552,7 +540,7 @@ class EventLogger(EventLoggerInterface):
                 user_id=entry.user_id,
                 event_type=entry.event_type,
                 description=entry.description,
-                context=entry.context
+                context=entry.context,
             )
         except Exception as e:
             self._logger.error("save_log_to_db_failed", error=str(e), log_id=entry.log_id)

@@ -11,19 +11,25 @@
 依赖模块: LLMAdapterLib, UtilsLib
 被依赖模块: SDPJDetector
 """
-from typing import Dict, Any, Optional
+
+import asyncio
+import time
+from typing import Any, Dict, Optional
+
 from tenacity import (
+    RetryError,
     retry,
     stop_after_attempt,
     wait_exponential,
-    RetryError,
 )
 
-from sdpj.infrastructure.llm_adapters.llm_adapter_interface import LLMAdapterLibInterface
 from sdpj.infrastructure.llm_adapters.errors import (
-    StandardizedLLMError,
     ErrorCategory,
     LLMServiceInstance,
+    StandardizedLLMError,
+)
+from sdpj.infrastructure.llm_adapters.llm_adapter_interface import (
+    LLMAdapterLibInterface,
 )
 from sdpj.infrastructure.utils.utils_interface import UtilsInterface
 
@@ -112,10 +118,7 @@ class LLMService:
             try:
                 system_prompt = request_data.get("system_prompt", "")
                 user_message = request_data.get("user_message", "")
-                extra = {
-                    k: v for k, v in request_data.items()
-                    if k not in ("system_prompt", "user_message")
-                }
+                extra = {k: v for k, v in request_data.items() if k not in ("system_prompt", "user_message")}
                 return await service_instance.call(system_prompt, user_message, **extra)
             except StandardizedLLMError:
                 raise
@@ -127,6 +130,64 @@ class LLMService:
                 ) from e
 
         return await _do_call()
+
+    async def verify_connectivity(self, service_instance, timeout: float = 30.0) -> dict:
+        """验证模型连接性，发送健康检查消息并返回结构化结果"""
+        req = self.assemble_request("", "Hello, respond with exactly: OK")
+        start = time.monotonic()
+        try:
+            resp = await asyncio.wait_for(
+                self.invoke_llm(service_instance, req),
+                timeout=timeout,
+            )
+            latency_ms = int((time.monotonic() - start) * 1000)
+            return {
+                "success": True,
+                "status": "ok",
+                "model": resp.get("model", ""),
+                "latency_ms": latency_ms,
+                "response_preview": resp.get("content", "")[:200],
+            }
+        except asyncio.TimeoutError:
+            latency_ms = int((time.monotonic() - start) * 1000)
+            return {
+                "success": False,
+                "status": "timeout",
+                "latency_ms": latency_ms,
+                "error": f"验证超时({timeout}s)",
+            }
+        except StandardizedLLMError as e:
+            latency_ms = int((time.monotonic() - start) * 1000)
+            category_map = {
+                ErrorCategory.AUTH: "auth_failed",
+                ErrorCategory.INVALID_REQUEST: "format_mismatch",
+                ErrorCategory.NETWORK: "unreachable",
+                ErrorCategory.TIMEOUT: "timeout",
+            }
+            status = category_map.get(e.category, "unknown_error")
+            return {
+                "success": False,
+                "status": status,
+                "latency_ms": latency_ms,
+                "error": e.message,
+            }
+        except Exception as e:
+            latency_ms = int((time.monotonic() - start) * 1000)
+            err_msg = str(e)
+            if "401" in err_msg or "auth" in err_msg.lower():
+                status = "auth_failed"
+            elif "404" in err_msg:
+                status = "format_mismatch"
+            elif "connect" in err_msg.lower() or "refused" in err_msg.lower():
+                status = "unreachable"
+            else:
+                status = "unknown_error"
+            return {
+                "success": False,
+                "status": status,
+                "latency_ms": latency_ms,
+                "error": err_msg,
+            }
 
     def should_retry(self, error: StandardizedLLMError, attempt: int) -> bool:
         return error.category in self.RECOVERABLE_CATEGORIES and attempt < self._max_retry_attempts

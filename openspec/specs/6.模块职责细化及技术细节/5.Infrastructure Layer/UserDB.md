@@ -20,15 +20,20 @@ UserDB / 用户信息数据库模块
    - 输出:更新结果
    - 触发场景:用户修改密码(对应 1.spec.md 功能 3.1.1.2)
 
-4. 按账号查询用户
+4. 按账号查询用户（get_user_by_username）
    - 输入:账号
-   - 输出:用户信息(用户ID、账号、已存储密码)
+   - 输出:用户信息（用户ID、账号、已存储密码、created_at）
    - 触发场景:用户登录时根据账号读取凭据用于校验(对应 1.spec.md 功能 3.1.1.1);账号切换(对应 1.spec.md 功能 3.1.1.2)
 
-5. 按 ID 查询用户
+5. 按 ID 查询用户（get_user_by_id）
    - 输入:用户ID
-   - 输出:用户信息
+   - 输出:用户信息（用户ID、账号、created_at），不包含 password 字段
    - 触发场景:AccountManager 通过 UserCenter 读取当前用户信息(对应 1.spec.md 功能 3.1.1.2)
+
+19. 获取所有用户（get_all_users）
+    - 输入:无
+    - 输出:所有用户列表（每条含 user_id、username、created_at），不包含 password 字段
+    - 触发场景:管理功能列举全部注册用户
 
 # 资源级能力
 6. 登记资源
@@ -103,7 +108,7 @@ UserDB / 用户信息数据库模块
     - 不负责的边界:级联触发由资源外键约束保证,本职责仅做单条配置内容的显式清除
 
 # 接口契约
-18. 通过 UserDBInterface 对外暴露上述能力,UserCenter 是唯一调用方(符合 4.模型依赖关系图.puml 中 UserCenter → UserDB 边)
+20. 通过 UserDBInterface 对外暴露上述能力,UserCenter 是唯一调用方(符合 4.模型依赖关系图.puml 中 UserCenter → UserDB 边)
 
 不需要的:[对密码做加密/哈希处理,维护用户登录会话与在线态,做密码强度/账号格式校验,做权限授予资格的业务判定,做调用方业务逻辑(分页/排序/筛选),对「私有检测配置」类型之外的受控资源维护其具体内容(该类型由本模块专属的配置内容表承载,其他类型仅维护元信息与 ACL)]
 
@@ -114,7 +119,7 @@ UserDB / 用户信息数据库模块
 
 # 物理结构合并
 
-UserDB 的数据表（`User`、`Resource`、`AccessControl`、`PrivateConfig`）与 SampleDB、ResultDB 的数据表合并存储于同一 SQLite 文件 `data/db/sdpj.db`。
+UserDB 的数据表（`User`、`Resource`、`AccessControl`、`PrivateConfig`）与 SampleDB、ResultDB 的数据表合并存储于同一 SQLite 文件 `sdpj/infrastructure/database/sdpj.db`。
 
 原因：ResultDB 的 `TaskGroup.user_id` 引用本模块的 `User.user_id`。若两模块使用独立文件，该外键无法被 SQLite 引擎强制执行（跨文件外键约束不可用），数据完整性将崩溃。合并后由数据库引擎通过 `PRAGMA foreign_keys=ON` 统一执行所有约束。
 
@@ -122,7 +127,7 @@ UserDB 的数据表（`User`、`Resource`、`AccessControl`、`PrivateConfig`）
 
 用户信息数据库模块:存储用户账号信息，并进一步实现自主访问控制列表。
 在自主访问控制列表的基础逻辑上，设计符合数据库规范性3NF标准的关系模型，得：
-用户(用户ID[主键], 账号, 密码)
-资源(资源ID[主键], 资源类型, 资源拥有者用户ID[外键_用户(用户ID)])
-访问控制列表(访问控制项ID[主键], 资源ID[外键_资源(资源ID)], 被授权用户ID[外键_用户(用户ID)])
-私有检测配置内容(配置ID[主键/外键_资源(资源ID)], 配置内容JSON)
+用户(用户ID[主键], 账号, 密码, created_at)
+资源(资源ID[主键], 资源类型, 资源拥有者用户ID[外键_用户(用户ID)], created_at)
+访问控制列表(访问控制项ID[主键], 资源ID[外键_资源(资源ID)], 被授权用户ID[外键_用户(用户ID)], created_at)
+私有检测配置内容(配置ID[主键/外键_资源(资源ID)], 配置内容JSON, created_at, updated_at)

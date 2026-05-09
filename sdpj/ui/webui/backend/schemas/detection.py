@@ -1,6 +1,8 @@
 """检测相关 Pydantic 模型"""
-from pydantic import BaseModel
+
 from typing import Optional, Union
+
+from pydantic import BaseModel
 
 
 class DetectionStartRequest(BaseModel):

@@ -11,3 +11,7 @@ export async function register(username, password) {
 export async function logout() {
   return api.post('/auth/logout')
 }
+
+export async function checkSession() {
+  return api.get('/auth/me')
+}

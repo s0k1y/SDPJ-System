@@ -3,9 +3,14 @@
 职责 16-18: 命令提示与帮助、本地终端用户会话、接口契约。
 仅依赖 StateSchedulerInterface，不含业务逻辑。
 """
+
 import click
 
 from sdpj.control.state_scheduler_interface import StateSchedulerInterface
+from sdpj.ui.cli.commands.adapter import config_group
+from sdpj.ui.cli.commands.detect import detect_group
+from sdpj.ui.cli.commands.report import report_group
+from sdpj.ui.cli.commands.user import user_group
 
 
 class CLIContext:
@@ -23,6 +28,7 @@ class CLIContext:
 
 def _bootstrap() -> StateSchedulerInterface:
     from sdpj.bootstrap import build_scheduler
+
     return build_scheduler()
 
 
@@ -41,11 +47,6 @@ def cli(ctx):
     ctx.obj = CLIContext(scheduler)
 
 
-from sdpj.ui.cli.commands.detect import detect_group
-from sdpj.ui.cli.commands.report import report_group
-from sdpj.ui.cli.commands.user import user_group
-from sdpj.ui.cli.commands.adapter import config_group
-
 cli.add_command(detect_group)
 cli.add_command(report_group)
 cli.add_command(user_group)
@@ -58,6 +59,7 @@ cli.add_command(config_group)
 def watch(ctx, interval):
     """实时监听系统状态变更推送"""
     import time
+
     last_state = [None]
 
     def on_state_change(new_state: str) -> None:
@@ -101,6 +103,7 @@ def watch_errors(ctx):
 def status(ctx):
     """查询系统状态 (职责 8)"""
     from sdpj.ui.cli.utils import output
+
     state = ctx.obj.scheduler.get_system_state()
     output.info(f"系统状态: {state}")
 
@@ -115,7 +118,9 @@ def status(ctx):
 def logs(ctx, category, source_module, user_id, page, page_size):
     """查询系统日志 (职责 9)"""
     import asyncio
+
     from sdpj.ui.cli.utils import output
+
     filters = {}
     if category:
         filters["category"] = category

@@ -3,28 +3,19 @@
 依赖模块: DataProcessor (via DataProcessorInterface), LLMService (via LLMServiceInterface)
 被依赖模块: StateScheduler
 """
+
 from typing import Callable
 
 from sdpj.drivers.data_processor_interface import DataProcessorInterface
-from sdpj.drivers.llm_service_interface import LLMServiceInterface, LLMError
+from sdpj.drivers.llm_service_interface import LLMError, LLMServiceInterface
 
-from .static_detector import run_static_detection, select_poc_pool, _call_llm, LLMCallCallback
-from .dynamic_detector import run_dynamic_detection, DynamicProgressCallback
 from . import prompt_builder, result_parser
-
-from .prompt_builder import (
-    build_judge_template,
-    build_attack_template,
-    build_judge_input,
-    build_mutation_input,
-)
-from .result_parser import (
-    parse_compliance_judgment,
-    extract_model_output,
-)
+from ..sdpj_detector_interface import SDPJDetectorInterface
+from .dynamic_detector import DynamicProgressCallback, run_dynamic_detection
+from .static_detector import LLMCallCallback, _call_llm, run_static_detection
 
 
-class SDPJDetector:
+class SDPJDetector(SDPJDetectorInterface):
     """SDPJ 检测内核"""
 
     def __init__(
@@ -35,9 +26,27 @@ class SDPJDetector:
         self._data_processor = data_processor
         self._llm = llm_service
 
-    async def run_static_detection(self, model_id: str, user_id: str, dataset_ids: list[int] | None = None, *, task_group_id: str | None = None, jailbreak_dataset_ids: list[int] | None = None, max_rps: float = 5.0, max_concurrency: int = 10, poc_progress_callback: Callable[[int, int, int, dict, dict | None], None] | None = None, task_progress_callback: Callable[[str, int, int], None] | None = None, force_refresh: bool = False, llm_callback: LLMCallCallback | None = None) -> dict:
+    async def run_static_detection(
+        self,
+        model_id: str,
+        user_id: str,
+        dataset_ids: list[int] | None = None,
+        *,
+        task_group_id: str | None = None,
+        jailbreak_dataset_ids: list[int] | None = None,
+        max_rps: float = 5.0,
+        max_concurrency: int = 10,
+        poc_progress_callback: Callable[[int, int, int, dict, dict | None], None] | None = None,
+        task_progress_callback: Callable[[str, int, int], None] | None = None,
+        force_refresh: bool = False,
+        llm_callback: LLMCallCallback | None = None,
+    ) -> dict:
         return await run_static_detection(
-            self._llm, self._data_processor, model_id, user_id, dataset_ids,
+            self._llm,
+            self._data_processor,
+            model_id,
+            user_id,
+            dataset_ids,
             task_group_id=task_group_id,
             jailbreak_dataset_ids=jailbreak_dataset_ids,
             max_rps=max_rps,
@@ -49,18 +58,30 @@ class SDPJDetector:
         )
 
     async def run_dynamic_detection(
-        self, model_id: str, user_id: str, static_result: dict, max_iterations: int = 3, max_rps: float = 5.0, max_concurrency: int = 10, llm_callback: LLMCallCallback | None = None, dynamic_progress_callback: DynamicProgressCallback | None = None
+        self,
+        model_id: str,
+        user_id: str,
+        static_result: dict,
+        max_iterations: int = 3,
+        max_rps: float = 5.0,
+        max_concurrency: int = 10,
+        llm_callback: LLMCallCallback | None = None,
+        dynamic_progress_callback: DynamicProgressCallback | None = None,
     ) -> dict:
         return await run_dynamic_detection(
-            self._llm, self._data_processor, model_id, user_id,
-            static_result, max_iterations, max_rps=max_rps, max_concurrency=max_concurrency,
+            self._llm,
+            self._data_processor,
+            model_id,
+            user_id,
+            static_result,
+            max_iterations,
+            max_rps=max_rps,
+            max_concurrency=max_concurrency,
             llm_callback=llm_callback,
             dynamic_progress_callback=dynamic_progress_callback,
         )
 
-    async def judge_compliance(
-        self, model_id: str, model_output: str, judge_template: str
-    ) -> str:
+    async def judge_compliance(self, model_id: str, model_output: str, judge_template: str) -> str:
         instance = await self._llm.get_service_instance(model_id)
         judge_input = prompt_builder.build_judge_input(judge_template, model_output)
         try:
@@ -75,3 +96,7 @@ class SDPJDetector:
         return await self._data_processor.append_result_data(
             report_id, risk_subclass, poc, model_output, compliance_result
         )
+
+    async def verify_connectivity(self, service_instance, timeout: float = 30.0) -> dict:
+        """验证大模型连接性，委托给 LLMService 执行健康检查"""
+        return await self._llm.verify_connectivity(service_instance, timeout)

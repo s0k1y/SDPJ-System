@@ -1,6 +1,8 @@
 """用户相关 Pydantic 模型"""
-from pydantic import BaseModel
+
 from typing import Optional
+
+from pydantic import BaseModel
 
 
 class AuthRequest(BaseModel):

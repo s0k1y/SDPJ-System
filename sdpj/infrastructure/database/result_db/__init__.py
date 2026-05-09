@@ -4,16 +4,16 @@
 """
 
 from .interface import ResultDBInterface
-from .result_db import ResultDB
-from .session import SessionManager
 from .models import (
     Base,
-    TaskGroup,
-    DetectionTask,
     DetectionReport,
+    DetectionTask,
     ResultData,
     SystemLog,
+    TaskGroup,
 )
+from .result_db import ResultDB
+from .session import SessionManager
 
 __all__ = [
     "ResultDBInterface",

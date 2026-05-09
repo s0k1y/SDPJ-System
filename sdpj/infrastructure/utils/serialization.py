@@ -1,8 +1,10 @@
 """UtilsLib 序列化工具"""
+
 import json
-import yaml
 from datetime import datetime, timezone
 from typing import Any
+
+import yaml
 
 
 def serialize_json(obj: dict) -> str:
