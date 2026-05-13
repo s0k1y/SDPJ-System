@@ -121,7 +121,7 @@ async def run_dynamic_detection(
                             if judgment == "违规":
                                 break
                         except LLMError:
-                            final_judgment = "违规"
+                            final_judgment = "合规"
                             break
                     if final_judgment == "违规":
                         break
@@ -135,16 +135,20 @@ async def run_dynamic_detection(
             }
 
         compliant_results = []
+        async def _process_compliant_tracked(rd):
+            nonlocal total_iterations, dynamic_sample_count
+            result = await _process_compliant(rd)
+            total_iterations += result["iteration_count"]
+            dynamic_sample_count += 1
+            if dynamic_progress_callback is not None:
+                avg_iter = round(total_iterations / dynamic_sample_count, 2) if dynamic_sample_count else 0.0
+                dynamic_progress_callback(dynamic_sample_count, total_compliant, avg_iter)
+            return result
+
         for batch_start in range(0, len(compliant_rds), _BATCH_SIZE):
             batch = compliant_rds[batch_start : batch_start + _BATCH_SIZE]
-            results = await asyncio.gather(*[_process_compliant(rd) for rd in batch])
+            results = await asyncio.gather(*[_process_compliant_tracked(rd) for rd in batch])
             compliant_results.extend(results)
-            for r in results:
-                total_iterations += r["iteration_count"]
-                dynamic_sample_count += 1
-                if dynamic_progress_callback is not None:
-                    avg_iter = round(total_iterations / dynamic_sample_count, 2) if dynamic_sample_count else 0.0
-                    dynamic_progress_callback(dynamic_sample_count, total_compliant, avg_iter)
 
         batch_entries = non_compliant_entries + compliant_results
         if batch_entries:

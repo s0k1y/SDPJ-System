@@ -221,6 +221,8 @@ class StateScheduler(StateSchedulerInterface):
             return {"success": False, "error": f"系统当前状态为'{current_state}'，不允许启动检测"}
 
         task_group_id = str(uuid.uuid4())
+        print(f"\n[DEBUG StateScheduler.start_detection] 生成 task_group_id={task_group_id} (仅在内存，未持久化)", flush=True)
+        print(f"[DEBUG StateScheduler.start_detection] user_id={user_id}, model_id={model_id}, type={detection_type}, dataset_ids={dataset_ids}, force_refresh={force_refresh}", flush=True)
         task_ids: list[str] = []
         try:
             for ds_id in dataset_ids:
@@ -271,6 +273,11 @@ class StateScheduler(StateSchedulerInterface):
         task_group_id = task_params.get("task_group_id")
         jailbreak_dataset_ids = task_params.get("jailbreak_dataset_ids")
         force_refresh = task_params.get("force_refresh", False)
+
+        print(f"\n[DEBUG StateScheduler.execute_detection_task] === 开始执行 ===", flush=True)
+        print(f"[DEBUG StateScheduler.execute_detection_task] task_id={task_id}, detection_type={detection_type}", flush=True)
+        print(f"[DEBUG StateScheduler.execute_detection_task] task_group_id={task_group_id}, model_id={model_id}, user_id={user_id}", flush=True)
+        print(f"[DEBUG StateScheduler.execute_detection_task] dataset_id={raw_ds_id}, jailbreak_ids={jailbreak_dataset_ids}, force_refresh={force_refresh}", flush=True)
 
         actual_model_name = model_id
         try:
@@ -614,42 +621,44 @@ class StateScheduler(StateSchedulerInterface):
             stage_info = {"stage": "unknown"}
             if poc_progress:
                 is_initializing = poc_progress.get("total", 0) == 0
-                if is_initializing:
-                    poc_child = {
-                        "task_id": f"poc_{group_id}",
-                        "status": "running",
-                        "dataset_id": "poc_selecting",
-                        "dataset_name": "构建PoC池（初始化中...[预计时间:5-10min]）",
-                        "error_message": "",
-                        "progress": None,
-                    }
-                else:
-                    sc = poc_progress.get("score_counts", {})
-                    score_parts = []
-                    for s in range(1, 6):
-                        cnt = sc.get(str(s), sc.get(s, 0))
-                        if cnt > 0:
-                            score_parts.append(f"{s}分{cnt}条")
-                    found_info = "、".join(score_parts) if score_parts else f"有效 {poc_progress['found']} 条"
-                    poc_child = {
-                        "task_id": f"poc_{group_id}",
-                        "status": "running",
-                        "dataset_id": "poc_selecting",
-                        "dataset_name": f"构建PoC池 ({poc_progress['processed']}/{poc_progress['total']}，{found_info})",
-                        "error_message": "",
-                        "progress": {
-                            "processed": poc_progress["processed"],
-                            "total": poc_progress["total"],
-                            "found": poc_progress["found"],
-                            "score_counts": poc_progress.get("score_counts", {}),
-                            "subtype_stats": poc_progress.get("subtype_stats", {}),
-                            "remaining_subtypes": poc_progress.get("remaining_subtypes", []),
-                        },
-                    }
-                children.insert(0, poc_child)
-                status_counts["running"] += 1
-                subtype_stats = poc_progress.get("subtype_stats", {})
                 remaining_subtypes = poc_progress.get("remaining_subtypes", [])
+                poc_complete = not is_initializing and not remaining_subtypes
+                if not poc_complete:
+                    if is_initializing:
+                        poc_child = {
+                            "task_id": f"poc_{group_id}",
+                            "status": "running",
+                            "dataset_id": "poc_selecting",
+                            "dataset_name": "构建PoC池（初始化中...[预计时间:5-10min]）",
+                            "error_message": "",
+                            "progress": None,
+                        }
+                    else:
+                        sc = poc_progress.get("score_counts", {})
+                        score_parts = []
+                        for s in range(1, 6):
+                            cnt = sc.get(str(s), sc.get(s, 0))
+                            if cnt > 0:
+                                score_parts.append(f"{s}分{cnt}条")
+                        found_info = "、".join(score_parts) if score_parts else f"有效 {poc_progress['found']} 条"
+                        poc_child = {
+                            "task_id": f"poc_{group_id}",
+                            "status": "running",
+                            "dataset_id": "poc_selecting",
+                            "dataset_name": f"构建PoC池 ({poc_progress['processed']}/{poc_progress['total']}，{found_info})",
+                            "error_message": "",
+                            "progress": {
+                                "processed": poc_progress["processed"],
+                                "total": poc_progress["total"],
+                                "found": poc_progress["found"],
+                                "score_counts": poc_progress.get("score_counts", {}),
+                                "subtype_stats": poc_progress.get("subtype_stats", {}),
+                                "remaining_subtypes": remaining_subtypes,
+                            },
+                        }
+                    children.insert(0, poc_child)
+                    status_counts["running"] += 1
+                subtype_stats = poc_progress.get("subtype_stats", {})
                 start_time = poc_progress.get("start_time")
                 last_update_time = poc_progress.get("last_update_time")
                 if not remaining_subtypes:
@@ -714,10 +723,9 @@ class StateScheduler(StateSchedulerInterface):
                 group_status = "completed"
 
             eta_seconds = -1.0
-            if poc_eta >= 0:
+            if poc_eta > 0:
                 eta_seconds = poc_eta
-                stage_info = stage_info
-            elif poc_progress is None and group_status in ("running", "pending"):
+            if eta_seconds <= 0 and group_status in ("running", "pending"):
                 task_etas = []
                 for child in children:
                     if child.get("status") == "running" and "progress" in child:
@@ -735,7 +743,7 @@ class StateScheduler(StateSchedulerInterface):
                         "stage": "static_detecting",
                         "tasks_remaining": sum(1 for c in children if c.get("status") in ("pending", "running")),
                     }
-                else:
+                elif eta_seconds < 0:
                     stage_info = {
                         "stage": "static_detecting",
                         "tasks_remaining": sum(1 for c in children if c.get("status") in ("pending", "running")),
@@ -771,6 +779,26 @@ class StateScheduler(StateSchedulerInterface):
                         "avg_iterations": round(dyn_avg_iter, 2),
                         "samples_remaining": 0,
                     }
+
+            if dynamic_prog and group_status == "running":
+                dyn_processed = dynamic_prog.get("processed", 0)
+                dyn_total = dynamic_prog.get("total", 0)
+                dyn_avg_iter = dynamic_prog.get("avg_iterations", 0.0)
+                dyn_name = f"动态检测 ({dyn_processed}/{dyn_total}，平均 {dyn_avg_iter} 轮)" if dyn_total > 0 else "动态检测（初始化中...）"
+                dyn_child = {
+                    "task_id": f"dyn_{group_id}",
+                    "status": "running",
+                    "dataset_id": "dynamic_detecting",
+                    "dataset_name": dyn_name,
+                    "error_message": "",
+                    "progress": {
+                        "processed": dyn_processed,
+                        "total": dyn_total,
+                        "avg_iterations": dyn_avg_iter,
+                    } if dyn_total > 0 else None,
+                }
+                children.append(dyn_child)
+                status_counts["running"] += 1
 
             if group_status == "completed":
                 eta_seconds = 0.0

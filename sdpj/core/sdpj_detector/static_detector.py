@@ -84,7 +84,7 @@ async def _call_llm(
             return resp
         except StandardizedLLMError as e:
             print(f"\033[31m[LLM调用错误]\033[0m 第{attempt+1}次尝试, 类型={e.category}, 信息={str(e)[:100]}", flush=True)
-            if e.category == ErrorCategory.RATE_LIMIT and attempt < max_retries:
+            if e.category in (ErrorCategory.RATE_LIMIT, ErrorCategory.TIMEOUT, ErrorCategory.NETWORK) and attempt < max_retries:
                 delay = base_delay * (2**attempt)
                 retry_after = None
                 if isinstance(e.detail, dict):
@@ -328,6 +328,15 @@ async def run_static_detection(
 
     if not task_group_id:
         task_group_id = await data_processor.create_task_group(user_id, model_id)
+        print(f"[DEBUG static_detector] 新建任务组: {task_group_id}", flush=True)
+    else:
+        # 确保 task_group_id 已持久化到数据库
+        # start_detection 只生成了内存中的 UUID，未写入 DB
+        print(f"[DEBUG static_detector] 收到外部传入 task_group_id={task_group_id}，确保持久化...", flush=True)
+        task_group_id = await data_processor.create_task_group_with_id(
+            task_group_id, str(user_id), model_id
+        )
+        print(f"[DEBUG static_detector] task_group_id 已确认持久化: {task_group_id}", flush=True)
 
     poc_pool: list[str]
     if force_refresh:
@@ -337,6 +346,10 @@ async def run_static_detection(
     if cached:
         entries = [(c["poc_text"], c["score"], c["subtype"]) for c in cached]
         poc_pool = _build_pool(entries)
+        if poc_progress_callback is not None:
+            poc_progress_callback(
+                len(poc_pool), len(poc_pool), len(poc_pool), {}, {}
+            )
     else:
         poc_pool, raw_entries = await select_poc_pool(
             llm,
@@ -348,6 +361,7 @@ async def run_static_detection(
             progress_callback=poc_progress_callback,
             llm_callback=llm_callback,
         )
+        print(f"[DEBUG static_detector] select_poc_pool 完成: {len(poc_pool)} 条PoC, raw_entries={len(raw_entries) if raw_entries else 0}", flush=True)
         if raw_entries:
             cache_entries = [
                 {"subtype": subtype, "poc_text": poc_text, "score": score}
@@ -366,6 +380,7 @@ async def run_static_detection(
                 )
                 # 缓存写入失败不影响检测流程继续
     if not poc_pool:
+        print(f"[DEBUG static_detector] PoC池为空，标记 no_jailbreak_risk", flush=True)
         for ds_meta in non_jailbreak:
             task_id = await data_processor.create_detection_task(
                 task_group_id, ds_meta["dataset_id"], "no_jailbreak_risk", datetime.now(timezone.utc)
@@ -373,6 +388,7 @@ async def run_static_detection(
             await data_processor.update_task_status(task_id, "no_jailbreak_risk", datetime.now(timezone.utc))
         return {"status": "no_jailbreak_risk", "task_group_id": task_group_id}
 
+    print(f"[DEBUG static_detector] PoC池构建完成: {len(poc_pool)} 条PoC, 开始静态检测非越狱数据集: {[d['dataset_id'] for d in non_jailbreak]}", flush=True)
     judge_template = prompt_builder.build_judge_template(poc_pool[0])
     instance = await llm.get_service_instance(model_id)
     sem = asyncio.Semaphore(max_concurrency)
@@ -403,15 +419,26 @@ async def run_static_detection(
                     judge_resp = await _call_llm(llm, instance, "", judge_input, limiter, llm_callback)
                     judgment = result_parser.parse_compliance_judgment(judge_resp)
                 except StandardizedLLMError as e:
-                    # e.message 已有空消息防护（errors.py 中兜底），但仍显式检查
                     msg = e.message or f"{e.category.value} (no detail)"
                     output_text = f"[ERROR] {msg}"
-                    judgment = "违规"
+                    judgment = "合规"
             return {"risk_subclass": subtype, "poc": poc, "model_output": output_text, "compliance_result": judgment}
 
         for batch_start in range(0, len(samples), _BATCH_SIZE):
             batch = samples[batch_start : batch_start + _BATCH_SIZE]
-            results = await asyncio.gather(*[_process(s) for s in batch])
+            batch_completed = 0
+
+            async def _process_tracked(s):
+                nonlocal batch_completed
+                result = await _process(s)
+                batch_completed += 1
+                if task_progress_callback is not None and batch_completed % 20 == 0:
+                    task_progress_callback(
+                        task_id, batch_start + batch_completed, sample_total
+                    )
+                return result
+
+            results = await asyncio.gather(*[_process_tracked(s) for s in batch])
             await data_processor.append_result_data_batch(report_id, list(results))
             if task_progress_callback is not None:
                 processed = min(batch_start + _BATCH_SIZE, sample_total)

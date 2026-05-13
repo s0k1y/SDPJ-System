@@ -83,8 +83,11 @@ class LLMAdapterLib:
     def standardize_error(exc: Exception) -> StandardizedLLMError:
         if isinstance(exc, StandardizedLLMError):
             return exc
+        import asyncio
         import aiohttp
 
+        if isinstance(exc, (asyncio.TimeoutError, TimeoutError)):
+            return StandardizedLLMError(ErrorCategory.TIMEOUT, str(exc), original_error=exc)
         if isinstance(exc, aiohttp.ServerTimeoutError):
             return StandardizedLLMError(ErrorCategory.TIMEOUT, str(exc), original_error=exc)
         if isinstance(exc, aiohttp.ClientResponseError):

@@ -66,11 +66,16 @@ class ResultDB:
             return task_group.task_group_id
 
     async def create_task_group_with_id(self, task_group_id: str, user_id: int, model_id: str) -> str:
+        print(f"[DEBUG ResultDB] create_task_group_with_id: task_group_id={task_group_id}, user_id={user_id}, model_id={model_id}", flush=True)
         async with self.session_manager.session() as session:
-            model = await TargetModelRepository(session).get_by_id(model_id)
-            if model is None:
-                raise ValueError(f"被测大模型 '{model_id}' 不存在，请先注册模型")
-            task_group = await TaskGroupRepository(session).create_with_id(task_group_id, user_id, model_id)
+            await TargetModelRepository(session).register(model_id)
+            tg_repo = TaskGroupRepository(session)
+            existing = await tg_repo.get_by_id(task_group_id)
+            if existing is not None:
+                print(f"[DEBUG ResultDB] create_task_group_with_id: 任务组已存在，跳过创建 (existing={existing.task_group_id})", flush=True)
+                return existing.task_group_id
+            task_group = await tg_repo.create_with_id(task_group_id, user_id, model_id)
+            print(f"[DEBUG ResultDB] create_task_group_with_id 写入完成: {task_group.task_group_id}", flush=True)
             return task_group.task_group_id
 
     async def delete_task_group(self, task_group_id: str) -> bool:
@@ -146,6 +151,7 @@ class ResultDB:
         metadata_json: Optional[dict] = None,
         task_id: Optional[str] = None,
     ) -> str:
+        print(f"[DEBUG ResultDB] create_detection_task: task_group_id={task_group_id}, dataset_id={dataset_id}, task_status={task_status}", flush=True)
         async with self.session_manager.session() as session:
             task_repo = TaskRepository(session)
 
@@ -161,7 +167,9 @@ class ResultDB:
                 return existing.task_id
 
             task_group_repo = TaskGroupRepository(session)
-            if await task_group_repo.get_by_id(task_group_id) is None:
+            tg_check = await task_group_repo.get_by_id(task_group_id)
+            print(f"[DEBUG ResultDB] create_detection_task: 检查任务组存在性 -> tg_check={'存在' if tg_check else '不存在'}", flush=True)
+            if tg_check is None:
                 raise ValueError(f"任务组ID '{task_group_id}' 不存在")
 
             if task_id is None:
@@ -732,7 +740,6 @@ class ResultDB:
                     "score": e.score,
                     "dataset_version": e.dataset_version,
                     "created_at": e.created_at.isoformat(),
-                    "expires_at": e.expires_at.isoformat() if e.expires_at else None,
                 }
                 for e in entries
             ]

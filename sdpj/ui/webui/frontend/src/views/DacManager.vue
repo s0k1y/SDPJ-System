@@ -322,12 +322,13 @@ table {
 }
 
 th {
-  color: #8b8b8b;
+  color: #333333;
   font-weight: 600;
   font-size: 14px;
   text-align: left;
   padding: 10px 8px;
-  border-bottom: 1px solid #e5e5e5;
+  border-top: 2px solid #333333;
+  border-bottom: 1px solid #333333;
   vertical-align: middle;
 }
 
@@ -336,6 +337,11 @@ td {
   font-size: 14px;
   padding: 10px 8px;
   vertical-align: middle;
+  border: none;
+}
+
+table tr:last-child td {
+  border-bottom: 2px solid #333333;
 }
 
 .row-selected {

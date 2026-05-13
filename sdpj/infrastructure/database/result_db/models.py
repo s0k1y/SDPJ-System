@@ -149,9 +149,6 @@ class PocPoolCache(Base):
     score: Mapped[int] = mapped_column(Integer, nullable=False, comment="PoC评分(1-5)")
     dataset_version: Mapped[str] = mapped_column(String(255), nullable=False, comment="数据集版本标识")
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, comment="创建时间")
-    expires_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime, nullable=True, index=True, comment="过期时间（已弃用）"
-    )
 
     def __repr__(self) -> str:
         return f"<PocPoolCache(cache_id={self.cache_id}, model_id={self.model_id}, subtype={self.subtype})>"

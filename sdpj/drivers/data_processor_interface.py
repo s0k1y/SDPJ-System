@@ -130,6 +130,19 @@ class DataProcessorInterface(Protocol):
         """
         ...
 
+    async def create_task_group_with_id(self, task_group_id: str, user_id: str, model_id: str) -> str:
+        """以指定ID开设检测任务组（幂等）
+
+        Args:
+            task_group_id: 预生成的任务组ID
+            user_id: 用户 ID
+            model_id: 目标被测大模型 ID
+
+        Returns:
+            任务组 ID
+        """
+        ...
+
     async def create_detection_task(
         self, task_group_id: str, dataset_id: int, task_status: str, start_time: datetime
     ) -> str:

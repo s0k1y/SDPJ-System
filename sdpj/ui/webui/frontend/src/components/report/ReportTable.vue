@@ -4,16 +4,16 @@
       <table>
         <thead>
           <tr>
-            <th style="width: 18%">任务组ID / 任务ID</th>
-            <th style="width: 12%">模型</th>
-            <th style="width: 12%">数据集</th>
+            <th style="width: 30%">任务组ID / 任务ID</th>
+            <th style="width: 14%">模型</th>
+            <th style="width: 14%">数据集</th>
             <th style="width: 10%">合规率</th>
             <th style="width: 10%">风险等级</th>
-            <th style="width: 10%">状态</th>
-            <th style="width: 28%">操作</th>
+            <th style="width: 8%">状态</th>
+            <th style="width: 14%">操作</th>
           </tr>
         </thead>
-        <template v-if="!loading && flattenedRows.length > 0">
+        <tbody v-if="!loading && flattenedRows.length > 0">
           <template v-for="row in flattenedRows" :key="row.id">
             <tr :class="{ 'group-row': !row.isLeaf, 'task-row': row.isLeaf }">
               <td>
@@ -57,7 +57,7 @@
               </td>
             </tr>
           </template>
-        </template>
+        </tbody>
         <tbody v-else-if="flattenedRows.length === 0">
           <tr>
             <td colspan="99" class="empty-row"><div class="empty-center" style="margin-right: 26%;">暂无检测报告</div></td>
@@ -168,12 +168,14 @@ table {
 }
 
 th {
-  color: #8b8b8b;
+  color: #333333;
   font-weight: 600;
   font-size: 14px;
   text-align: left;
   padding: 10px 8px;
-  border-bottom: 1px solid #e5e5e5;
+  border-top: 2px solid #333333;
+  border-bottom: 1px solid #333333;
+  white-space: nowrap;
 }
 
 td {
@@ -182,6 +184,11 @@ td {
   padding: 10px 8px;
   vertical-align: middle;
   white-space: nowrap;
+  border: none;
+}
+
+table tr:last-child td {
+  border-bottom: 2px solid #333333;
 }
 
 .cell-mono {
@@ -230,7 +237,6 @@ td {
 }
 
 .group-row {
-  background: #f5f5f5;
   font-weight: 500;
 }
 

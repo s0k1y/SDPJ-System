@@ -1,7 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "Bash(\"D:\\\\Anaconda\\\\envs\\\\SDPJ-System\\\\python.exe\" \"e:\\\\Sky毕业设计\\\\4.系统源代码\\\\SDPJ-System\\\\test_debug.py\")"
+      "Bash(\"D:\\\\Anaconda\\\\envs\\\\SDPJ-System\\\\python.exe\" \"e:\\\\Sky毕业设计\\\\4.系统源代码\\\\SDPJ-System\\\\test_debug.py\")",
+      "Bash(conda run *)",
+      "Bash(D:/Anaconda/envs/SDPJ-System/python.exe *)",
+      "Bash(\"D:/Anaconda/envs/SDPJ-System/python.exe\" -m py_compile \"E:/Sky毕业设计/4.系统源代码/SDPJ-System/sdpj/drivers/data_processor_interface.py\")",
+      "Bash(\"D:/Anaconda/envs/SDPJ-System/python.exe\" -m py_compile \"E:/Sky毕业设计/4.系统源代码/SDPJ-System/sdpj/drivers/data_processor.py\")",
+      "Bash(\"D:/Anaconda/envs/SDPJ-System/python.exe\" -m py_compile \"E:/Sky毕业设计/4.系统源代码/SDPJ-System/sdpj/core/sdpj_detector/static_detector.py\")",
+      "Bash(\"D:/Anaconda/envs/SDPJ-System/python.exe\" -m py_compile \"E:/Sky毕业设计/4.系统源代码/SDPJ-System/sdpj/control/state_scheduler.py\")",
+      "Bash(\"D:/Anaconda/envs/SDPJ-System/python.exe\" -m py_compile \"E:/Sky毕业设计/4.系统源代码/SDPJ-System/sdpj/infrastructure/database/result_db/result_db.py\")",
+      "Bash(\"D:/Anaconda/envs/SDPJ-System/python.exe\" -c \"import ast; ast.parse\\(open\\('sdpj/core/task_queue_manager.py'\\).read\\(\\)\\); print\\('语法检查通过'\\)\")",
+      "Bash(npm run *)",
+      "WebSearch"
     ]
   }
 }

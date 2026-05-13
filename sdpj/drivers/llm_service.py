@@ -122,6 +122,12 @@ class LLMService:
                 return await service_instance.call(system_prompt, user_message, **extra)
             except StandardizedLLMError:
                 raise
+            except asyncio.TimeoutError as e:
+                raise StandardizedLLMError(
+                    category=ErrorCategory.TIMEOUT,
+                    message=f"请求超时: {e}",
+                    original_error=e,
+                ) from e
             except Exception as e:
                 raise StandardizedLLMError(
                     category=ErrorCategory.UNKNOWN,

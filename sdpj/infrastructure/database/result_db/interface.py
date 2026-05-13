@@ -348,7 +348,7 @@ class ResultDBInterface(Protocol):
 
         Returns:
             缓存条目列表，按 score 降序排列，每条包含：
-            - cache_id, model_id, subtype, poc_text, score, dataset_version, created_at, expires_at
+            - cache_id, model_id, subtype, poc_text, score, dataset_version, created_at
         """
         ...
 

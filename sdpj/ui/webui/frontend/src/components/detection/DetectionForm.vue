@@ -1,16 +1,6 @@
 <template>
   <div class="detection-form">
-    <div class="section-header">
-      <h2 class="section-title">新建检测任务</h2>
-    </div>
-
     <div class="steps-container">
-      <el-steps :active="currentStep" align-center finish-status="success">
-        <el-step title="上传被测大模型API调用配置文件" />
-        <el-step title="选择待测数据集与参数" />
-        <el-step title="确认并启动" />
-      </el-steps>
-
       <div class="step-content">
         <el-form :model="form" :rules="rules" ref="formRef" label-width="130px" class="form-content">
 
@@ -462,6 +452,8 @@ onMounted(() => {
   fetchDatasets()
   fetchModelAdapters()
 })
+
+defineExpose({ currentStep })
 </script>
 
 <style scoped>
@@ -469,31 +461,8 @@ onMounted(() => {
   margin-bottom: 42px;
 }
 
-.section-header {
-  margin-bottom: 21px;
-}
-
-.section-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #404040;
-  margin: 0;
-}
-
 .steps-container {
   max-width: 520px;
-}
-
-:deep(.el-steps) {
-  margin-bottom: 0;
-}
-
-:deep(.el-step__title) {
-  font-size: 14px;
-  font-weight: 500;
-  color: #404040;
-  white-space: normal;
-  line-height: 1.4;
 }
 
 .step-content {

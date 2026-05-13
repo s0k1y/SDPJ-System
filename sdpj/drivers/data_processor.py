@@ -174,7 +174,15 @@ class DataProcessor:
         """开设检测任务组（若被测大模型未登记则先行入表）"""
         await self._result_db.register_target_model(model_id)
         task_group_id = await self._result_db.create_task_group(int(user_id), model_id)
+        print(f"[DEBUG DataProcessor] create_task_group: user_id={user_id}, model_id={model_id} -> {task_group_id}", flush=True)
         return task_group_id
+
+    async def create_task_group_with_id(self, task_group_id: str, user_id: str, model_id: str) -> str:
+        """以指定ID开设检测任务组（幂等，内部已处理重复注册）"""
+        print(f"[DEBUG DataProcessor] create_task_group_with_id: task_group_id={task_group_id}, user_id={user_id}, model_id={model_id}", flush=True)
+        result = await self._result_db.create_task_group_with_id(task_group_id, int(user_id), model_id)
+        print(f"[DEBUG DataProcessor] create_task_group_with_id DONE: {result}", flush=True)
+        return result
 
     async def create_detection_task(
         self, task_group_id: str, dataset_id: int, task_status: str, start_time: datetime
@@ -190,6 +198,7 @@ class DataProcessor:
         Returns:
             新创建任务的任务 ID
         """
+        print(f"[DEBUG DataProcessor] create_detection_task: task_group_id={task_group_id}, dataset_id={dataset_id}, task_status={task_status}", flush=True)
         # 将 dataset_id 转换为字符串以符合 ResultDB 接口
         task_id = await self._result_db.create_detection_task(
             task_group_id=task_group_id, dataset_id=dataset_id, task_status=task_status, start_time=start_time
