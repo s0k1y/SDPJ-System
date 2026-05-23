@@ -1,3 +1,4 @@
+from tests.fixtures.sample_data import REAL_MODEL_ID, REAL_MODEL_ID_2
 """ResultDB 主实现类单元测试
 
 测试 ResultDB 类实现的所有接口能力。
@@ -14,8 +15,8 @@ async def result_db():
     session_manager = SessionManager("sqlite+aiosqlite:///:memory:", echo=False)
     await session_manager.create_tables()
     db = ResultDB(session_manager)
-    await db.register_target_model("gpt-4")
-    await db.register_target_model("claude-3")
+    await db.register_target_model(REAL_MODEL_ID)
+    await db.register_target_model(REAL_MODEL_ID_2)
     from sdpj.infrastructure.database.user_db.models import User
     from sdpj.infrastructure.database.sample_db.models import Dataset
     async with session_manager.session() as session:
@@ -37,19 +38,19 @@ async def result_db():
 @pytest.mark.asyncio
 async def test_create_task_group(result_db):
     """测试创建检测任务组"""
-    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     assert task_group_id.startswith("tg_")
 
 
 @pytest.mark.asyncio
 async def test_get_task_group(result_db):
     """测试查询单个任务组"""
-    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
 
     task_group = await result_db.get_task_group(task_group_id)
     assert task_group["task_group_id"] == task_group_id
     assert task_group["user_id"] == 1
-    assert task_group["model_id"] == "gpt-4"
+    assert task_group["model_id"] == REAL_MODEL_ID
 
 
 @pytest.mark.asyncio
@@ -62,9 +63,9 @@ async def test_get_task_group_not_found(result_db):
 @pytest.mark.asyncio
 async def test_list_task_groups(result_db):
     """测试查询任务组列表"""
-    tg1 = await result_db.create_task_group(1, "gpt-4")
-    tg2 = await result_db.create_task_group(1, "claude-3")
-    tg3 = await result_db.create_task_group(2, "gpt-4")
+    tg1 = await result_db.create_task_group(1, REAL_MODEL_ID)
+    tg2 = await result_db.create_task_group(1, REAL_MODEL_ID_2)
+    tg3 = await result_db.create_task_group(2, REAL_MODEL_ID)
 
     all_groups = await result_db.list_task_groups()
     assert len(all_groups) == 3
@@ -72,14 +73,14 @@ async def test_list_task_groups(result_db):
     user_groups = await result_db.list_task_groups(user_id=1)
     assert len(user_groups) == 2
 
-    model_groups = await result_db.list_task_groups(model_id="gpt-4")
+    model_groups = await result_db.list_task_groups(model_id=REAL_MODEL_ID)
     assert len(model_groups) == 2
 
 
 @pytest.mark.asyncio
 async def test_delete_task_group(result_db):
     """测试删除任务组"""
-    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
 
     result = await result_db.delete_task_group(task_group_id)
     assert result is True
@@ -93,7 +94,7 @@ async def test_delete_task_group(result_db):
 @pytest.mark.asyncio
 async def test_create_detection_task(result_db):
     """测试创建检测任务"""
-    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
 
     start_time = datetime.now()
     task_id = await result_db.create_detection_task(
@@ -114,7 +115,7 @@ async def test_create_detection_task_invalid_group(result_db):
 @pytest.mark.asyncio
 async def test_get_detection_task(result_db):
     """测试查询单个检测任务"""
-    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(
         task_group_id, 1, "running", datetime.now()
     )
@@ -127,7 +128,7 @@ async def test_get_detection_task(result_db):
 @pytest.mark.asyncio
 async def test_update_task_status(result_db):
     """测试更新任务状态"""
-    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(
         task_group_id, 1, "running", datetime.now()
     )
@@ -144,7 +145,7 @@ async def test_update_task_status(result_db):
 @pytest.mark.asyncio
 async def test_list_tasks_by_group(result_db):
     """测试按任务组查询任务列表"""
-    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
 
     await result_db.create_detection_task(
         task_group_id, 1, "running", datetime.now()
@@ -160,7 +161,7 @@ async def test_list_tasks_by_group(result_db):
 @pytest.mark.asyncio
 async def test_delete_detection_task(result_db):
     """测试删除检测任务"""
-    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(
         task_group_id, 1, "running", datetime.now()
     )
@@ -177,7 +178,7 @@ async def test_delete_detection_task(result_db):
 @pytest.mark.asyncio
 async def test_create_detection_report(result_db):
     """测试创建检测报告"""
-    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(
         task_group_id, 1, "completed", datetime.now()
     )
@@ -195,7 +196,7 @@ async def test_create_detection_report_invalid_task(result_db):
 @pytest.mark.asyncio
 async def test_get_detection_report(result_db):
     """测试查询单份检测报告"""
-    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(
         task_group_id, 1, "completed", datetime.now()
     )
@@ -209,7 +210,7 @@ async def test_get_detection_report(result_db):
 @pytest.mark.asyncio
 async def test_get_report_by_task(result_db):
     """测试按任务ID查询报告"""
-    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(
         task_group_id, 1, "completed", datetime.now()
     )
@@ -223,8 +224,8 @@ async def test_get_report_by_task(result_db):
 @pytest.mark.asyncio
 async def test_list_detection_reports(result_db):
     """测试查询报告列表"""
-    tg1 = await result_db.create_task_group(1, "gpt-4")
-    tg2 = await result_db.create_task_group(2, "gpt-4")
+    tg1 = await result_db.create_task_group(1, REAL_MODEL_ID)
+    tg2 = await result_db.create_task_group(2, REAL_MODEL_ID)
 
     task1 = await result_db.create_detection_task(tg1, 1, "completed", datetime.now())
     task2 = await result_db.create_detection_task(tg1, 2, "completed", datetime.now())
@@ -244,7 +245,7 @@ async def test_list_detection_reports(result_db):
 @pytest.mark.asyncio
 async def test_delete_detection_report(result_db):
     """测试删除检测报告"""
-    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(
         task_group_id, 1, "completed", datetime.now()
     )
@@ -261,7 +262,7 @@ async def test_delete_detection_report(result_db):
 @pytest.mark.asyncio
 async def test_append_result_data(result_db):
     """测试追加检测结果数据"""
-    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(
         task_group_id, 1, "completed", datetime.now()
     )
@@ -285,7 +286,7 @@ async def test_append_result_data_invalid_report(result_db):
 @pytest.mark.asyncio
 async def test_list_result_data_by_report(result_db):
     """测试按报告ID查询结果数据"""
-    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(
         task_group_id, 1, "completed", datetime.now()
     )
@@ -301,7 +302,7 @@ async def test_list_result_data_by_report(result_db):
 @pytest.mark.asyncio
 async def test_append_result_data_with_iteration_count(result_db):
     """测试追加结果数据时包含迭代次数"""
-    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(
         task_group_id, 1, "completed", datetime.now()
     )
@@ -320,7 +321,7 @@ async def test_append_result_data_with_iteration_count(result_db):
 @pytest.mark.asyncio
 async def test_append_result_data_without_iteration_count(result_db):
     """测试追加结果数据时不传迭代次数（静态检测）"""
-    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(
         task_group_id, 1, "completed", datetime.now()
     )
@@ -339,7 +340,7 @@ async def test_append_result_data_without_iteration_count(result_db):
 @pytest.mark.asyncio
 async def test_append_result_data_zero_iterations(result_db):
     """测试追加结果数据时迭代次数为0（动态检测中静态就违规的样本）"""
-    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(
         task_group_id, 1, "completed", datetime.now()
     )
@@ -358,7 +359,7 @@ async def test_append_result_data_zero_iterations(result_db):
 @pytest.mark.asyncio
 async def test_delete_result_data(result_db):
     """测试删除结果数据"""
-    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(
         task_group_id, 1, "completed", datetime.now()
     )
@@ -379,7 +380,7 @@ async def test_delete_result_data(result_db):
 @pytest.mark.asyncio
 async def test_cascade_delete_full_chain(result_db):
     """测试完整的级联删除链"""
-    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(
         task_group_id, 1, "completed", datetime.now()
     )
@@ -412,20 +413,20 @@ async def test_save_and_get_poc_pool_cache(result_db):
         {"subtype": "模板化越狱", "poc_text": "poc_1", "score": 5},
         {"subtype": "default_jailbreak", "poc_text": "poc_2", "score": 3},
     ]
-    count = await result_db.save_poc_pool_cache("gpt-4", entries, "v1")
+    count = await result_db.save_poc_pool_cache(REAL_MODEL_ID, entries, "v1")
     assert count == 2
 
-    cached = await result_db.get_poc_pool_cache("gpt-4")
+    cached = await result_db.get_poc_pool_cache(REAL_MODEL_ID)
     assert len(cached) == 2
     assert cached[0]["score"] >= cached[1]["score"]
-    assert cached[0]["model_id"] == "gpt-4"
+    assert cached[0]["model_id"] == REAL_MODEL_ID
     assert cached[0]["dataset_version"] == "v1"
 
 
 @pytest.mark.asyncio
 async def test_get_poc_pool_cache_empty(result_db):
     """测试无缓存时返回空列表"""
-    cached = await result_db.get_poc_pool_cache("gpt-4")
+    cached = await result_db.get_poc_pool_cache(REAL_MODEL_ID)
     assert cached == []
 
 
@@ -433,16 +434,16 @@ async def test_get_poc_pool_cache_empty(result_db):
 async def test_save_poc_pool_cache_replaces_old(result_db):
     """测试保存缓存会替换同模型旧缓存"""
     entries_v1 = [{"subtype": "模板化越狱", "poc_text": "old_poc", "score": 3}]
-    await result_db.save_poc_pool_cache("gpt-4", entries_v1, "v1")
+    await result_db.save_poc_pool_cache(REAL_MODEL_ID, entries_v1, "v1")
 
     entries_v2 = [
         {"subtype": "模板化越狱", "poc_text": "new_poc_1", "score": 5},
         {"subtype": "说服式越狱", "poc_text": "new_poc_2", "score": 4},
     ]
-    count = await result_db.save_poc_pool_cache("gpt-4", entries_v2, "v2")
+    count = await result_db.save_poc_pool_cache(REAL_MODEL_ID, entries_v2, "v2")
     assert count == 2
 
-    cached = await result_db.get_poc_pool_cache("gpt-4")
+    cached = await result_db.get_poc_pool_cache(REAL_MODEL_ID)
     assert len(cached) == 2
     assert all(c["dataset_version"] == "v2" for c in cached)
 
@@ -451,12 +452,12 @@ async def test_save_poc_pool_cache_replaces_old(result_db):
 async def test_invalidate_poc_pool_cache(result_db):
     """测试手动失效缓存"""
     entries = [{"subtype": "模板化越狱", "poc_text": "poc_1", "score": 5}]
-    await result_db.save_poc_pool_cache("gpt-4", entries, "v1")
+    await result_db.save_poc_pool_cache(REAL_MODEL_ID, entries, "v1")
 
-    deleted = await result_db.invalidate_poc_pool_cache("gpt-4")
+    deleted = await result_db.invalidate_poc_pool_cache(REAL_MODEL_ID)
     assert deleted == 1
 
-    cached = await result_db.get_poc_pool_cache("gpt-4")
+    cached = await result_db.get_poc_pool_cache(REAL_MODEL_ID)
     assert cached == []
 
 
@@ -473,13 +474,13 @@ async def test_cache_isolation_between_models(result_db):
     entries_gpt = [{"subtype": "模板化越狱", "poc_text": "gpt_poc", "score": 5}]
     entries_claude = [{"subtype": "说服式越狱", "poc_text": "claude_poc", "score": 4}]
 
-    await result_db.save_poc_pool_cache("gpt-4", entries_gpt, "v1")
-    await result_db.save_poc_pool_cache("claude-3", entries_claude, "v1")
+    await result_db.save_poc_pool_cache(REAL_MODEL_ID, entries_gpt, "v1")
+    await result_db.save_poc_pool_cache(REAL_MODEL_ID_2, entries_claude, "v1")
 
-    await result_db.invalidate_poc_pool_cache("gpt-4")
+    await result_db.invalidate_poc_pool_cache(REAL_MODEL_ID)
 
-    gpt_cache = await result_db.get_poc_pool_cache("gpt-4")
-    claude_cache = await result_db.get_poc_pool_cache("claude-3")
+    gpt_cache = await result_db.get_poc_pool_cache(REAL_MODEL_ID)
+    claude_cache = await result_db.get_poc_pool_cache(REAL_MODEL_ID_2)
     assert gpt_cache == []
     assert len(claude_cache) == 1
 
@@ -488,7 +489,7 @@ async def test_cache_isolation_between_models(result_db):
 
 @pytest.mark.asyncio
 async def test_create_detection_task_idempotent_same_group_and_dataset(result_db):
-    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
 
     task_id_1 = await result_db.create_detection_task(
         task_group_id, 1, "pending", datetime.now()
@@ -506,7 +507,7 @@ async def test_create_detection_task_idempotent_same_group_and_dataset(result_db
 
 @pytest.mark.asyncio
 async def test_create_detection_task_different_dataset_creates_new(result_db):
-    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
 
     task_id_1 = await result_db.create_detection_task(
         task_group_id, 1, "pending", datetime.now()
@@ -524,7 +525,7 @@ async def test_create_detection_task_different_dataset_creates_new(result_db):
 
 @pytest.mark.asyncio
 async def test_create_detection_task_with_custom_task_id_idempotent(result_db):
-    task_group_id = await result_db.create_task_group(1, "gpt-4")
+    task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
 
     custom_id = "custom_task_001"
     task_id_1 = await result_db.create_detection_task(

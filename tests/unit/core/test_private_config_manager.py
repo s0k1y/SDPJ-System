@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 from sdpj.core.private_config_manager import PrivateConfigManager
+from tests.fixtures.sample_data import REAL_MODEL_ID, REAL_DATASET_SAMPLES, REAL_RISK_TYPE
 
 
 def make_manager():
@@ -17,9 +18,10 @@ def make_manager():
 async def test_create_config_success():
     mgr, dp, uc, reg = make_manager()
     reg.is_model_available = AsyncMock(return_value=(True, None))
+    reg.register_private_model = AsyncMock(return_value=(True, REAL_MODEL_ID, ""))
     uc.register_resource = AsyncMock(return_value=10)
     uc.write_private_config = AsyncMock()
-    ok, rid = await mgr.create_config(1, {"model_id": "gpt-4", "k": "v"})
+    ok, rid, msg = await mgr.create_config(1, {"model_id": REAL_MODEL_ID, "k": "v"})
     assert ok and rid == 10
 
 
@@ -27,7 +29,7 @@ async def test_create_config_success():
 async def test_create_config_model_unavailable():
     mgr, dp, uc, reg = make_manager()
     uc.register_resource = AsyncMock(side_effect=ValueError("注册失败"))
-    ok, rid = await mgr.create_config(1, {"model_id": "bad-model"})
+    ok, rid, msg = await mgr.create_config(1, {"model_id": "bad-model"})
     assert not ok and rid is None
 
 
@@ -51,14 +53,14 @@ async def test_upload_dataset_success():
     mgr, dp, uc, reg = make_manager()
     dp.import_private_dataset = AsyncMock(return_value={"dataset_id": 5})
     uc.register_resource = AsyncMock(return_value=20)
-    ok, result = await mgr.upload_dataset("ds", "越狱", [{"poc": "x", "subtype": "s"}], 1)
+    ok, result = await mgr.upload_dataset("ds", REAL_RISK_TYPE, REAL_DATASET_SAMPLES, 1)
     assert ok and result["dataset_id"] == 5
 
 
 @pytest.mark.asyncio
 async def test_upload_dataset_missing_fields():
     mgr, dp, uc, reg = make_manager()
-    ok, result = await mgr.upload_dataset("ds", "越狱", [{"poc": "x"}], 1)
+    ok, result = await mgr.upload_dataset("ds", REAL_RISK_TYPE, [{"poc": "x"}], 1)
     assert not ok and "subtype" in result["error"]
 
 

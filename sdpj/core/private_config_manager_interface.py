@@ -9,8 +9,8 @@ from typing import Literal, Optional, Protocol
 class PrivateConfigManagerInterface(Protocol):
     """用户私有检测配置管理接口"""
 
-    async def create_config(self, user_id: int, config_content: dict) -> tuple[bool, int | None]:
-        """创建用户私有检测配置"""
+    async def create_config(self, user_id: int, config_content: dict) -> tuple[bool, int | None, str]:
+        """创建用户私有检测配置，自动注册适配器"""
         ...
 
     async def read_config(self, config_id: int) -> Optional[dict]:
@@ -22,7 +22,7 @@ class PrivateConfigManagerInterface(Protocol):
         ...
 
     async def delete_config(self, config_id: int) -> bool:
-        """删除用户私有检测配置"""
+        """删除用户私有检测配置，自动注销适配器"""
         ...
 
     async def list_configs(self, user_id: int) -> list[dict]:
@@ -53,8 +53,16 @@ class PrivateConfigManagerInterface(Protocol):
         """导出用户私有检测配置"""
         ...
 
-    async def import_config(self, file_content: str, user_id: int) -> tuple[bool, int | None]:
-        """导入用户私有检测配置"""
+    async def import_config(self, file_content, user_id: int) -> tuple[bool, int | None, str]:
+        """导入用户私有检测配置
+
+        Args:
+            file_content: 配置内容，支持 str（原始 JSON/YAML 文本）或 dict（已解析的配置对象）
+            user_id: 用户 ID
+
+        Returns:
+            (成功标志, 配置ID, 提示消息)
+        """
         ...
 
     async def import_dataset_file(self, user_id: int, filename: str, content: bytes, username: str) -> dict:

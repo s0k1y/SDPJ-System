@@ -3,6 +3,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 
 from sdpj.control.state_scheduler import StateScheduler
+from tests.fixtures.sample_data import REAL_MODEL_ID
 
 
 @pytest.fixture
@@ -55,7 +56,7 @@ class TestWave2ToWave3Integration:
     async def test_state_scheduler_detection_flow(self, scheduler):
         """测试 StateScheduler 检测流程"""
         config_data = {
-            "model_id": "gpt-4",
+            "model_id": REAL_MODEL_ID,
             "detection_type": "static",
             "dataset_ids": [1],
         }
@@ -96,7 +97,7 @@ class TestCrossLayerIntegration:
         assert scheduler.get_system_state() == "idle"
 
         config_data = {
-            "model_id": "gpt-4",
+            "model_id": REAL_MODEL_ID,
             "detection_type": "static",
             "dataset_ids": [1],
         }

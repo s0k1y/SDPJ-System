@@ -3,6 +3,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 
 from sdpj.control.state_scheduler import StateScheduler
+from tests.fixtures.sample_data import REAL_MODEL_ID
 
 
 def _make_scheduler(**overrides):
@@ -33,7 +34,7 @@ class TestStartDetection:
         tq.enqueue_task = AsyncMock(side_effect=["t1", "t2"])
         s = _make_scheduler(task_queue_manager=tq)
         result = await s.start_detection(1, {
-            "model_id": "gpt-4",
+            "model_id": REAL_MODEL_ID,
             "detection_type": "static",
             "dataset_ids": ["ds1", "ds2"],
         })

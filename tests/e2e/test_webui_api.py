@@ -17,6 +17,7 @@ import pytest
 import uuid
 from fastapi.testclient import TestClient
 from sdpj.ui.webui.backend.app import app
+from tests.fixtures.sample_data import REAL_MODEL_ID
 
 
 class TestWebUIUserManagement:
@@ -99,7 +100,7 @@ class TestWebUIDetectionCore:
         # 启动静态检测
         response = self.client.post("/api/detection/start", json={
             "session_id": self.session_id,
-            "model_id": "gpt-4",
+            "model_id": REAL_MODEL_ID,
             "dataset_id": 1,
             "algorithm_type": "static"
         })
@@ -112,7 +113,7 @@ class TestWebUIDetectionCore:
 
         response = self.client.post("/api/detection/start", json={
             "session_id": self.session_id,
-            "model_id": "gpt-4",
+            "model_id": REAL_MODEL_ID,
             "dataset_id": 1,
             "algorithm_type": "dynamic"
         })
@@ -195,7 +196,7 @@ class TestWebUIFullWorkflow:
         # 5. 启动检测任务 (2.1.1 + 2.1.4)
         detection_response = self.client.post("/api/detection/start", json={
             "session_id": session_id,
-            "model_id": "gpt-4",
+            "model_id": REAL_MODEL_ID,
             "dataset_id": 1,
             "algorithm_type": "static"
         })

@@ -1,0 +1,9 @@
+{
+  "model": "deepseek-v4-pro",
+  "request_format": "openai",
+  "api_key": "sk-95033b3c11914e7484298d3b736f2d95",
+  "base_url": "https://api.deepseek.com",
+  "timeout": 60,
+  "max_rps": 5,
+  "max_concurrency": 10
+}

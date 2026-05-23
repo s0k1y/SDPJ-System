@@ -63,7 +63,7 @@
             style="margin-bottom: 16px"
           />
 
-          <el-form-item label="配置内容 (JSON)">
+          <el-form-item label="配置内容 (JSON)" label-position="top">
             <el-input v-model="configJson" type="textarea" :rows="14" placeholder='{"key": "value"}' />
           </el-form-item>
         </el-form>
@@ -102,7 +102,7 @@
             </el-upload>
           </el-form-item>
 
-          <el-form-item label="配置内容 (JSON)">
+          <el-form-item label="配置内容 (JSON)" label-position="top">
             <el-input v-model="importJson" type="textarea" :rows="10" placeholder='{"key": "value"}' />
           </el-form-item>
         </el-form>

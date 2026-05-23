@@ -1,0 +1,9 @@
+{
+  "model": "GLM-4-Flash-250414",
+  "request_format": "openai",
+  "api_key": "148e9d4b43084e81ba68d685ce9e6337.ulOfWumT5HMdggYT",
+  "base_url": "https://open.bigmodel.cn/api/paas/v4/",
+  "timeout": 60,
+  "max_rps": 0.5,
+  "max_concurrency": 3
+}

@@ -29,7 +29,7 @@ class AccountManagerInterface(Protocol):
         """用户登出"""
         ...
 
-    async def switch_account(self, username: str, password: str) -> tuple[bool, Optional[int]]:
+    async def switch_account(self, username: str, password: str) -> tuple[bool, Optional[int], str]:
         """账号切换"""
         ...
 

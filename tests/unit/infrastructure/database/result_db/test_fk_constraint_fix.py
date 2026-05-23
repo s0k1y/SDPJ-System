@@ -1,3 +1,4 @@
+from tests.fixtures.sample_data import REAL_MODEL_ID, REAL_MODEL_ID_2
 """测试外键约束修复：TargetModel 未注册时 save_poc_pool_cache 自动注册
 
 对应 bug：state_scheduler 传入 task_group_id 跳过 create_task_group，
@@ -58,7 +59,7 @@ async def test_save_poc_pool_cache_auto_registers_target_model(result_db):
 @pytest.mark.asyncio
 async def test_save_poc_pool_cache_idempotent_register(result_db):
     """幂等性：多次调用 save_poc_pool_cache 不应因重复注册而报错"""
-    model_id = "gpt-4o"
+    model_id = REAL_MODEL_ID
 
     # 第一次：模型未注册
     entries_v1 = [{"subtype": "default_jailbreak", "poc_text": "poc_v1", "score": 4}]
@@ -79,7 +80,7 @@ async def test_save_poc_pool_cache_idempotent_register(result_db):
 @pytest.mark.asyncio
 async def test_save_poc_pool_cache_without_prior_registration(result_db):
     """完全不经过 create_task_group 的路径，纯 save_poc_pool_cache 调用链"""
-    model_id = "qwen-72b"
+    model_id = REAL_MODEL_ID_2
 
     # 模拟 state_scheduler 路径：不调用 create_task_group，直接写缓存
     entries = [

@@ -6,6 +6,7 @@ from sdpj.control.state_scheduler import StateScheduler
 from sdpj.control.system_states import SystemStateMachine
 from sdpj.core.task_queue_manager import TaskQueueManager
 from sdpj.core.task_queue_manager_interface import TaskStatus
+from tests.fixtures.sample_data import REAL_MODEL_ID, REAL_MODEL_ID_2
 
 
 class _StubAccountManager:
@@ -60,7 +61,7 @@ class TestStartDetectionStateGuard:
         assert _state_val(scheduler) == "idle"
 
         result = await scheduler.start_detection(1, {
-            "model_id": "gpt-4",
+            "model_id": REAL_MODEL_ID,
             "detection_type": "static",
             "dataset_ids": [1],
         })
@@ -122,7 +123,7 @@ class TestDeleteReportSyncsTaskQueue:
         scheduler = _make_scheduler_with_stubs()
 
         result = await scheduler.start_detection(1, {
-            "model_id": "gpt-4",
+            "model_id": REAL_MODEL_ID,
             "detection_type": "static",
             "dataset_ids": [1],
         })
@@ -146,7 +147,7 @@ class TestDeleteReportSyncsTaskQueue:
         scheduler = _make_scheduler_with_stubs()
 
         result = await scheduler.start_detection(1, {
-            "model_id": "gpt-4",
+            "model_id": REAL_MODEL_ID,
             "detection_type": "static",
             "dataset_ids": [1, 2],
         })
@@ -168,7 +169,7 @@ class TestDeleteReportSyncsTaskQueue:
         scheduler = _make_scheduler_with_stubs(report_mgr=report_mgr)
 
         result = await scheduler.start_detection(1, {
-            "model_id": "gpt-4",
+            "model_id": REAL_MODEL_ID,
             "detection_type": "static",
             "dataset_ids": [1],
         })
@@ -196,7 +197,7 @@ class TestDeleteReportSyncsTaskQueue:
         scheduler = _make_scheduler_with_stubs(report_mgr=report_mgr)
 
         result = await scheduler.start_detection(1, {
-            "model_id": "gpt-4",
+            "model_id": REAL_MODEL_ID,
             "detection_type": "static",
             "dataset_ids": [1],
         })
@@ -213,7 +214,7 @@ class TestDeleteReportSyncsTaskQueue:
         scheduler = _make_scheduler_with_stubs()
 
         result = await scheduler.start_detection(1, {
-            "model_id": "gpt-4",
+            "model_id": REAL_MODEL_ID,
             "detection_type": "static",
             "dataset_ids": [1],
         })
@@ -234,7 +235,7 @@ class TestDeleteReportSyncsTaskQueue:
         scheduler = _make_scheduler()
 
         result1 = await scheduler.start_detection(1, {
-            "model_id": "gpt-4",
+            "model_id": REAL_MODEL_ID,
             "detection_type": "static",
             "dataset_ids": [1],
         })
@@ -242,7 +243,7 @@ class TestDeleteReportSyncsTaskQueue:
         assert _state_val(scheduler) == "detecting"
 
         result2 = await scheduler.start_detection(1, {
-            "model_id": "gpt-4",
+            "model_id": REAL_MODEL_ID,
             "detection_type": "static",
             "dataset_ids": [2],
         })
@@ -256,14 +257,14 @@ class TestDeleteReportSyncsTaskQueue:
         scheduler = _make_scheduler()
 
         await scheduler.start_detection(1, {
-            "model_id": "gpt-4",
+            "model_id": REAL_MODEL_ID,
             "detection_type": "static",
             "dataset_ids": [1],
         })
 
         for i in range(3):
             result = await scheduler.start_detection(1, {
-                "model_id": "gpt-4",
+                "model_id": REAL_MODEL_ID,
                 "detection_type": "static",
                 "dataset_ids": [10 + i],
             })
@@ -275,7 +276,7 @@ class TestDeleteReportSyncsTaskQueue:
         scheduler._fsm.start_report()
 
         result = await scheduler.start_detection(1, {
-            "model_id": "gpt-4",
+            "model_id": REAL_MODEL_ID,
             "detection_type": "static",
             "dataset_ids": [1],
         })
@@ -289,7 +290,7 @@ class TestDeleteReportSyncsTaskQueue:
         scheduler._fsm.to_error()
 
         result = await scheduler.start_detection(1, {
-            "model_id": "gpt-4",
+            "model_id": REAL_MODEL_ID,
             "detection_type": "static",
             "dataset_ids": [1],
         })
@@ -303,7 +304,7 @@ class TestDeleteReportSyncsTaskQueue:
         scheduler._fsm.start_configuring()
 
         result = await scheduler.start_detection(1, {
-            "model_id": "gpt-4",
+            "model_id": REAL_MODEL_ID,
             "detection_type": "static",
             "dataset_ids": [1],
         })
@@ -316,7 +317,7 @@ class TestDeleteReportSyncsTaskQueue:
         scheduler = _make_scheduler()
 
         await scheduler.start_detection(1, {
-            "model_id": "gpt-4",
+            "model_id": REAL_MODEL_ID,
             "detection_type": "static",
             "dataset_ids": [1],
         })
@@ -326,7 +327,7 @@ class TestDeleteReportSyncsTaskQueue:
         assert _state_val(scheduler) == "idle"
 
         result = await scheduler.start_detection(1, {
-            "model_id": "gpt-4",
+            "model_id": REAL_MODEL_ID,
             "detection_type": "static",
             "dataset_ids": [2],
         })

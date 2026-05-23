@@ -66,7 +66,7 @@ class AccountManager(AccountManagerInterface):
         success = await self._user_center.update_user_password(user_id, new_password)
         return (True, "") if success else (False, "密码更新失败")
 
-    async def switch_account(self, username: str, password: str) -> tuple[bool, Optional[int]]:
+    async def switch_account(self, username: str, password: str) -> tuple[bool, Optional[int], str]:
         self._current_user_id = None
         return await self.login(username, password)
 

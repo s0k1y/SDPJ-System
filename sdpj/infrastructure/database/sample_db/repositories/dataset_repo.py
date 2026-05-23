@@ -5,7 +5,7 @@
 
 from typing import Optional
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import noload
@@ -95,7 +95,8 @@ class DatasetRepository:
             .scalar_subquery()
             .label("sample_count")
         )
-        stmt = select(Dataset, count_subq).options(noload(Dataset.samples)).order_by(Dataset.created_at.desc())
+        builtin_first = case((Dataset.resource_id == None, 0), else_=1)
+        stmt = select(Dataset, count_subq).options(noload(Dataset.samples)).order_by(builtin_first, Dataset.dataset_id)
         result = await self.session.execute(stmt)
         rows = result.all()
         return [

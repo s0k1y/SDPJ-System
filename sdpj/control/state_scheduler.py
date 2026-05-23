@@ -1157,7 +1157,7 @@ class StateScheduler(StateSchedulerInterface):
         return {"success": ok, "message": msg}
 
     async def _op_switch_account(self, p: dict) -> dict:
-        ok, uid = await self._account.switch_account(p["username"], p["password"])
+        ok, uid, _ = await self._account.switch_account(p["username"], p["password"])
         if ok:
             self._log_op(uid or 0, "switch_account", {"username": p["username"]})
         return {"success": ok, "user_id": uid}
@@ -1168,8 +1168,10 @@ class StateScheduler(StateSchedulerInterface):
         return {"success": ok}
 
     async def _op_unregister(self, p: dict) -> dict:
-        ok, msg = await self._account.unregister(p["user_id"])
-        self._log_op(p["user_id"], "unregister", {})
+        user_id = p["user_id"]
+        await self._cleanup_user_datasets(user_id)
+        ok, msg = await self._account.unregister(user_id)
+        self._log_op(user_id, "unregister", {})
         return {"success": ok, "message": msg}
 
     async def _op_get_profile(self, p: dict) -> dict:
@@ -1210,9 +1212,35 @@ class StateScheduler(StateSchedulerInterface):
         user_id = p.get("user_id")
         if user_id is None:
             return {"success": False, "error": "缺少 user_id"}
-        ok, msg = await self._account.unregister(int(user_id))
-        self._log_op(int(user_id), "admin_delete_user", {})
+        uid = int(user_id)
+        await self._cleanup_user_datasets(uid)
+        ok, msg = await self._account.unregister(uid)
+        self._log_op(uid, "admin_delete_user", {})
         return {"success": ok, "message": msg}
+
+    async def _cleanup_user_datasets(self, user_id: int) -> None:
+        """删除用户前清理其私有数据集（SampleDB 记录 + 磁盘文件）"""
+        try:
+            resources = await self._account.list_resources_for_user(user_id)
+            all_datasets = await self._config.query_datasets()
+            ds_map: dict[int, tuple[int, str]] = {}  # resource_id → (dataset_id, name)
+            for ds in all_datasets:
+                rid = ds.get("resource_id")
+                if rid is not None:
+                    ds_map[rid] = (ds.get("dataset_id"), ds.get("name", ""))
+            for r in resources:
+                if r.get("resource_type") == "private_dataset":
+                    rid = r.get("resource_id")
+                    info = ds_map.get(rid)
+                    if info:
+                        ds_id, ds_name = info
+                        await self._config.remove_dataset(ds_id, rid)
+                        self._log_rt(
+                            "dataset_cleaned",
+                            f"用户 {user_id} 删除前清理数据集: id={ds_id}, name={ds_name}",
+                        )
+        except Exception as e:
+            self._log_err("UserCleanup", f"清理用户 {user_id} 数据集失败: {e}")
 
     # ── 权限授权调度 (职责 15-16) ──
 
@@ -1261,9 +1289,9 @@ class StateScheduler(StateSchedulerInterface):
         try:
             if operation == "create":
                 config_content = params["config_content"]
-                ok, cid = await self._config.create_config(user_id, config_content)
+                ok, cid, msg = await self._config.create_config(user_id, config_content)
                 self._log_op(user_id, "create_config", {"config_id": cid})
-                return {"success": ok, "config_id": cid}
+                return {"success": ok, "config_id": cid, "message": msg}
 
             if operation in ("read", "update", "delete", "export"):
                 config_id: int = params["config_id"]
@@ -1307,9 +1335,9 @@ class StateScheduler(StateSchedulerInterface):
 
             if operation == "import":
                 file_content = params["file_content"]
-                ok, cid = await self._config.import_config(file_content, user_id)
+                ok, cid, msg = await self._config.import_config(file_content, user_id)
                 self._log_op(user_id, "import_config", {"config_id": cid})
-                return {"success": ok, "config_id": cid}
+                return {"success": ok, "config_id": cid, "message": msg}
 
             return {"success": False, "error": f"未知配置操作: {operation}"}
         finally:

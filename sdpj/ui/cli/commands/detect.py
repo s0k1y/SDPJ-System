@@ -6,16 +6,27 @@ import threading
 
 import click
 
-from sdpj.ui.cli.utils import output
+from sdpj.ui.cli import OrderedGroup
+from sdpj.ui.cli.schemas.detection import DetectionStartParams
+from sdpj.ui.cli.utils import output, progress as _progress
+from sdpj.ui.cli.utils.result import unwrap
 
 
-@click.group("detect")
+@click.group("Detect", cls=OrderedGroup, no_args_is_help=True)
 def detect_group():
     """检测任务管理"""
 
 
-@detect_group.command("start")
-@click.option("--model-id", required=True, help="目标被测大模型标识")
+# ── task 子命令组 ──
+
+
+@detect_group.group("task", cls=OrderedGroup, no_args_is_help=True)
+def task_group():
+    """检测任务执行"""
+
+
+@task_group.command("start")
+@click.option("--model-id", required=True, help="目标被测大模型标识（支持模型名或数字型配置ID）")
 @click.option("--type", "detection_type", default="static", type=click.Choice(["static", "dynamic"]), help="检测类型")
 @click.option("--dataset", "dataset_ids", multiple=True, type=int, help="检测数据集ID (可多选)")
 @click.option(
@@ -29,60 +40,44 @@ def detect_group():
 @click.option("--max-iter", default=3, type=int, help="动态算法最大迭代次数")
 @click.option("--force-refresh", is_flag=True, default=False, help="强制重新构建PoC池缓存")
 @click.pass_context
-def start(ctx, model_id, detection_type, dataset_ids, jailbreak_dataset_ids, config_id, max_iter, force_refresh):
+def task_start(ctx, model_id, detection_type, dataset_ids, jailbreak_dataset_ids, config_id, max_iter, force_refresh):
     """启动检测任务"""
     cli_ctx = ctx.obj
     user_id = cli_ctx.require_login()
     scheduler = cli_ctx.scheduler
 
-    config_data = {
-        "model_id": model_id,
-        "detection_type": detection_type,
-        "dataset_ids": list(dataset_ids),
-        "max_iterations": max_iter,
-        "force_refresh": force_refresh,
-    }
-    if force_refresh and jailbreak_dataset_ids:
-        config_data["jailbreak_dataset_ids"] = list(jailbreak_dataset_ids)
-    if config_id is not None:
-        config_data["config_id"] = config_id
+    if isinstance(model_id, str) and model_id.isdigit():
+        model_id = int(model_id)
 
-    result = asyncio.run(scheduler.start_detection(user_id, config_data))
-    if result["success"]:
-        output.success(f"任务组 {result['task_group_id']} 已创建")
-        for tid in result.get("task_ids", []):
-            output.info(f"子任务: {tid}")
-    else:
-        output.error(result.get("error", "启动失败"))
+    params = DetectionStartParams(
+        model_id=model_id,
+        detection_type=detection_type,
+        dataset_ids=list(dataset_ids),
+        jailbreak_dataset_ids=list(jailbreak_dataset_ids),
+        config_id=config_id,
+        max_iterations=max_iter,
+        force_refresh=force_refresh,
+    )
 
-
-@detect_group.command("datasets")
-@click.pass_context
-def datasets(ctx):
-    """查询可用检测数据集清单"""
-    user_id = ctx.obj.require_login()
-    ds_list = asyncio.run(ctx.obj.scheduler.query_available_datasets(user_id=user_id))
-    if not ds_list:
-        output.info("暂无可用数据集")
-        return
-    rows = [[str(d.get("id", "")), d.get("name", ""), d.get("risk_type", "")] for d in ds_list]
-    output.table(["ID", "名称", "风险类型"], rows)
+    result = asyncio.run(scheduler.start_detection(user_id, params.model_dump()))
+    data = unwrap(result, required="task_group_id")
+    output.success(f"任务组 {data['task_group_id']} 已创建")
+    for tid in data.get("task_ids", []):
+        output.info(f"子任务: {tid}")
 
 
-@detect_group.command("progress")
+@task_group.command("progress")
 @click.option("--task-id", default=None, help="队列任务标识 (省略则查询整体视图)")
 @click.pass_context
-def progress(ctx, task_id):
+def task_progress(ctx, task_id):
     """查询检测任务执行进度"""
     scheduler = ctx.obj.scheduler
     result = asyncio.run(scheduler.query_detection_progress(task_id))
-    if not result.get("success"):
-        output.error(result.get("error", "查询失败"))
-        return
+    data = unwrap(result)
     if task_id:
-        output.info(f"任务 {task_id}: {result['status']}")
+        output.info(f"任务 {task_id}: {data['status']}")
         return
-    groups = result.get("groups", [])
+    groups = data.get("groups", [])
     if not groups:
         output.info("当前无活跃任务")
         return
@@ -111,108 +106,28 @@ def progress(ctx, task_id):
         click.echo("")
 
 
-@detect_group.command("run")
+@task_group.command("run")
 @click.option("--concurrency", default=3, type=int, help="并发度上限")
 @click.pass_context
-def run_tasks(ctx, concurrency):
+def task_run(ctx, concurrency):
     """并发执行队列中的检测子任务"""
     scheduler = ctx.obj.scheduler
+    _progress.spinner("正在执行检测任务")
     result = asyncio.run(scheduler.execute_concurrent_tasks(concurrency))
-    if result.get("message"):
-        output.info(result["message"])
-    for t in result.get("tasks", []):
-        status = "OK" if t.get("success") else "FAIL"
-        output.info(f"  {t.get('task_id', '?')[:8]}: {status}")
+    data = unwrap(result)
+    if data.get("message"):
+        output.info(data["message"])
+    tasks = data.get("tasks", [])
+    if tasks:
+        for t in _progress.show_progress(tasks, label="执行"):
+            status = "OK" if t.get("success") else "FAIL"
+            click.echo(f"\n    {t.get('task_id', '?')[:8]}: {status}")
 
 
-@detect_group.command("cancel")
-@click.option("--task-id", default=None, help="取消单个任务")
-@click.option("--group-id", default=None, help="取消整个任务组")
-@click.pass_context
-def cancel(ctx, task_id, group_id):
-    """取消检测任务"""
-    scheduler = ctx.obj.scheduler
-    if group_id:
-        result = asyncio.run(scheduler.cancel_task_group(group_id))
-    elif task_id:
-        result = asyncio.run(scheduler.cancel_task(task_id))
-    else:
-        output.error("必须提供 --task-id 或 --group-id")
-        return
-    if result.get("success"):
-        output.success("已取消")
-    else:
-        output.error(result.get("error", "取消失败"))
-
-
-@detect_group.command("dataset-detail")
-@click.argument("dataset_id", type=int)
-@click.pass_context
-def dataset_detail(ctx, dataset_id):
-    """查看数据集详情"""
-    user_id = ctx.obj.require_login()
-    dataset = asyncio.run(ctx.obj.scheduler.query_dataset_detail(dataset_id, user_id=user_id))
-    if not dataset:
-        output.info("数据集不存在")
-        return
-    output.kv(dataset)
-
-
-@detect_group.command("dataset-export")
-@click.argument("dataset_id", type=int)
-@click.option("--output", "output_path", default=None, help="输出文件路径")
-@click.pass_context
-def dataset_export(ctx, dataset_id, output_path):
-    """导出数据集文件"""
-    user_id = ctx.obj.require_login()
-    result = asyncio.run(ctx.obj.scheduler.export_dataset_file(dataset_id, user_id=user_id))
-    if not result:
-        output.error("数据集不存在")
-        return
-    if "error" in result and "content" not in result:
-        output.error(result["error"])
-        return
-    content = result["content"]
-    if isinstance(content, str):
-        content = content.encode("utf-8")
-    filename = output_path or result.get("filename", f"dataset_{dataset_id}")
-    pathlib.Path(filename).write_bytes(content)
-    output.success(f"已导出至 {filename}")
-
-
-@detect_group.command("dataset-delete")
-@click.argument("dataset_id", type=int)
-@click.confirmation_option(prompt="确认删除该数据集?")
-@click.pass_context
-def dataset_delete(ctx, dataset_id):
-    """删除用户数据集"""
-    user_id = ctx.obj.require_login()
-    result = asyncio.run(ctx.obj.scheduler.delete_user_dataset(dataset_id, user_id))
-    if result.get("success"):
-        output.success("删除成功")
-    else:
-        output.error(result.get("error", "删除失败"))
-
-
-@detect_group.command("dataset-import")
-@click.argument("file_path", type=click.Path(exists=True))
-@click.pass_context
-def dataset_import(ctx, file_path):
-    """导入数据集文件"""
-    user_id = ctx.obj.require_login()
-    p = pathlib.Path(file_path)
-    content = p.read_bytes()
-    result = asyncio.run(ctx.obj.scheduler.import_dataset_file(user_id=user_id, filename=p.name, content=content))
-    if result.get("success"):
-        output.success(f"导入成功, 数据集ID: {result.get('dataset_id')}")
-    else:
-        output.error(result.get("error", "导入失败"))
-
-
-@detect_group.command("trace")
+@task_group.command("trace")
 @click.option("--show-full", is_flag=True, default=False, help="显示完整内容（默认截断长文本）")
 @click.pass_context
-def trace(ctx, show_full):
+def task_trace(ctx, show_full):
     """实时追踪检测过程中的 LLM 请求与响应"""
     scheduler = ctx.obj.scheduler
     stop_event = threading.Event()
@@ -260,7 +175,27 @@ def trace(ctx, show_full):
         while not stop_event.is_set():
             stop_event.wait(1.0)
     except KeyboardInterrupt:
-        pass
-    finally:
-        scheduler.unsubscribe_llm_calls(_on_llm_call)
-        click.echo(click.style("\n已停止监听", fg="bright_white"))
+        click.echo(click.style("\n正在停止... (再次按 Ctrl+C 强制退出)", fg="yellow"))
+        try:
+            scheduler.unsubscribe_llm_calls(_on_llm_call)
+            click.echo(click.style("已停止监听", fg="bright_white"))
+        except KeyboardInterrupt:
+            click.echo(click.style("强制退出", fg="red"))
+
+
+@task_group.command("cancel")
+@click.option("--task-id", default=None, help="取消单个任务")
+@click.option("--group-id", default=None, help="取消整个任务组")
+@click.pass_context
+def task_cancel(ctx, task_id, group_id):
+    """取消检测任务"""
+    scheduler = ctx.obj.scheduler
+    if group_id:
+        result = asyncio.run(scheduler.cancel_task_group(group_id))
+    elif task_id:
+        result = asyncio.run(scheduler.cancel_task(task_id))
+    else:
+        output.error("必须提供 --task-id 或 --group-id")
+        return
+    unwrap(result)
+    output.success("已取消")
