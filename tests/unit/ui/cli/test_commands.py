@@ -27,6 +27,7 @@ from tests.fixtures.sample_data import REAL_MODEL_ID
 # Schema 验证测试
 # ═══════════════════════════════════════════════════════════
 
+
 class TestDetectionStartParams:
     def test_valid_string_model_id(self):
         p = DetectionStartParams(model_id="deepseek-v4-pro", dataset_ids=[1, 2])
@@ -75,6 +76,7 @@ class TestAuthParams:
 # unwrap() 测试
 # ═══════════════════════════════════════════════════════════
 
+
 class TestUnwrap:
     def test_success_strips_wrapper(self):
         data = unwrap({"success": True, "task_group_id": "tg-001", "task_ids": ["t1"]})
@@ -104,6 +106,7 @@ class TestUnwrap:
 # ═══════════════════════════════════════════════════════════
 # Mock 辅助
 # ═══════════════════════════════════════════════════════════
+
 
 def _make_mock_scheduler():
     s = MagicMock()
@@ -152,17 +155,21 @@ def _make_mock_scheduler():
 def _invoke(args: list[str], scheduler, *, user_id: int = 1):
     """调用 CLI 命令，以 Mock scheduler 和已登录用户跑"""
     runner = CliRunner()
-    with patch("sdpj.ui.cli.main._bootstrap", return_value=scheduler), \
-         patch("sdpj.ui.cli.main.load_session", return_value=user_id), \
-         patch.object(CLIContext, "require_login", return_value=user_id):
+    with (
+        patch("sdpj.ui.cli.main._bootstrap", return_value=scheduler),
+        patch("sdpj.ui.cli.main.load_session", return_value=user_id),
+        patch.object(CLIContext, "require_login", return_value=user_id),
+    ):
         return runner.invoke(cli, args)
 
 
 def _invoke_logout(args: list[str], scheduler):
     """调用 CLI 命令，未登录状态"""
     runner = CliRunner()
-    with patch("sdpj.ui.cli.main._bootstrap", return_value=scheduler), \
-         patch("sdpj.ui.cli.main.load_session", return_value=None):
+    with (
+        patch("sdpj.ui.cli.main._bootstrap", return_value=scheduler),
+        patch("sdpj.ui.cli.main.load_session", return_value=None),
+    ):
         return runner.invoke(cli, args)
 
 
@@ -170,29 +177,66 @@ def _invoke_logout(args: list[str], scheduler):
 # Detect task 命令
 # ═══════════════════════════════════════════════════════════
 
+
 class TestDetectStart:
     def test_start_basic(self):
         s = _make_mock_scheduler()
-        s.start_detection.return_value = {"success": True, "task_group_id": "tg-001", "task_ids": ["t1", "t2"]}
-        result = _invoke(["Detect", "task", "start", "--model-id", "deepseek", "--dataset", "1", "--dataset", "2"], s)
+        s.start_detection.return_value = {
+            "success": True,
+            "task_group_id": "tg-001",
+            "task_ids": ["t1", "t2"],
+        }
+        result = _invoke(
+            [
+                "Detect",
+                "task",
+                "start",
+                "--model-id",
+                "deepseek",
+                "--dataset",
+                "1",
+                "--dataset",
+                "2",
+            ],
+            s,
+        )
         assert result.exit_code == 0
         config_data = s.start_detection.call_args[0][1]
         assert config_data["dataset_ids"] == [1, 2]
 
     def test_start_with_int_model_id(self):
         s = _make_mock_scheduler()
-        s.start_detection.return_value = {"success": True, "task_group_id": "tg-002", "task_ids": ["t1"]}
+        s.start_detection.return_value = {
+            "success": True,
+            "task_group_id": "tg-002",
+            "task_ids": ["t1"],
+        }
         result = _invoke(["Detect", "task", "start", "--model-id", "42", "--dataset", "1"], s)
         assert result.exit_code == 0
         assert s.start_detection.call_args[0][1]["model_id"] == 42
 
     def test_start_force_refresh(self):
         s = _make_mock_scheduler()
-        s.start_detection.return_value = {"success": True, "task_group_id": "tg-003", "task_ids": []}
-        result = _invoke([
-            "Detect", "task", "start", "--model-id", "ds", "--dataset", "1",
-            "--force-refresh", "--jailbreak-dataset", "5"
-        ], s)
+        s.start_detection.return_value = {
+            "success": True,
+            "task_group_id": "tg-003",
+            "task_ids": [],
+        }
+        result = _invoke(
+            [
+                "Detect",
+                "task",
+                "start",
+                "--model-id",
+                "ds",
+                "--dataset",
+                "1",
+                "--force-refresh",
+                "--jailbreak-dataset",
+                "5",
+            ],
+            s,
+        )
         assert result.exit_code == 0
         config = s.start_detection.call_args[0][1]
         assert config["force_refresh"] is True
@@ -215,7 +259,11 @@ class TestDetectStart:
 class TestDetectProgress:
     def test_progress_single_task(self):
         s = _make_mock_scheduler()
-        s.query_detection_progress.return_value = {"success": True, "task_id": "t1", "status": "running"}
+        s.query_detection_progress.return_value = {
+            "success": True,
+            "task_id": "t1",
+            "status": "running",
+        }
         result = _invoke(["Detect", "task", "progress", "--task-id", "t1"], s)
         assert result.exit_code == 0
         assert "running" in result.output
@@ -223,11 +271,23 @@ class TestDetectProgress:
     def test_progress_full_view(self):
         s = _make_mock_scheduler()
         s.query_detection_progress.return_value = {
-            "success": True, "groups": [
-                {"task_group_id": "tg-001", "model_name": "deepseek", "model_id": "deepseek", "status": "running",
-                 "progress": {"total": 10, "completed": 5, "failed": 0, "running": 3, "pending": 2},
-                 "children": []}
-            ]
+            "success": True,
+            "groups": [
+                {
+                    "task_group_id": "tg-001",
+                    "model_name": "deepseek",
+                    "model_id": "deepseek",
+                    "status": "running",
+                    "progress": {
+                        "total": 10,
+                        "completed": 5,
+                        "failed": 0,
+                        "running": 3,
+                        "pending": 2,
+                    },
+                    "children": [],
+                }
+            ],
         }
         result = _invoke(["Detect", "task", "progress"], s)
         assert result.exit_code == 0
@@ -259,7 +319,11 @@ class TestDetectCancel:
 class TestDetectRun:
     def test_run(self):
         s = _make_mock_scheduler()
-        s.execute_concurrent_tasks.return_value = {"success": True, "tasks": [], "message": "队列为空"}
+        s.execute_concurrent_tasks.return_value = {
+            "success": True,
+            "tasks": [],
+            "message": "队列为空",
+        }
         result = _invoke(["Detect", "task", "run"], s)
         assert result.exit_code == 0
         s.execute_concurrent_tasks.assert_called_once_with(3)
@@ -276,12 +340,15 @@ class TestDetectRun:
 # Detect dataset 命令
 # ═══════════════════════════════════════════════════════════
 
+
 class TestDetectDatasets:
     def test_list_datasets(self):
         s = _make_mock_scheduler()
-        s.query_available_datasets = AsyncMock(return_value=[
-            {"id": 1, "name": "jailbreak_llm", "risk_type": "jailbreak"},
-        ])
+        s.query_available_datasets = AsyncMock(
+            return_value=[
+                {"id": 1, "name": "jailbreak_llm", "risk_type": "jailbreak"},
+            ]
+        )
         result = _invoke(["Config", "dataset", "list"], s)
         assert result.exit_code == 0
         assert "jailbreak_llm" in result.output
@@ -297,9 +364,9 @@ class TestDetectDatasets:
 class TestDetectDatasetDetail:
     def test_detail(self):
         s = _make_mock_scheduler()
-        s.query_dataset_detail = AsyncMock(return_value={
-            "dataset_id": 1, "name": "jailbreak_llm", "risk_type": "jailbreak"
-        })
+        s.query_dataset_detail = AsyncMock(
+            return_value={"dataset_id": 1, "name": "jailbreak_llm", "risk_type": "jailbreak"}
+        )
         result = _invoke(["Config", "dataset", "detail", "--id", "1"], s)
         assert result.exit_code == 0
         s.query_dataset_detail.assert_called_once_with(1, user_id=1)
@@ -315,9 +382,9 @@ class TestDetectDatasetDetail:
 class TestDetectDatasetExport:
     def test_export(self):
         s = _make_mock_scheduler()
-        s.export_dataset_file = AsyncMock(return_value={
-            "content": b"test", "filename": "dataset_1.jsonl"
-        })
+        s.export_dataset_file = AsyncMock(
+            return_value={"content": b"test", "filename": "dataset_1.jsonl"}
+        )
         result = _invoke(["Config", "export-dataset", "--id", "1"], s)
         assert result.exit_code == 0
         assert "已导出" in result.output
@@ -334,11 +401,15 @@ class TestDetectDatasetExport:
 # Report 命令
 # ═══════════════════════════════════════════════════════════
 
+
 class TestReportExport:
     def test_export_passes_task_id(self):
         s = _make_mock_scheduler()
         s.export_report.return_value = {"success": True, "filename": "report.json", "content": "x"}
-        result = _invoke(["Report", "export", "--group-id", "tg-001", "--format", "json", "--task-id", "task-1"], s)
+        result = _invoke(
+            ["Report", "export", "--group-id", "tg-001", "--format", "json", "--task-id", "task-1"],
+            s,
+        )
         assert result.exit_code == 0
         assert s.export_report.call_args[1]["task_id"] == "task-1"
 
@@ -360,7 +431,9 @@ class TestReportGenerate:
 
     def test_generate_dynamic(self):
         s = _make_mock_scheduler()
-        s.generate_report = AsyncMock(return_value={"success": True, "report": {"task_group_id": "tg-001"}})
+        s.generate_report = AsyncMock(
+            return_value={"success": True, "report": {"task_group_id": "tg-001"}}
+        )
         result = _invoke(["Report", "generate", "--group-id", "tg-001", "--type", "dynamic"], s)
         assert result.exit_code == 0
 
@@ -377,7 +450,12 @@ class TestReportDelete:
 class TestReportView:
     def test_view(self):
         s = _make_mock_scheduler()
-        s.view_report = AsyncMock(return_value={"success": True, "report": {"task_group_id": "tg-001", "status": "completed"}})
+        s.view_report = AsyncMock(
+            return_value={
+                "success": True,
+                "report": {"task_group_id": "tg-001", "status": "completed"},
+            }
+        )
         result = _invoke(["Report", "view", "--group-id", "tg-001"], s)
         assert result.exit_code == 0
         s.view_report.assert_called_once_with("tg-001", user_id=1)
@@ -386,9 +464,11 @@ class TestReportView:
 class TestReportList:
     def test_list(self):
         s = _make_mock_scheduler()
-        s.list_reports = AsyncMock(return_value=[
-            {"task_group_id": "tg-001", "model_id": "deepseek", "status": "completed"},
-        ])
+        s.list_reports = AsyncMock(
+            return_value=[
+                {"task_group_id": "tg-001", "model_id": "deepseek", "status": "completed"},
+            ]
+        )
         result = _invoke(["Report", "list"], s)
         assert result.exit_code == 0
         assert "deepseek" in result.output
@@ -411,9 +491,9 @@ class TestReportList:
 class TestReportStatistics:
     def test_statistics(self):
         s = _make_mock_scheduler()
-        s.query_compliance_statistics = AsyncMock(return_value={
-            "success": True, "total_samples": 100, "passed": 80, "failed": 20
-        })
+        s.query_compliance_statistics = AsyncMock(
+            return_value={"success": True, "total_samples": 100, "passed": 80, "failed": 20}
+        )
         result = _invoke(["Report", "statistics"], s)
         assert result.exit_code == 0
 
@@ -421,17 +501,17 @@ class TestReportStatistics:
 class TestReportVisualization:
     def test_visualization(self):
         s = _make_mock_scheduler()
-        s.prepare_visualization_data = AsyncMock(return_value={
-            "success": True, "data": {"risk_distribution": {}}
-        })
+        s.prepare_visualization_data = AsyncMock(
+            return_value={"success": True, "data": {"risk_distribution": {}}}
+        )
         result = _invoke(["Report", "visualization", "--group-id", "tg-001"], s)
         assert result.exit_code == 0
 
     def test_task_visualization(self):
         s = _make_mock_scheduler()
-        s.prepare_task_visualization_data = AsyncMock(return_value={
-            "success": True, "data": {"risk_distribution": {}}
-        })
+        s.prepare_task_visualization_data = AsyncMock(
+            return_value={"success": True, "data": {"risk_distribution": {}}}
+        )
         result = _invoke(["Report", "task-visualization", "--task-id", "task-001"], s)
         assert result.exit_code == 0
 
@@ -439,6 +519,7 @@ class TestReportVisualization:
 # ═══════════════════════════════════════════════════════════
 # User 命令
 # ═══════════════════════════════════════════════════════════
+
 
 class TestUserAuth:
     def test_register_success(self):
@@ -475,9 +556,9 @@ class TestUserLogout:
 class TestUserAccountOps:
     def test_profile(self):
         s = _make_mock_scheduler()
-        s.schedule_account_operation = AsyncMock(return_value={
-            "success": True, "profile": {"user_id": 1, "username": "alice"}
-        })
+        s.schedule_account_operation = AsyncMock(
+            return_value={"success": True, "profile": {"user_id": 1, "username": "alice"}}
+        )
         result = _invoke(["User", "profile"], s)
         assert result.exit_code == 0
         assert "alice" in result.output
@@ -505,19 +586,22 @@ class TestUserAccountOps:
 
     def test_resources(self):
         s = _make_mock_scheduler()
-        s.schedule_account_operation = AsyncMock(return_value={
-            "success": True, "resources": [{"id": 1, "type": "dataset", "name": "test"}],
-            "shared_resources": []
-        })
+        s.schedule_account_operation = AsyncMock(
+            return_value={
+                "success": True,
+                "resources": [{"id": 1, "type": "dataset", "name": "test"}],
+                "shared_resources": [],
+            }
+        )
         result = _invoke(["User", "resources"], s)
         assert result.exit_code == 0
         assert "test" in result.output
 
     def test_list_users(self):
         s = _make_mock_scheduler()
-        s.list_all_users = AsyncMock(return_value=[
-            {"user_id": 1, "username": "alice", "created_at": "2026-01-01"}
-        ])
+        s.list_all_users = AsyncMock(
+            return_value=[{"user_id": 1, "username": "alice", "created_at": "2026-01-01"}]
+        )
         result = _invoke(["User", "list"], s)
         assert result.exit_code == 0
         assert "alice" in result.output
@@ -531,7 +615,9 @@ class TestUserAccountOps:
 
     def test_delete_user(self):
         s = _make_mock_scheduler()
-        s.schedule_account_operation = AsyncMock(return_value={"success": True, "message": "用户已删除"})
+        s.schedule_account_operation = AsyncMock(
+            return_value={"success": True, "message": "用户已删除"}
+        )
         result = _invoke(["User", "delete-user", "--user-id", "99", "--yes"], s)
         assert result.exit_code == 0
 
@@ -557,7 +643,9 @@ class TestDACOps:
     def test_grant(self):
         s = _make_mock_scheduler()
         s.schedule_dac_operation = AsyncMock(return_value={"success": True, "message": "已授权"})
-        result = _invoke(["User", "auth", "grant", "--resource-id", "10", "--target-username", "bob"], s)
+        result = _invoke(
+            ["User", "auth", "grant", "--resource-id", "10", "--target-username", "bob"], s
+        )
         assert result.exit_code == 0
 
     def test_revoke(self):
@@ -568,9 +656,12 @@ class TestDACOps:
 
     def test_show_acl(self):
         s = _make_mock_scheduler()
-        s.schedule_dac_operation = AsyncMock(return_value={
-            "success": True, "acl_list": [{"id": 1, "user_id": 2, "permission": "read"}]
-        })
+        s.schedule_dac_operation = AsyncMock(
+            return_value={
+                "success": True,
+                "acl_list": [{"id": 1, "user_id": 2, "permission": "read"}],
+            }
+        )
         result = _invoke(["User", "auth", "show", "--resource-id", "10"], s)
         assert result.exit_code == 0
         assert "read" in result.output
@@ -587,30 +678,54 @@ class TestDACOps:
 # Config 命令
 # ═══════════════════════════════════════════════════════════
 
+
 class TestConfigOps:
     def test_create(self):
         s = _make_mock_scheduler()
-        s.schedule_config_operation = AsyncMock(return_value={"success": True, "config_id": 7, "message": ""})
-        with patch("sdpj.ui.cli.main._bootstrap", return_value=s), \
-             patch.object(CLIContext, "require_login", return_value=1):
-            result = CliRunner().invoke(cli, [
-                "Config", "create",
-                "--model", "deepseek-v4-pro",
-                "--request-format", "openai",
-                "--api-key", "sk-95033b3c11914e7484298d3b736f2d95",
-                "--base-url", "https://api.deepseek.com",
-                "--timeout", "60",
-                "--max-rps", "5",
-                "--max-concurrency", "10",
-            ])
+        s.schedule_config_operation = AsyncMock(
+            return_value={"success": True, "config_id": 7, "message": ""}
+        )
+        with (
+            patch("sdpj.ui.cli.main._bootstrap", return_value=s),
+            patch.object(CLIContext, "require_login", return_value=1),
+        ):
+            result = CliRunner().invoke(
+                cli,
+                [
+                    "Config",
+                    "create",
+                    "--model",
+                    "deepseek-v4-pro",
+                    "--request-format",
+                    "openai",
+                    "--api-key",
+                    "sk-95033b3c11914e7484298d3b736f2d95",
+                    "--base-url",
+                    "https://api.deepseek.com",
+                    "--timeout",
+                    "60",
+                    "--max-rps",
+                    "5",
+                    "--max-concurrency",
+                    "10",
+                ],
+            )
         assert result.exit_code == 0
         assert "7" in result.output
 
     def test_list(self):
         s = _make_mock_scheduler()
-        s.schedule_config_operation = AsyncMock(return_value={
-            "success": True, "configs": [{"config_id": 1, "content": {"model_id": "deepseek-v4-pro", "request_format": "openai"}}]
-        })
+        s.schedule_config_operation = AsyncMock(
+            return_value={
+                "success": True,
+                "configs": [
+                    {
+                        "config_id": 1,
+                        "content": {"model_id": "deepseek-v4-pro", "request_format": "openai"},
+                    }
+                ],
+            }
+        )
         result = _invoke(["Config", "list"], s)
         assert result.exit_code == 0
         assert "deepseek-v4-pro" in result.output
@@ -624,18 +739,25 @@ class TestConfigOps:
 
     def test_view(self):
         s = _make_mock_scheduler()
-        s.schedule_config_operation = AsyncMock(return_value={
-            "success": True, "config": {"id": 1, "model_id": REAL_MODEL_ID}
-        })
+        s.schedule_config_operation = AsyncMock(
+            return_value={"success": True, "config": {"id": 1, "model_id": REAL_MODEL_ID}}
+        )
         result = _invoke(["Config", "view", "--config-id", "1"], s)
         assert result.exit_code == 0
 
     def test_verify(self):
         s = _make_mock_scheduler()
-        s.schedule_config_operation = AsyncMock(return_value={
-            "success": True,
-            "result": {"status": "ok", "model": "deepseek-v4-pro", "latency_ms": 150, "response_preview": "OK"}
-        })
+        s.schedule_config_operation = AsyncMock(
+            return_value={
+                "success": True,
+                "result": {
+                    "status": "ok",
+                    "model": "deepseek-v4-pro",
+                    "latency_ms": 150,
+                    "response_preview": "OK",
+                },
+            }
+        )
         result = _invoke(["Config", "verify", "--config-id", "1"], s)
         assert result.exit_code == 0
         assert "连接正常" in result.output
@@ -648,20 +770,28 @@ class TestConfigOps:
 
     def test_export(self):
         s = _make_mock_scheduler()
-        s.schedule_config_operation = AsyncMock(return_value={"success": True, "content": '{"key":"val"}'})
+        s.schedule_config_operation = AsyncMock(
+            return_value={"success": True, "content": '{"key":"val"}'}
+        )
         result = _invoke(["Config", "export", "--config-id", "1"], s)
         assert result.exit_code == 0
         assert '"key":"val"' in result.output
 
     def test_import(self):
         s = _make_mock_scheduler()
-        s.schedule_config_operation = AsyncMock(return_value={"success": True, "config_id": 8, "message": ""})
+        s.schedule_config_operation = AsyncMock(
+            return_value={"success": True, "config_id": 8, "message": ""}
+        )
         runner = CliRunner()
         with runner.isolated_filesystem():
             with open("import_cfg.json", "w", encoding="utf-8") as f:
-                f.write('{"model":"deepseek-v4-pro","request_format":"openai","api_key":"sk-95033b3c11914e7484298d3b736f2d95","base_url":"https://api.deepseek.com","timeout":60,"max_rps":5,"max_concurrency":10}')
-            with patch("sdpj.ui.cli.main._bootstrap", return_value=s), \
-                 patch.object(CLIContext, "require_login", return_value=1):
+                f.write(
+                    '{"model":"deepseek-v4-pro","request_format":"openai","api_key":"sk-95033b3c11914e7484298d3b736f2d95","base_url":"https://api.deepseek.com","timeout":60,"max_rps":5,"max_concurrency":10}'
+                )
+            with (
+                patch("sdpj.ui.cli.main._bootstrap", return_value=s),
+                patch.object(CLIContext, "require_login", return_value=1),
+            ):
                 result = runner.invoke(cli, ["Config", "import", "import_cfg.json"])
             assert result.exit_code == 0
             assert "8" in result.output
@@ -669,38 +799,53 @@ class TestConfigOps:
     def test_update(self):
         s = _make_mock_scheduler()
         s.schedule_config_operation = AsyncMock(return_value={"success": True})
-        with patch("sdpj.ui.cli.main._bootstrap", return_value=s), \
-             patch.object(CLIContext, "require_login", return_value=1):
-            result = CliRunner().invoke(cli, [
-                "Config", "update",
-                "--config-id", "1",
-                "--model", "deepseek-v4-pro",
-                "--request-format", "anthropic",
-                "--api-key", "sk-95033b3c11914e7484298d3b736f2d95",
-                "--base-url", "https://api.deepseek.com/anthropic",
-                "--timeout", "60",
-                "--max-rps", "5",
-                "--max-concurrency", "10",
-            ])
+        with (
+            patch("sdpj.ui.cli.main._bootstrap", return_value=s),
+            patch.object(CLIContext, "require_login", return_value=1),
+        ):
+            result = CliRunner().invoke(
+                cli,
+                [
+                    "Config",
+                    "update",
+                    "--config-id",
+                    "1",
+                    "--model",
+                    "deepseek-v4-pro",
+                    "--request-format",
+                    "anthropic",
+                    "--api-key",
+                    "sk-95033b3c11914e7484298d3b736f2d95",
+                    "--base-url",
+                    "https://api.deepseek.com/anthropic",
+                    "--timeout",
+                    "60",
+                    "--max-rps",
+                    "5",
+                    "--max-concurrency",
+                    "10",
+                ],
+            )
         assert result.exit_code == 0
 
 
 class TestPrivateResourceOps:
     def test_upload_dataset(self):
         s = _make_mock_scheduler()
-        s.schedule_private_resource_operation = AsyncMock(return_value={
-            "success": True, "info": {"dataset_id": 20}
-        })
+        s.schedule_private_resource_operation = AsyncMock(
+            return_value={"success": True, "info": {"dataset_id": 20}}
+        )
         runner = CliRunner()
         with runner.isolated_filesystem():
             import json
+
             with open("ds.jsonl", "w", encoding="utf-8") as f:
                 f.write('{"subtype": "jailbreak", "poc": "test poc"}\n')
-            with patch("sdpj.ui.cli.main._bootstrap", return_value=s), \
-                 patch.object(CLIContext, "require_login", return_value=1):
-                result = runner.invoke(cli, [
-                    "Config", "upload-dataset", "ds.jsonl"
-                ])
+            with (
+                patch("sdpj.ui.cli.main._bootstrap", return_value=s),
+                patch.object(CLIContext, "require_login", return_value=1),
+            ):
+                result = runner.invoke(cli, ["Config", "upload-dataset", "ds.jsonl"])
             assert result.exit_code == 0
 
     def test_remove_dataset(self):
@@ -713,6 +858,7 @@ class TestPrivateResourceOps:
 # ═══════════════════════════════════════════════════════════
 # System 命令
 # ═══════════════════════════════════════════════════════════
+
 
 class TestSystemStatus:
     def test_status(self):

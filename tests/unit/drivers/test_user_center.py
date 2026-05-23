@@ -26,6 +26,7 @@ def user_center(mock_user_db):
 
 # ==================== 账号生命周期测试 ====================
 
+
 @pytest.mark.asyncio
 async def test_register_user_success(user_center, mock_user_db):
     username = "testuser"
@@ -89,7 +90,7 @@ async def test_get_user_by_username_success(user_center, mock_user_db):
         "user_id": 1,
         "username": username,
         "password": "password123",
-        "created_at": datetime(2026, 5, 1, 10, 0, 0)
+        "created_at": datetime(2026, 5, 1, 10, 0, 0),
     }
 
     # 配置 mock
@@ -129,7 +130,7 @@ async def test_get_user_by_id_success(user_center, mock_user_db):
         "user_id": user_id,
         "username": "testuser",
         "password": "password123",
-        "created_at": datetime(2026, 5, 1, 10, 0, 0)
+        "created_at": datetime(2026, 5, 1, 10, 0, 0),
     }
 
     # 配置 mock
@@ -162,13 +163,16 @@ async def test_get_user_by_id_not_found(user_center, mock_user_db):
 
 # ==================== 凭据校验测试 ====================
 
+
 @pytest.mark.asyncio
 async def test_verify_credentials_success(user_center, mock_user_db):
     username = "testuser"
     password = "password123"
     mock_user_db.get_user_by_username.return_value = {
-        "user_id": 1, "username": username, "password": password,
-        "created_at": datetime(2026, 5, 1, 10, 0, 0)
+        "user_id": 1,
+        "username": username,
+        "password": password,
+        "created_at": datetime(2026, 5, 1, 10, 0, 0),
     }
     success, user_id, error_msg = await user_center.verify_credentials(username, password)
     assert success is True
@@ -179,8 +183,10 @@ async def test_verify_credentials_success(user_center, mock_user_db):
 @pytest.mark.asyncio
 async def test_verify_credentials_wrong_password(user_center, mock_user_db):
     mock_user_db.get_user_by_username.return_value = {
-        "user_id": 1, "username": "testuser", "password": "password123",
-        "created_at": datetime(2026, 5, 1, 10, 0, 0)
+        "user_id": 1,
+        "username": "testuser",
+        "password": "password123",
+        "created_at": datetime(2026, 5, 1, 10, 0, 0),
     }
     success, user_id, error_msg = await user_center.verify_credentials("testuser", "wrongpassword")
     assert success is False
@@ -201,6 +207,7 @@ async def test_verify_credentials_user_not_found(user_center, mock_user_db):
 
 
 # ==================== 资源登记与查询测试 ====================
+
 
 @pytest.mark.asyncio
 async def test_register_resource_success(user_center, mock_user_db):
@@ -256,14 +263,14 @@ async def test_get_resources_by_owner_success(user_center, mock_user_db):
             "resource_id": 10,
             "resource_type": "private_config",
             "owner_user_id": user_id,
-            "created_at": datetime(2026, 5, 1, 10, 0, 0)
+            "created_at": datetime(2026, 5, 1, 10, 0, 0),
         },
         {
             "resource_id": 11,
             "resource_type": "private_dataset",
             "owner_user_id": user_id,
-            "created_at": datetime(2026, 5, 2, 11, 0, 0)
-        }
+            "created_at": datetime(2026, 5, 2, 11, 0, 0),
+        },
     ]
 
     # 配置 mock
@@ -288,7 +295,7 @@ async def test_get_resource_by_id_success(user_center, mock_user_db):
         "resource_id": resource_id,
         "resource_type": "private_config",
         "owner_user_id": 1,
-        "created_at": datetime(2026, 5, 1, 10, 0, 0)
+        "created_at": datetime(2026, 5, 1, 10, 0, 0),
     }
 
     # 配置 mock
@@ -318,6 +325,7 @@ async def test_get_resource_by_id_not_found(user_center, mock_user_db):
 
 
 # ==================== ACL 授权管理测试 ====================
+
 
 @pytest.mark.asyncio
 async def test_grant_access_success(user_center, mock_user_db):
@@ -373,14 +381,14 @@ async def test_get_access_list_success(user_center, mock_user_db):
             "acl_id": 100,
             "resource_id": resource_id,
             "grantee_user_id": 2,
-            "created_at": datetime(2026, 5, 1, 10, 0, 0)
+            "created_at": datetime(2026, 5, 1, 10, 0, 0),
         },
         {
             "acl_id": 101,
             "resource_id": resource_id,
             "grantee_user_id": 3,
-            "created_at": datetime(2026, 5, 2, 11, 0, 0)
-        }
+            "created_at": datetime(2026, 5, 2, 11, 0, 0),
+        },
     ]
 
     # 配置 mock
@@ -424,6 +432,7 @@ async def test_check_access_no_permission(user_center, mock_user_db):
 
 
 # ==================== 私有检测配置内容管理测试 ====================
+
 
 @pytest.mark.asyncio
 async def test_write_private_config_success(user_center, mock_user_db):
@@ -537,4 +546,3 @@ async def test_delete_private_config_success(user_center, mock_user_db):
     # 验证结果
     assert result is True
     mock_user_db.delete_private_config.assert_called_once_with(10)
-

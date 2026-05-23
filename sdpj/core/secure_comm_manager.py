@@ -74,17 +74,21 @@ class SecureCommManager(SecureCommManagerInterface):
         key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
         # Subject / Issuer（自签名，两者相同）
-        subject = issuer = x509.Name([
-            x509.NameAttribute(NameOID.COMMON_NAME, "SDPJ-System Dev"),
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "SDPJ-System"),
-        ])
+        subject = issuer = x509.Name(
+            [
+                x509.NameAttribute(NameOID.COMMON_NAME, "SDPJ-System Dev"),
+                x509.NameAttribute(NameOID.ORGANIZATION_NAME, "SDPJ-System"),
+            ]
+        )
 
         # SAN：覆盖本地开发所有可能的地址
-        san = x509.SubjectAlternativeName([
-            x509.DNSName("localhost"),
-            x509.IPAddress(ipaddress.IPv4Address("127.0.0.1")),
-            x509.IPAddress(ipaddress.IPv6Address("::1")),
-        ])
+        san = x509.SubjectAlternativeName(
+            [
+                x509.DNSName("localhost"),
+                x509.IPAddress(ipaddress.IPv4Address("127.0.0.1")),
+                x509.IPAddress(ipaddress.IPv6Address("::1")),
+            ]
+        )
 
         cert = (
             x509.CertificateBuilder()
@@ -95,9 +99,7 @@ class SecureCommManager(SecureCommManagerInterface):
             .not_valid_before(datetime.datetime.utcnow())
             .not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=3650))
             .add_extension(san, critical=False)
-            .add_extension(
-                x509.BasicConstraints(ca=False, path_length=None), critical=True
-            )
+            .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
             .sign(key, hashes.SHA256())
         )
 

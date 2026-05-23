@@ -1,6 +1,7 @@
 """
 TaskQueueManager 单元测试
 """
+
 import asyncio
 import pytest
 
@@ -19,7 +20,7 @@ class TestTaskEnqueue:
             "user_id": "user1",
             "model_id": "gpt-4",
             "algorithm_type": "static",
-            "dataset_id": "dataset1"
+            "dataset_id": "dataset1",
         }
 
         task_id = await manager.enqueue_task(task_desc)
@@ -36,7 +37,7 @@ class TestTaskEnqueue:
         manager = TaskQueueManager()
         task_desc = {
             "user_id": "user1",
-            "model_id": "gpt-4"
+            "model_id": "gpt-4",
             # 缺少 algorithm_type 和 dataset_id
         }
 
@@ -53,7 +54,7 @@ class TestTaskEnqueue:
                 "user_id": f"user{i}",
                 "model_id": "gpt-4",
                 "algorithm_type": "static",
-                "dataset_id": "dataset1"
+                "dataset_id": "dataset1",
             }
             task_id = await manager.enqueue_task(task_desc)
             task_ids.append(task_id)
@@ -78,7 +79,7 @@ class TestTaskDequeue:
             "user_id": "user1",
             "model_id": "gpt-4",
             "algorithm_type": "static",
-            "dataset_id": "dataset1"
+            "dataset_id": "dataset1",
         }
 
         task_id = await manager.enqueue_task(task_desc)
@@ -106,7 +107,7 @@ class TestTaskDequeue:
                 "user_id": f"user{i}",
                 "model_id": "gpt-4",
                 "algorithm_type": "static",
-                "dataset_id": "dataset1"
+                "dataset_id": "dataset1",
             }
             task_id = await manager.enqueue_task(task_desc)
             task_ids.append(task_id)
@@ -131,7 +132,7 @@ class TestTaskDequeueMultiple:
                 "user_id": f"user{i}",
                 "model_id": "gpt-4",
                 "algorithm_type": "static",
-                "dataset_id": "dataset1"
+                "dataset_id": "dataset1",
             }
             await manager.enqueue_task(task_desc)
 
@@ -152,7 +153,7 @@ class TestTaskDequeueMultiple:
                 "user_id": f"user{i}",
                 "model_id": "gpt-4",
                 "algorithm_type": "static",
-                "dataset_id": "dataset1"
+                "dataset_id": "dataset1",
             }
             await manager.enqueue_task(task_desc)
 
@@ -180,7 +181,7 @@ class TestTaskStatusUpdate:
             "user_id": "user1",
             "model_id": "gpt-4",
             "algorithm_type": "static",
-            "dataset_id": "dataset1"
+            "dataset_id": "dataset1",
         }
 
         task_id = await manager.enqueue_task(task_desc)
@@ -208,7 +209,7 @@ class TestTaskStatusUpdate:
             "user_id": "user1",
             "model_id": "gpt-4",
             "algorithm_type": "static",
-            "dataset_id": "dataset1"
+            "dataset_id": "dataset1",
         }
 
         task_id = await manager.enqueue_task(task_desc)
@@ -234,7 +235,7 @@ class TestTaskStatusQuery:
             "user_id": "user1",
             "model_id": "gpt-4",
             "algorithm_type": "static",
-            "dataset_id": "dataset1"
+            "dataset_id": "dataset1",
         }
 
         task_id = await manager.enqueue_task(task_desc)
@@ -271,7 +272,7 @@ class TestQueueView:
                 "user_id": f"user{i}",
                 "model_id": "gpt-4",
                 "algorithm_type": "static",
-                "dataset_id": "dataset1"
+                "dataset_id": "dataset1",
             }
             await manager.enqueue_task(task_desc)
 
@@ -292,7 +293,7 @@ class TestQueueView:
                 "user_id": f"user{i}",
                 "model_id": "gpt-4",
                 "algorithm_type": "static",
-                "dataset_id": "dataset1"
+                "dataset_id": "dataset1",
             }
             task_id = await manager.enqueue_task(task_desc)
             task_ids.append(task_id)
@@ -325,7 +326,7 @@ class TestConcurrency:
                 "user_id": f"user{i}",
                 "model_id": "gpt-4",
                 "algorithm_type": "static",
-                "dataset_id": "dataset1"
+                "dataset_id": "dataset1",
             }
             return await manager.enqueue_task(task_desc)
 
@@ -345,7 +346,7 @@ class TestConcurrency:
                 "user_id": f"user{i}",
                 "model_id": "gpt-4",
                 "algorithm_type": "static",
-                "dataset_id": "dataset1"
+                "dataset_id": "dataset1",
             }
             await manager.enqueue_task(task_desc)
 
@@ -367,7 +368,7 @@ class TestTaskCancel:
             "user_id": "user1",
             "model_id": "gpt-4",
             "algorithm_type": "static",
-            "dataset_id": "dataset1"
+            "dataset_id": "dataset1",
         }
 
         task_id = await manager.enqueue_task(task_desc)
@@ -383,7 +384,7 @@ class TestTaskCancel:
             "user_id": "user1",
             "model_id": "gpt-4",
             "algorithm_type": "static",
-            "dataset_id": "dataset1"
+            "dataset_id": "dataset1",
         }
 
         task_id = await manager.enqueue_task(task_desc)
@@ -401,7 +402,7 @@ class TestTaskCancel:
             "user_id": "user1",
             "model_id": "gpt-4",
             "algorithm_type": "static",
-            "dataset_id": "dataset1"
+            "dataset_id": "dataset1",
         }
 
         task_id = await manager.enqueue_task(task_desc)
@@ -426,7 +427,7 @@ class TestTaskCancel:
             "user_id": "user1",
             "model_id": "gpt-4",
             "algorithm_type": "static",
-            "dataset_id": "dataset1"
+            "dataset_id": "dataset1",
         }
 
         task_id = await manager.enqueue_task(task_desc)
@@ -447,7 +448,7 @@ class TestRemoveTask:
             "user_id": "user1",
             "model_id": "gpt-4",
             "algorithm_type": "static",
-            "dataset_id": "dataset1"
+            "dataset_id": "dataset1",
         }
 
         task_id = await manager.enqueue_task(task_desc)
@@ -466,7 +467,7 @@ class TestRemoveTask:
             "user_id": "user1",
             "model_id": "gpt-4",
             "algorithm_type": "static",
-            "dataset_id": "dataset1"
+            "dataset_id": "dataset1",
         }
 
         task_id = await manager.enqueue_task(task_desc)
@@ -494,7 +495,7 @@ class TestRemoveTask:
                 "user_id": f"user{i}",
                 "model_id": "gpt-4",
                 "algorithm_type": "static",
-                "dataset_id": "dataset1"
+                "dataset_id": "dataset1",
             }
             task_id = await manager.enqueue_task(task_desc)
             task_ids.append(task_id)
@@ -517,7 +518,7 @@ class TestTerminalStateProtection:
             "user_id": "user1",
             "model_id": "gpt-4",
             "algorithm_type": "static",
-            "dataset_id": "dataset1"
+            "dataset_id": "dataset1",
         }
 
         task_id = await manager.enqueue_task(task_desc)
@@ -536,7 +537,7 @@ class TestTerminalStateProtection:
             "user_id": "user1",
             "model_id": "gpt-4",
             "algorithm_type": "static",
-            "dataset_id": "dataset1"
+            "dataset_id": "dataset1",
         }
 
         task_id = await manager.enqueue_task(task_desc)
@@ -555,7 +556,7 @@ class TestTerminalStateProtection:
             "user_id": "user1",
             "model_id": "gpt-4",
             "algorithm_type": "static",
-            "dataset_id": "dataset1"
+            "dataset_id": "dataset1",
         }
 
         task_id = await manager.enqueue_task(task_desc)
@@ -577,7 +578,7 @@ class TestTerminalStateProtection:
                 "user_id": f"user{i}",
                 "model_id": "gpt-4",
                 "algorithm_type": "static",
-                "dataset_id": "dataset1"
+                "dataset_id": "dataset1",
             }
             task_id = await manager.enqueue_task(task_desc)
             task_ids.append(task_id)

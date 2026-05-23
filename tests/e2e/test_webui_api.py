@@ -13,6 +13,7 @@
 - 2.1.8.1.2 用户权限管理(授予/移除)
 - 2.1.8.2 加密通信(账号密码、私有配置文件)
 """
+
 import pytest
 import uuid
 from fastapi.testclient import TestClient
@@ -31,10 +32,9 @@ class TestWebUIUserManagement:
 
     def test_user_registration(self):
         """测试用户注册 (2.1.8.1.1.1)"""
-        response = self.client.post("/api/auth/register", json={
-            "username": self.unique_username,
-            "password": self.password
-        })
+        response = self.client.post(
+            "/api/auth/register", json={"username": self.unique_username, "password": self.password}
+        )
         # 注册应该成功或返回用户已存在
         assert response.status_code in [200, 400, 500]
         if response.status_code == 200:
@@ -43,16 +43,14 @@ class TestWebUIUserManagement:
     def test_user_login(self):
         """测试用户登录 (2.1.8.1.1.1)"""
         # 先注册
-        self.client.post("/api/auth/register", json={
-            "username": self.unique_username,
-            "password": self.password
-        })
+        self.client.post(
+            "/api/auth/register", json={"username": self.unique_username, "password": self.password}
+        )
 
         # 再登录
-        response = self.client.post("/api/auth/login", json={
-            "username": self.unique_username,
-            "password": self.password
-        })
+        response = self.client.post(
+            "/api/auth/login", json={"username": self.unique_username, "password": self.password}
+        )
 
         assert response.status_code in [200, 500]
         if response.status_code == 200:
@@ -62,10 +60,13 @@ class TestWebUIUserManagement:
     def test_encrypted_communication(self):
         """测试加密通信 (2.1.8.2) - 账号密码加密传输"""
         # 注册时密码应该被加密
-        response = self.client.post("/api/auth/register", json={
-            "username": self.unique_username,
-            "password": self.password  # 客户端应该加密,服务端解密
-        })
+        response = self.client.post(
+            "/api/auth/register",
+            json={
+                "username": self.unique_username,
+                "password": self.password,  # 客户端应该加密,服务端解密
+            },
+        )
         assert response.status_code in [200, 400, 500]
 
 
@@ -81,14 +82,12 @@ class TestWebUIDetectionCore:
 
     def _register_and_login(self):
         """辅助方法: 注册并登录"""
-        self.client.post("/api/auth/register", json={
-            "username": self.unique_username,
-            "password": self.password
-        })
-        login_response = self.client.post("/api/auth/login", json={
-            "username": self.unique_username,
-            "password": self.password
-        })
+        self.client.post(
+            "/api/auth/register", json={"username": self.unique_username, "password": self.password}
+        )
+        login_response = self.client.post(
+            "/api/auth/login", json={"username": self.unique_username, "password": self.password}
+        )
         if login_response.status_code == 200:
             data = login_response.json()
             self.session_id = data.get("session_id") or data.get("token")
@@ -98,12 +97,15 @@ class TestWebUIDetectionCore:
         self._register_and_login()
 
         # 启动静态检测
-        response = self.client.post("/api/detection/start", json={
-            "session_id": self.session_id,
-            "model_id": REAL_MODEL_ID,
-            "dataset_id": 1,
-            "algorithm_type": "static"
-        })
+        response = self.client.post(
+            "/api/detection/start",
+            json={
+                "session_id": self.session_id,
+                "model_id": REAL_MODEL_ID,
+                "dataset_id": 1,
+                "algorithm_type": "static",
+            },
+        )
         # API应该能响应(即使可能因缺少真实LLM而失败)
         assert response.status_code in [200, 400, 401, 500]
 
@@ -111,12 +113,15 @@ class TestWebUIDetectionCore:
         """测试动态检测算法 (2.1.2)"""
         self._register_and_login()
 
-        response = self.client.post("/api/detection/start", json={
-            "session_id": self.session_id,
-            "model_id": REAL_MODEL_ID,
-            "dataset_id": 1,
-            "algorithm_type": "dynamic"
-        })
+        response = self.client.post(
+            "/api/detection/start",
+            json={
+                "session_id": self.session_id,
+                "model_id": REAL_MODEL_ID,
+                "dataset_id": 1,
+                "algorithm_type": "dynamic",
+            },
+        )
         assert response.status_code in [200, 400, 401, 500]
 
     def test_dataset_selection(self):
@@ -168,17 +173,15 @@ class TestWebUIFullWorkflow:
         """测试完整检测流程: 注册 -> 登录 -> 选择数据集 -> 启动检测 -> 查询状态 -> 查看报告"""
 
         # 1. 用户注册 (2.1.8.1.1.1)
-        reg_response = self.client.post("/api/auth/register", json={
-            "username": self.unique_username,
-            "password": self.password
-        })
+        reg_response = self.client.post(
+            "/api/auth/register", json={"username": self.unique_username, "password": self.password}
+        )
         assert reg_response.status_code in [200, 400, 500]
 
         # 2. 用户登录 (2.1.8.1.1.1)
-        login_response = self.client.post("/api/auth/login", json={
-            "username": self.unique_username,
-            "password": self.password
-        })
+        login_response = self.client.post(
+            "/api/auth/login", json={"username": self.unique_username, "password": self.password}
+        )
         assert login_response.status_code in [200, 500]
         session_id = None
         if login_response.status_code == 200:
@@ -194,12 +197,15 @@ class TestWebUIFullWorkflow:
         assert datasets_response.status_code in [200, 401, 500]
 
         # 5. 启动检测任务 (2.1.1 + 2.1.4)
-        detection_response = self.client.post("/api/detection/start", json={
-            "session_id": session_id,
-            "model_id": REAL_MODEL_ID,
-            "dataset_id": 1,
-            "algorithm_type": "static"
-        })
+        detection_response = self.client.post(
+            "/api/detection/start",
+            json={
+                "session_id": session_id,
+                "model_id": REAL_MODEL_ID,
+                "dataset_id": 1,
+                "algorithm_type": "static",
+            },
+        )
         assert detection_response.status_code in [200, 400, 401, 500]
 
         # 6. 查询报告列表 (2.1.6)
@@ -234,15 +240,11 @@ class TestWebUIAPIs:
     def test_register_endpoint_validation(self):
         """测试注册端点参数验证"""
         # 缺少密码
-        response = self.client.post("/api/auth/register", json={
-            "username": "testuser"
-        })
+        response = self.client.post("/api/auth/register", json={"username": "testuser"})
         assert response.status_code in [400, 422, 500]
 
     def test_login_endpoint_validation(self):
         """测试登录端点参数验证"""
         # 缺少密码
-        response = self.client.post("/api/auth/login", json={
-            "username": "testuser"
-        })
+        response = self.client.post("/api/auth/login", json={"username": "testuser"})
         assert response.status_code in [400, 422, 500]

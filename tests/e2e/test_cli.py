@@ -23,12 +23,21 @@ from tests.fixtures.sample_data import REAL_CONFIGS
 # 帮助与状态（无需登录）
 # ═══════════════════════════════════════════════════════════
 
+
 class TestHelpAndStatus:
     def test_top_level_help(self):
         r = CliRunner().invoke(cli, ["--help"])
         assert r.exit_code == 0
-        for cmd in ["detect", "report", "user", "config", "logs", "status",
-                     "watch", "watch-errors"]:
+        for cmd in [
+            "detect",
+            "report",
+            "user",
+            "config",
+            "logs",
+            "status",
+            "watch",
+            "watch-errors",
+        ]:
             assert cmd in r.output, f"顶层帮助缺少命令: {cmd}"
 
     def test_subgroup_helps(self):
@@ -46,8 +55,9 @@ class TestHelpAndStatus:
         assert r.exit_code == 0
 
     def test_logs_with_pagination(self):
-        r = CliRunner().invoke(cli, ["logs", "--category", "runtime",
-                                      "--page", "1", "--page-size", "5"])
+        r = CliRunner().invoke(
+            cli, ["logs", "--category", "runtime", "--page", "1", "--page-size", "5"]
+        )
         assert r.exit_code == 0
 
     def test_logs_invalid_user_id(self):
@@ -60,6 +70,7 @@ class TestHelpAndStatus:
 # 用户认证（通过 input= 直接提供凭据，真实注册/登录）
 # ═══════════════════════════════════════════════════════════
 
+
 class TestUserAuth:
     @pytest.fixture(scope="class")
     def creds(self):
@@ -67,41 +78,37 @@ class TestUserAuth:
 
     def test_register_success(self, creds):
         user, pwd = creds
-        r = CliRunner().invoke(cli, ["user", "register"],
-                               input=f"{user}\n{pwd}\n")
+        r = CliRunner().invoke(cli, ["user", "register"], input=f"{user}\n{pwd}\n")
         assert r.exit_code == 0
         assert "注册成功" in r.output or "已存在" in r.output
 
     def test_register_duplicate(self, creds):
         user, pwd = creds
         # 重复注册，预期提示已存在
-        r = CliRunner().invoke(cli, ["user", "register"],
-                               input=f"{user}\n{pwd}\n")
+        r = CliRunner().invoke(cli, ["user", "register"], input=f"{user}\n{pwd}\n")
         assert r.exit_code in [0, 1]
 
     def test_login_success(self, creds):
         user, pwd = creds
-        r = CliRunner().invoke(cli, ["user", "login"],
-                               input=f"{user}\n{pwd}\n")
+        r = CliRunner().invoke(cli, ["user", "login"], input=f"{user}\n{pwd}\n")
         assert r.exit_code == 0
         assert "登录成功" in r.output
         assert "用户ID:" in r.output
 
     def test_login_wrong_password(self, creds):
         user, _ = creds
-        r = CliRunner().invoke(cli, ["user", "login"],
-                               input=f"{user}\nWrongPass_999\n")
+        r = CliRunner().invoke(cli, ["user", "login"], input=f"{user}\nWrongPass_999\n")
         assert r.exit_code == 1
 
     def test_login_nonexistent_user(self):
-        r = CliRunner().invoke(cli, ["user", "login"],
-                               input=f"no_user_{uuid.uuid4().hex}\npass\n")
+        r = CliRunner().invoke(cli, ["user", "login"], input=f"no_user_{uuid.uuid4().hex}\npass\n")
         assert r.exit_code == 1
 
 
 # ═══════════════════════════════════════════════════════════
 # 需登录的命令：验证"未登录→被拒"
 # ═══════════════════════════════════════════════════════════
+
 
 class TestLoginRequired:
     """每个需登录的命令，不传登录凭据直接调，预期返回 exit_code=1 且提示登录"""
@@ -223,8 +230,9 @@ class TestLoginRequired:
         assert r.exit_code in [0, 1]
 
     def test_user_auth_grant(self):
-        r = CliRunner().invoke(cli, ["user", "auth", "grant",
-                                      "--resource-id", "1", "--target-username", "x"])
+        r = CliRunner().invoke(
+            cli, ["user", "auth", "grant", "--resource-id", "1", "--target-username", "x"]
+        )
         assert r.exit_code == 1
         assert "登录" in r.output
 
@@ -264,8 +272,9 @@ class TestLoginRequired:
         assert "登录" in r.output
 
     def test_remove_adapter(self):
-        r = CliRunner().invoke(cli, ["config", "remove-adapter",
-                                      "--model-id", "x", "--resource-id", "999"])
+        r = CliRunner().invoke(
+            cli, ["config", "remove-adapter", "--model-id", "x", "--resource-id", "999"]
+        )
         assert r.exit_code == 1
         assert "登录" in r.output
 
@@ -278,6 +287,7 @@ class TestLoginRequired:
 # ═══════════════════════════════════════════════════════════
 # 需登录 + 需本地文件的命令：未登录被拒
 # ═══════════════════════════════════════════════════════════
+
 
 class TestLoginRequiredWithFiles:
     def test_config_create(self):
@@ -311,10 +321,15 @@ class TestLoginRequiredWithFiles:
         runner = CliRunner()
         with runner.isolated_filesystem():
             with open("adapter.json", "w", encoding="utf-8") as f:
-                json.dump({"request_format": "openai", "api_url": REAL_CONFIGS["deepseek_openai"]["base_url"],
-                           "api_key": REAL_CONFIGS["deepseek_openai"]["api_key"]}, f)
-            r = runner.invoke(cli, ["config", "upload-adapter", "adapter.json",
-                                    "--model-id", "m"])
+                json.dump(
+                    {
+                        "request_format": "openai",
+                        "api_url": REAL_CONFIGS["deepseek_openai"]["base_url"],
+                        "api_key": REAL_CONFIGS["deepseek_openai"]["api_key"],
+                    },
+                    f,
+                )
+            r = runner.invoke(cli, ["config", "upload-adapter", "adapter.json", "--model-id", "m"])
             assert r.exit_code == 1
             assert "登录" in r.output
 
@@ -323,8 +338,10 @@ class TestLoginRequiredWithFiles:
         with runner.isolated_filesystem():
             with open("ds.json", "w", encoding="utf-8") as f:
                 json.dump([{"subtype": "t", "poc": "c"}], f)
-            r = runner.invoke(cli, ["config", "upload-dataset", "ds.json",
-                                    "--name", "ds", "--risk-type", "jailbreak"])
+            r = runner.invoke(
+                cli,
+                ["config", "upload-dataset", "ds.json", "--name", "ds", "--risk-type", "jailbreak"],
+            )
             assert r.exit_code == 1
             assert "登录" in r.output
 

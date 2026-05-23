@@ -60,15 +60,24 @@ def load_adapter_from_config(model_id: str, config: Union[dict, str, Path]) -> L
 
             _meta_keys = {"request_format", "adapter_class", "max_rps", "max_concurrency"}
             filtered_config = {k: v for k, v in config.items() if k not in _meta_keys}
-            return adapter_class(model_id=model_id, max_rps=max_rps, max_concurrency=max_concurrency, **filtered_config)
+            return adapter_class(
+                model_id=model_id,
+                max_rps=max_rps,
+                max_concurrency=max_concurrency,
+                **filtered_config,
+            )
         except (ImportError, AttributeError, TypeError) as e:
             raise AdapterValidationError(f"Failed to load custom adapter: {e}")
 
     # 方式 1: 内置规范（OpenAI/Anthropic）
-    api_url = (config.get("api_url") or config.get("base_url") or config.get("api_endpoint") or "").strip()
+    api_url = (
+        config.get("api_url") or config.get("base_url") or config.get("api_endpoint") or ""
+    ).strip()
     api_key = (config.get("api_key") or "").strip()
     if not api_url or not api_key:
-        raise AdapterValidationError("config must contain 'api_url'/'base_url'/'api_endpoint' and 'api_key'")
+        raise AdapterValidationError(
+            "config must contain 'api_url'/'base_url'/'api_endpoint' and 'api_key'"
+        )
 
     model_name = config.get("model") or config.get("model_id") or model_id
     timeout = config.get("timeout", 60)

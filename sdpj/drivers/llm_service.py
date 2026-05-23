@@ -118,7 +118,11 @@ class LLMService:
             try:
                 system_prompt = request_data.get("system_prompt", "")
                 user_message = request_data.get("user_message", "")
-                extra = {k: v for k, v in request_data.items() if k not in ("system_prompt", "user_message")}
+                extra = {
+                    k: v
+                    for k, v in request_data.items()
+                    if k not in ("system_prompt", "user_message")
+                }
                 return await service_instance.call(system_prompt, user_message, **extra)
             except StandardizedLLMError:
                 raise

@@ -1,4 +1,5 @@
 """DACManager 单元测试"""
+
 import pytest
 from unittest.mock import AsyncMock
 
@@ -25,19 +26,23 @@ class TestGrantAccess:
         assert not ok and "拥有者" in msg
 
     async def test_already_has_access(self):
-        mgr = DACManager(_uc(
-            get_resource_by_id=lambda rid: {"owner_user_id": 1},
-            check_access=lambda rid, uid: True,
-        ))
+        mgr = DACManager(
+            _uc(
+                get_resource_by_id=lambda rid: {"owner_user_id": 1},
+                check_access=lambda rid, uid: True,
+            )
+        )
         ok, msg = await mgr.grant_access(1, 2, caller_user_id=1)
         assert not ok and "已拥有" in msg
 
     async def test_success(self):
-        mgr = DACManager(_uc(
-            get_resource_by_id=lambda rid: {"owner_user_id": 1},
-            check_access=lambda rid, uid: False,
-            grant_access=lambda rid, uid: 10,
-        ))
+        mgr = DACManager(
+            _uc(
+                get_resource_by_id=lambda rid: {"owner_user_id": 1},
+                check_access=lambda rid, uid: False,
+                grant_access=lambda rid, uid: 10,
+            )
+        )
         ok, acl_id = await mgr.grant_access(1, 2, caller_user_id=1)
         assert ok and acl_id == "10"
 
@@ -49,10 +54,12 @@ class TestCheckAccess:
         assert await mgr.check_access(1, user_id=5) is True
 
     async def test_non_owner_delegates(self):
-        mgr = DACManager(_uc(
-            get_resource_by_id=lambda rid: {"owner_user_id": 1},
-            check_access=lambda rid, uid: True,
-        ))
+        mgr = DACManager(
+            _uc(
+                get_resource_by_id=lambda rid: {"owner_user_id": 1},
+                check_access=lambda rid, uid: True,
+            )
+        )
         assert await mgr.check_access(1, user_id=2) is True
 
     async def test_resource_missing(self):
@@ -68,18 +75,22 @@ class TestRevokeAccess:
         assert not ok and "不存在" in msg
 
     async def test_not_owner(self):
-        mgr = DACManager(_uc(
-            get_acl_by_id=lambda aid: {"resource_id": 10},
-            get_resource_by_id=lambda rid: {"owner_user_id": 99},
-        ))
+        mgr = DACManager(
+            _uc(
+                get_acl_by_id=lambda aid: {"resource_id": 10},
+                get_resource_by_id=lambda rid: {"owner_user_id": 99},
+            )
+        )
         ok, msg = await mgr.revoke_access(1, caller_user_id=1)
         assert not ok and "拥有者" in msg
 
     async def test_success(self):
-        mgr = DACManager(_uc(
-            get_acl_by_id=lambda aid: {"resource_id": 10},
-            get_resource_by_id=lambda rid: {"owner_user_id": 1},
-            revoke_access=lambda aid: True,
-        ))
+        mgr = DACManager(
+            _uc(
+                get_acl_by_id=lambda aid: {"resource_id": 10},
+                get_resource_by_id=lambda rid: {"owner_user_id": 1},
+                revoke_access=lambda aid: True,
+            )
+        )
         ok, _ = await mgr.revoke_access(1, caller_user_id=1)
         assert ok

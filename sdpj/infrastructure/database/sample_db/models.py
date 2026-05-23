@@ -31,10 +31,14 @@ class Dataset(Base):
     risk_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
 
     # 对应 UserDB Resource 表的 resource_id（内置数据集为 NULL）
-    resource_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("Resource.resource_id", ondelete="SET NULL"), nullable=True, index=True)
+    resource_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("Resource.resource_id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     # 创建时间
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
     # 关系：一个数据集包含多个检测样本
     samples: Mapped[List["DetectionSample"]] = relationship(
@@ -70,7 +74,9 @@ class DetectionSample(Base):
     )
 
     # 创建时间
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
     # 关系：多个样本属于一个数据集
     dataset: Mapped["Dataset"] = relationship("Dataset", back_populates="samples")
@@ -97,7 +103,9 @@ class SystemMeta(Base):
     value: Mapped[str] = mapped_column(Text, nullable=False)
 
     # 创建时间
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
     # 更新时间
     updated_at: Mapped[datetime] = mapped_column(

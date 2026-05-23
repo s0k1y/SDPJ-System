@@ -1,6 +1,7 @@
 """
 EventLogger 单元测试
 """
+
 import asyncio
 from datetime import datetime, timedelta, timezone
 
@@ -25,7 +26,7 @@ class TestOperationLogging:
         log_id = logger.log_operation(
             user_id="user1",
             operation_type="start_detection",
-            context={"model": "gpt-4", "dataset": "dataset1"}
+            context={"model": "gpt-4", "dataset": "dataset1"},
         )
 
         assert log_id is not None
@@ -43,11 +44,7 @@ class TestOperationLogging:
         log_ids = []
 
         for i in range(3):
-            log_id = logger.log_operation(
-                user_id=f"user{i}",
-                operation_type="login",
-                context={}
-            )
+            log_id = logger.log_operation(user_id=f"user{i}", operation_type="login", context={})
             log_ids.append(log_id)
 
         # 验证所有日志ID唯一
@@ -63,7 +60,7 @@ class TestOperationLogging:
         log_id = logger.log_operation(
             user_id="user1",
             operation_type="change_password",
-            context={"password": "***"}  # 已脱敏
+            context={"password": "***"},  # 已脱敏
         )
 
         logs = _query(logger, user_id="user1")
@@ -81,7 +78,7 @@ class TestRuntimeLogging:
         log_id = logger.log_runtime(
             source_module="StateScheduler",
             event_type="state_transition",
-            description="状态从 IDLE 转为 RUNNING"
+            description="状态从 IDLE 转为 RUNNING",
         )
 
         assert log_id is not None
@@ -94,9 +91,7 @@ class TestRuntimeLogging:
         """测试记录检测任务进度"""
         logger = EventLogger()
         log_id = logger.log_runtime(
-            source_module="SDPJDetector",
-            event_type="task_progress",
-            description="任务进度: 50%"
+            source_module="SDPJDetector", event_type="task_progress", description="任务进度: 50%"
         )
 
         logs = _query(logger, source_module="SDPJDetector")
@@ -109,7 +104,7 @@ class TestRuntimeLogging:
         log_id = logger.log_runtime(
             source_module="LLMService",
             event_type="call_phase",
-            description="大模型调用阶段: 请求发送"
+            description="大模型调用阶段: 请求发送",
         )
 
         logs = _query(logger, source_module="LLMService")
@@ -123,9 +118,7 @@ class TestErrorLogging:
         """测试成功记录错误日志"""
         logger = EventLogger()
         log_id = logger.log_error(
-            source_module="LLMService",
-            error_type="api_error",
-            description="API 调用失败: 超时"
+            source_module="LLMService", error_type="api_error", description="API 调用失败: 超时"
         )
 
         assert log_id is not None
@@ -138,9 +131,7 @@ class TestErrorLogging:
         """测试记录数据库访问错误"""
         logger = EventLogger()
         log_id = logger.log_error(
-            source_module="UserDB",
-            error_type="database_error",
-            description="数据库连接失败"
+            source_module="UserDB", error_type="database_error", description="数据库连接失败"
         )
 
         logs = _query(logger, source_module="UserDB")
@@ -152,7 +143,7 @@ class TestErrorLogging:
         log_id = logger.log_error(
             source_module="DACManager",
             error_type="permission_error",
-            description="用户 user1 权限校验失败"
+            description="用户 user1 权限校验失败",
         )
 
         logs = _query(logger, source_module="DACManager")
@@ -217,11 +208,7 @@ class TestLogQuery:
         logger.log_operation("user2", "login", {}, timestamp=now)
 
         # 查询特定用户在过去1小时的操作日志
-        logs = _query(logger,
-            category=LogCategory.OPERATION,
-            user_id="user1",
-            time_start=past
-        )
+        logs = _query(logger, category=LogCategory.OPERATION, user_id="user1", time_start=past)
         assert len(logs) == 1
         assert logs[0].user_id == "user1"
 
@@ -409,7 +396,7 @@ class TestTimestampSorting:
             user_id=None,
             event_type="test_event",
             description="test",
-            context={}
+            context={},
         )
 
         asyncio.run(logger._save_to_db(entry))
@@ -443,7 +430,7 @@ class TestTimestampSorting:
             user_id=None,
             event_type="test_event",
             description="test",
-            context={}
+            context={},
         )
 
         asyncio.run(logger._save_to_db(entry))

@@ -54,7 +54,9 @@ class AccountManager(AccountManagerInterface):
             return True
         return False
 
-    async def change_password_for_user(self, user_id: int, old_password: str, new_password: str) -> tuple[bool, str]:
+    async def change_password_for_user(
+        self, user_id: int, old_password: str, new_password: str
+    ) -> tuple[bool, str]:
         if not new_password or len(new_password) < 6:
             return False, "新密码长度至少6个字符"
         user = await self._user_center.get_user_by_id(user_id)

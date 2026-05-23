@@ -58,7 +58,9 @@ class SDPJDetectorInterface(Protocol):
         """对被测大模型单次响应做合规判断"""
         ...
 
-    async def write_result(self, report_id: str, risk_subclass: str, model_output: str, compliance_result: str) -> str:
+    async def write_result(
+        self, report_id: str, risk_subclass: str, model_output: str, compliance_result: str
+    ) -> str:
         """将单条检测结果写入检测结果数据库"""
         ...
 

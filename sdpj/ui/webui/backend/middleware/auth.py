@@ -49,7 +49,9 @@ class AuthMiddleware:
 
         user_id = request.session.get("user_id")
         if not user_id:
-            response = JSONResponse({"success": False, "data": None, "message": "未登录"}, status_code=401)
+            response = JSONResponse(
+                {"success": False, "data": None, "message": "未登录"}, status_code=401
+            )
             await response(scope, receive, send)
             return
 

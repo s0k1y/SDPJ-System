@@ -1,4 +1,5 @@
 """完整集成测试 - 跨层级模块协作"""
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
@@ -32,6 +33,7 @@ class TestWave0ToWave2Integration:
     def test_data_processor_initialization(self):
         """测试 DataProcessor 初始化（依赖注入）"""
         from sdpj.drivers.data_processor import DataProcessor
+
         processor = DataProcessor(
             sample_db=AsyncMock(),
             result_db=AsyncMock(),
@@ -72,6 +74,7 @@ class TestWave3ToWave4Integration:
         """测试 WebUI Backend 导入"""
         from sdpj.ui.webui.backend.app import app
         from fastapi.testclient import TestClient
+
         client = TestClient(app)
         response = client.get("/")
         assert response.status_code == 200
@@ -80,11 +83,11 @@ class TestWave3ToWave4Integration:
         """测试 WebUI Backend 注册端点"""
         from sdpj.ui.webui.backend.app import app
         from fastapi.testclient import TestClient
+
         client = TestClient(app, raise_server_exceptions=False)
-        response = client.post("/api/auth/register", json={
-            "username": "webui_test_user",
-            "password": "password12345"
-        })
+        response = client.post(
+            "/api/auth/register", json={"username": "webui_test_user", "password": "password12345"}
+        )
         assert response.status_code in [200, 400, 500]
 
 

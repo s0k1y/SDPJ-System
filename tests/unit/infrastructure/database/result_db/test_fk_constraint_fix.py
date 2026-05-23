@@ -1,4 +1,5 @@
 from tests.fixtures.sample_data import REAL_MODEL_ID, REAL_MODEL_ID_2
+
 """测试外键约束修复：TargetModel 未注册时 save_poc_pool_cache 自动注册
 
 对应 bug：state_scheduler 传入 task_group_id 跳过 create_task_group，

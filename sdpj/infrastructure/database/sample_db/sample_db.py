@@ -26,7 +26,9 @@ class SampleDB:
 
     # ==================== 数据集级能力 ====================
 
-    async def create_dataset(self, name: str, risk_type: str, resource_id: int | None = None) -> int:
+    async def create_dataset(
+        self, name: str, risk_type: str, resource_id: int | None = None
+    ) -> int:
         """创建检测数据集
 
         Args:
@@ -161,7 +163,9 @@ class SampleDB:
             await session.commit()
             return sample.sample_id
 
-    async def bulk_add_samples(self, records: list[tuple[str, str, int]], batch_size: int = 5000) -> int:
+    async def bulk_add_samples(
+        self, records: list[tuple[str, str, int]], batch_size: int = 5000
+    ) -> int:
         """批量添加检测样本
 
         Args:
@@ -184,7 +188,9 @@ class SampleDB:
             await session.commit()
         return inserted
 
-    async def bulk_insert_samples(self, records: list[tuple[str, str, int]], batch_size: int = 5000) -> int:
+    async def bulk_insert_samples(
+        self, records: list[tuple[str, str, int]], batch_size: int = 5000
+    ) -> int:
         """批量插入检测样本（原生 SQL，绕过 ORM 层）
 
         Args:

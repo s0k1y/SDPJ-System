@@ -85,7 +85,9 @@ class OpenAICompatibleAdapter(LLMAdapter):
             ) as resp:
                 data = await resp.json()
                 if resp.status == 200:
-                    content = (data.get("choices") or [{}])[0].get("message", {}).get("content") or ""
+                    content = (data.get("choices") or [{}])[0].get("message", {}).get(
+                        "content"
+                    ) or ""
                     return {
                         "success": True,
                         "content": content,
@@ -101,11 +103,15 @@ class OpenAICompatibleAdapter(LLMAdapter):
                     error_msg = f"Client error {resp.status}"
                 else:
                     error_msg = f"Server error {resp.status}"
-                self._raise_api_error(resp.status, error_msg, retry_after=retry_after, extra_detail=data)
+                self._raise_api_error(
+                    resp.status, error_msg, retry_after=retry_after, extra_detail=data
+                )
         except StandardizedLLMError:
             raise
         except aiohttp.ServerTimeoutError as e:
-            raise StandardizedLLMError(ErrorCategory.TIMEOUT, f"Request timed out ({timeout}s)", original_error=e)
+            raise StandardizedLLMError(
+                ErrorCategory.TIMEOUT, f"Request timed out ({timeout}s)", original_error=e
+            )
         except aiohttp.ClientError as e:
             raise StandardizedLLMError(ErrorCategory.NETWORK, str(e), original_error=e)
         except Exception as e:

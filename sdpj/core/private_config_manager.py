@@ -34,9 +34,13 @@ class PrivateConfigManager(PrivateConfigManagerInterface):
         self._user_center = user_center
         self._llm_registry = llm_registry
 
-    async def create_config(self, user_id: int, config_content: dict) -> tuple[bool, int | None, str]:
+    async def create_config(
+        self, user_id: int, config_content: dict
+    ) -> tuple[bool, int | None, str]:
         try:
-            resource_id = await self._user_center.register_resource(self.RESOURCE_TYPE_CONFIG, user_id)
+            resource_id = await self._user_center.register_resource(
+                self.RESOURCE_TYPE_CONFIG, user_id
+            )
             await self._user_center.write_private_config(resource_id, config_content)
         except ValueError:
             return False, None, ""
@@ -73,7 +77,9 @@ class PrivateConfigManager(PrivateConfigManagerInterface):
                 if available:
                     await self._llm_registry.unregister_private_model(model_id)
                 adapter_content = json.dumps(config_content, ensure_ascii=False)
-                ok, _, err = await self._llm_registry.register_private_model(adapter_content, model_id)
+                ok, _, err = await self._llm_registry.register_private_model(
+                    adapter_content, model_id
+                )
                 if not ok:
                     return True, f"配置已更新但适配器热重载失败: {err}"
             return True, ""
@@ -104,7 +110,10 @@ class PrivateConfigManager(PrivateConfigManagerInterface):
                 config_ids.append(rid)
                 seen_ids.add(rid)
         for r in shared:
-            if r.get("resource_type") == self.RESOURCE_TYPE_CONFIG and r["resource_id"] not in seen_ids:
+            if (
+                r.get("resource_type") == self.RESOURCE_TYPE_CONFIG
+                and r["resource_id"] not in seen_ids
+            ):
                 rid = r["resource_id"]
                 config_ids.append(rid)
                 seen_ids.add(rid)
@@ -143,12 +152,16 @@ class PrivateConfigManager(PrivateConfigManagerInterface):
     async def query_datasets(self) -> list[dict]:
         return await self._data_processor.get_all_datasets()
 
-    async def upload_adapter(self, adapter_content: str, model_id: str, user_id: int) -> tuple[bool, str, int | None]:
+    async def upload_adapter(
+        self, adapter_content: str, model_id: str, user_id: int
+    ) -> tuple[bool, str, int | None]:
         valid, msg = self._data_processor.validate_file_format(adapter_content, "json")
         if not valid:
             return False, f"文件格式校验失败: {msg}", None
 
-        success, registered_id, error = await self._llm_registry.register_private_model(adapter_content, model_id)
+        success, registered_id, error = await self._llm_registry.register_private_model(
+            adapter_content, model_id
+        )
         if not success:
             return False, error, None
 
@@ -162,16 +175,26 @@ class PrivateConfigManager(PrivateConfigManagerInterface):
         await self._user_center.delete_resource(resource_id)
         return True, ""
 
-    async def upload_dataset(self, name: str, risk_type: str, samples: list[dict], user_id: int) -> tuple[bool, dict]:
+    async def upload_dataset(
+        self, name: str, risk_type: str, samples: list[dict], user_id: int
+    ) -> tuple[bool, dict]:
         if not name or not risk_type:
             return False, {"error": "name 和 risk_type 不能为空"}
         for i, s in enumerate(samples):
             if not isinstance(s, dict) or "poc" not in s or "subtype" not in s:
                 return False, {"error": f"样本[{i}]缺少必要字段 poc/subtype"}
         try:
-            resource_id = await self._user_center.register_resource(self.RESOURCE_TYPE_DATASET, user_id)
-            full_name = f"user_datasets/{resource_id}/{name}" if not name.startswith("user_datasets/") else name
-            result = await self._data_processor.import_private_dataset(full_name, risk_type, samples, resource_id)
+            resource_id = await self._user_center.register_resource(
+                self.RESOURCE_TYPE_DATASET, user_id
+            )
+            full_name = (
+                f"user_datasets/{resource_id}/{name}"
+                if not name.startswith("user_datasets/")
+                else name
+            )
+            result = await self._data_processor.import_private_dataset(
+                full_name, risk_type, samples, resource_id
+            )
             result["resource_id"] = resource_id
             return True, result
         except Exception as e:
@@ -213,7 +236,9 @@ class PrivateConfigManager(PrivateConfigManagerInterface):
 
         return success
 
-    async def add_custom_dataset(self, user_id: int, name: str, sample_count: int, file_path: str) -> tuple[int, int]:
+    async def add_custom_dataset(
+        self, user_id: int, name: str, sample_count: int, file_path: str
+    ) -> tuple[int, int]:
         """添加自定义数据集到数据库
 
         Returns:
@@ -221,7 +246,9 @@ class PrivateConfigManager(PrivateConfigManagerInterface):
         """
         resource_id = await self._user_center.register_resource(self.RESOURCE_TYPE_DATASET, user_id)
 
-        full_name = f"user_datasets/{resource_id}/{name}" if not name.startswith("user_datasets/") else name
+        full_name = (
+            f"user_datasets/{resource_id}/{name}" if not name.startswith("user_datasets/") else name
+        )
         dataset_id = await self._data_processor.add_dataset_record(
             name=full_name, sample_count=sample_count, file_path=file_path, resource_id=resource_id
         )
@@ -254,7 +281,9 @@ class PrivateConfigManager(PrivateConfigManagerInterface):
 
         return await self.create_config(user_id, config_content)
 
-    async def import_dataset_file(self, user_id: int, filename: str, content: bytes, username: str) -> dict:
+    async def import_dataset_file(
+        self, user_id: int, filename: str, content: bytes, username: str
+    ) -> dict:
         """导入用户数据集文件"""
         try:
             text_content = content.decode("utf-8")
@@ -317,13 +346,17 @@ class PrivateConfigManager(PrivateConfigManagerInterface):
     def get_adapter_info(self, model_id: str) -> dict:
         return self._llm_registry.get_adapter_info(model_id)
 
-    async def register_private_model(self, adapter_content: str, model_id: str) -> tuple[bool, str, str]:
+    async def register_private_model(
+        self, adapter_content: str, model_id: str
+    ) -> tuple[bool, str, str]:
         return await self._llm_registry.register_private_model(adapter_content, model_id)
 
     async def unregister_private_model(self, model_id: str) -> tuple[bool, str]:
         return await self._llm_registry.unregister_private_model(model_id)
 
-    async def export_dataset_file(self, dataset_id: int, username: str | None = None) -> dict | None:
+    async def export_dataset_file(
+        self, dataset_id: int, username: str | None = None
+    ) -> dict | None:
         """导出数据集文件"""
         datasets = await self.query_datasets()
         dataset = None
@@ -349,6 +382,7 @@ class PrivateConfigManager(PrivateConfigManagerInterface):
             file_path = base_path / f"{dataset_name}.jsonl"
 
         file_content = None
+
         def _json_default(obj):
             if isinstance(obj, datetime):
                 return obj.isoformat()
@@ -359,7 +393,9 @@ class PrivateConfigManager(PrivateConfigManagerInterface):
                 with open(file_path, "r", encoding="utf-8") as f:
                     file_content = f.read()
             except Exception:
-                file_content = json.dumps(dataset, ensure_ascii=False, indent=2, default=_json_default)
+                file_content = json.dumps(
+                    dataset, ensure_ascii=False, indent=2, default=_json_default
+                )
         else:
             file_content = json.dumps(dataset, ensure_ascii=False, indent=2, default=_json_default)
 

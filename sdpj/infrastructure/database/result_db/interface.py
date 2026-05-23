@@ -74,7 +74,9 @@ class ResultDBInterface(Protocol):
         """
         ...
 
-    async def list_task_groups(self, user_id: Optional[int] = None, model_id: Optional[str] = None) -> list[dict]:
+    async def list_task_groups(
+        self, user_id: Optional[int] = None, model_id: Optional[str] = None
+    ) -> list[dict]:
         """查询检测任务组列表
 
         Args:
@@ -124,7 +126,9 @@ class ResultDBInterface(Protocol):
         """
         ...
 
-    async def update_task_status(self, task_id: str, task_status: str, end_time: Optional[datetime] = None) -> bool:
+    async def update_task_status(
+        self, task_id: str, task_status: str, end_time: Optional[datetime] = None
+    ) -> bool:
         """更新检测任务状态
 
         Args:

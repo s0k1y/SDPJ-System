@@ -109,7 +109,9 @@ async def task_progress_ws(
             status = result["status"]
             if status != last_status:
                 last_status = status
-                await websocket.send_json({"type": "progress", "task_id": task_id, "status": status})
+                await websocket.send_json(
+                    {"type": "progress", "task_id": task_id, "status": status}
+                )
             if status in ("completed", "failed", "cancelled"):
                 break
             await asyncio.sleep(1)

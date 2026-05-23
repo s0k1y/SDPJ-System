@@ -48,7 +48,11 @@ class UserDBSessionManager:
                     cursor.close()
 
         self._session_factory = async_sessionmaker(
-            self._engine, class_=AsyncSession, expire_on_commit=False, autoflush=False, autocommit=False
+            self._engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+            autoflush=False,
+            autocommit=False,
         )
 
     async def initialize(self) -> None:
@@ -88,7 +92,9 @@ class UserDBSessionManager:
                                 else:
                                     default = f" DEFAULT {val}"
                         await conn.execute(
-                            text(f'ALTER TABLE "{table_name}" ADD COLUMN {col.name} {col_type}{nullable}{default}')
+                            text(
+                                f'ALTER TABLE "{table_name}" ADD COLUMN {col.name} {col_type}{nullable}{default}'
+                            )
                         )
 
     async def drop_tables(self) -> None:

@@ -1,4 +1,5 @@
 """result_parser 单元测试"""
+
 import pytest
 from sdpj.core.sdpj_detector.result_parser import (
     parse_compliance_judgment,

@@ -21,7 +21,9 @@ class DACManager(DACManagerInterface):
             return None
         return resource.get("owner_user_id")
 
-    async def grant_access(self, resource_id: int, target_username: str, caller_user_id: int) -> tuple[bool, str]:
+    async def grant_access(
+        self, resource_id: int, target_username: str, caller_user_id: int
+    ) -> tuple[bool, str]:
         owner_id = await self._get_resource_owner(resource_id)
         if owner_id is None:
             return False, "资源不存在"
@@ -61,13 +63,17 @@ class DACManager(DACManagerInterface):
             return True
         return await self._user_center.check_access(resource_id, user_id)
 
-    async def batch_check_accessible_resource_ids(self, user_id: int, resource_ids: list[int]) -> set[int]:
+    async def batch_check_accessible_resource_ids(
+        self, user_id: int, resource_ids: list[int]
+    ) -> set[int]:
         """批量查询用户在指定资源中有访问权限的资源 ID 集合"""
         if not resource_ids:
             return set()
         return await self._user_center.get_accessible_resource_ids(user_id, resource_ids)
 
-    async def get_access_list(self, resource_id: int, caller_user_id: int) -> tuple[bool, list[dict]]:
+    async def get_access_list(
+        self, resource_id: int, caller_user_id: int
+    ) -> tuple[bool, list[dict]]:
         owner_id = await self._get_resource_owner(resource_id)
         if owner_id is None:
             return False, []

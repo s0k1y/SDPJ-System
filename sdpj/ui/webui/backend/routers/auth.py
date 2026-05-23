@@ -26,10 +26,14 @@ def _get_or_create_rsa_keys():
             backend=default_backend(),
         )
         _rsa_private_key = key
-        _rsa_public_key = key.public_key().public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        ).decode("utf-8")
+        _rsa_public_key = (
+            key.public_key()
+            .public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo,
+            )
+            .decode("utf-8")
+        )
     return _rsa_public_key
 
 
@@ -46,7 +50,9 @@ async def register(
     result = await scheduler.schedule_user_auth(req.username, req.password, "register")
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result.get("message", "注册失败"))
-    return success_response(data={"user_id": result.get("user_id")}, message=result.get("message", ""))
+    return success_response(
+        data={"user_id": result.get("user_id")}, message=result.get("message", "")
+    )
 
 
 @router.post("/login")

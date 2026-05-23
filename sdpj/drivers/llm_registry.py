@@ -55,7 +55,10 @@ class LLMRegistry:
                 failed_models.append(f"{model_id}: {e}")
         if failed_models:
             import sys
-            print(f"[LLMRegistry] 以下适配器初始化失败: {', '.join(failed_models)}", file=sys.stderr)
+
+            print(
+                f"[LLMRegistry] 以下适配器初始化失败: {', '.join(failed_models)}", file=sys.stderr
+            )
             return False
         return True
 

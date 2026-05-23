@@ -55,7 +55,9 @@ class TaskRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_by_group_and_dataset(self, task_group_id: str, dataset_id: int) -> Optional[DetectionTask]:
+    async def get_by_group_and_dataset(
+        self, task_group_id: str, dataset_id: int
+    ) -> Optional[DetectionTask]:
         stmt = select(DetectionTask).where(
             DetectionTask.task_group_id == task_group_id,
             DetectionTask.dataset_id == dataset_id,
@@ -77,7 +79,11 @@ class TaskRepository:
         return list(result.scalars().all())
 
     async def update_status(
-        self, task_id: str, task_status: str, end_time: Optional[datetime] = None, error_message: Optional[str] = None
+        self,
+        task_id: str,
+        task_status: str,
+        end_time: Optional[datetime] = None,
+        error_message: Optional[str] = None,
     ) -> bool:
         """更新任务状态
 

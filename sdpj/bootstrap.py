@@ -82,7 +82,9 @@ def build_scheduler() -> StateSchedulerInterface:
         config_manager=PrivateConfigManager(dp, uc, reg),
         report_manager=ReportManager(dp, uc),
         detector=SDPJDetector(dp, llm),
-        event_logger=EventLogger(result_db=result_db, output_targets={"memory", "database", "console"}),
+        event_logger=EventLogger(
+            result_db=result_db, output_targets={"memory", "database", "console"}
+        ),
         task_queue_manager=TaskQueueManager(session_manager=result_sm, persistence=result_db),
         db_initializer=_init_db,
     )

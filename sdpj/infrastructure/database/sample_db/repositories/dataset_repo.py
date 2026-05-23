@@ -96,7 +96,11 @@ class DatasetRepository:
             .label("sample_count")
         )
         builtin_first = case((Dataset.resource_id == None, 0), else_=1)
-        stmt = select(Dataset, count_subq).options(noload(Dataset.samples)).order_by(builtin_first, Dataset.dataset_id)
+        stmt = (
+            select(Dataset, count_subq)
+            .options(noload(Dataset.samples))
+            .order_by(builtin_first, Dataset.dataset_id)
+        )
         result = await self.session.execute(stmt)
         rows = result.all()
         return [

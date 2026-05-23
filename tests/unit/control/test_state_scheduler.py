@@ -1,4 +1,5 @@
 """StateScheduler 单元测试 — 聚焦 start_detection 状态守卫逻辑"""
+
 import asyncio
 import pytest
 
@@ -10,29 +11,52 @@ from tests.fixtures.sample_data import REAL_MODEL_ID, REAL_MODEL_ID_2
 
 
 class _StubAccountManager:
-    async def authenticate(self, *a, **kw): return {"success": True}
+    async def authenticate(self, *a, **kw):
+        return {"success": True}
+
 
 class _StubDACManager:
-    async def check_access(self, *a, **kw): return True
+    async def check_access(self, *a, **kw):
+        return True
+
 
 class _StubConfigManager:
-    async def read_config(self, *a, **kw): return None
-    async def query_datasets(self, *a, **kw): return []
-    async def is_model_available(self, model_id): return (True, None)
-    async def initialize_registry(self): pass
-    async def shutdown_registry(self): pass
-    async def register_private_model(self, *a, **kw): return (True, None, None)
+    async def read_config(self, *a, **kw):
+        return None
+
+    async def query_datasets(self, *a, **kw):
+        return []
+
+    async def is_model_available(self, model_id):
+        return (True, None)
+
+    async def initialize_registry(self):
+        pass
+
+    async def shutdown_registry(self):
+        pass
+
+    async def register_private_model(self, *a, **kw):
+        return (True, None, None)
+
 
 class _StubReportManager:
     pass
 
+
 class _StubDetector:
     pass
 
+
 class _StubEventLogger:
-    def log_operation(self, *a, **kw): pass
-    def log_runtime(self, *a, **kw): pass
-    def log_error(self, *a, **kw): pass
+    def log_operation(self, *a, **kw):
+        pass
+
+    def log_runtime(self, *a, **kw):
+        pass
+
+    def log_error(self, *a, **kw):
+        pass
 
 
 def _make_scheduler() -> StateScheduler:
@@ -60,11 +84,14 @@ class TestStartDetectionStateGuard:
         scheduler = _make_scheduler()
         assert _state_val(scheduler) == "idle"
 
-        result = await scheduler.start_detection(1, {
-            "model_id": REAL_MODEL_ID,
-            "detection_type": "static",
-            "dataset_ids": [1],
-        })
+        result = await scheduler.start_detection(
+            1,
+            {
+                "model_id": REAL_MODEL_ID,
+                "detection_type": "static",
+                "dataset_ids": [1],
+            },
+        )
 
         assert result["success"] is True
         assert _state_val(scheduler) == "detecting"
@@ -81,25 +108,46 @@ class _StubReportManagerForDelete:
 
     async def list_reports(self, **kwargs):
         if self._deleted:
-            return [g for g in self._existing_groups
-                    if g["task_group_id"] not in kwargs.get("_deleted_ids", set())]
+            return [
+                g
+                for g in self._existing_groups
+                if g["task_group_id"] not in kwargs.get("_deleted_ids", set())
+            ]
         return list(self._existing_groups)
 
 
 class _StubConfigManagerWithDatasets:
-    async def read_config(self, *a, **kw): return None
-    async def query_datasets(self, *a, **kw): return []
-    async def read_configs_batch(self, ids): return {}
-    async def is_model_available(self, model_id): return (True, None)
-    async def initialize_registry(self): pass
-    async def shutdown_registry(self): pass
-    async def register_private_model(self, *a, **kw): return (True, None, None)
+    async def read_config(self, *a, **kw):
+        return None
+
+    async def query_datasets(self, *a, **kw):
+        return []
+
+    async def read_configs_batch(self, ids):
+        return {}
+
+    async def is_model_available(self, model_id):
+        return (True, None)
+
+    async def initialize_registry(self):
+        pass
+
+    async def shutdown_registry(self):
+        pass
+
+    async def register_private_model(self, *a, **kw):
+        return (True, None, None)
 
 
 class _StubEventLoggerWithLog:
-    def log_operation(self, *a, **kw): pass
-    def log_runtime(self, *a, **kw): pass
-    def log_error(self, *a, **kw): pass
+    def log_operation(self, *a, **kw):
+        pass
+
+    def log_runtime(self, *a, **kw):
+        pass
+
+    def log_error(self, *a, **kw):
+        pass
 
 
 def _make_scheduler_with_stubs(report_mgr=None) -> StateScheduler:
@@ -122,11 +170,14 @@ class TestDeleteReportSyncsTaskQueue:
         """删除任务组报告后，内存队列中对应任务应被移除"""
         scheduler = _make_scheduler_with_stubs()
 
-        result = await scheduler.start_detection(1, {
-            "model_id": REAL_MODEL_ID,
-            "detection_type": "static",
-            "dataset_ids": [1],
-        })
+        result = await scheduler.start_detection(
+            1,
+            {
+                "model_id": REAL_MODEL_ID,
+                "detection_type": "static",
+                "dataset_ids": [1],
+            },
+        )
         assert result["success"] is True
         task_group_id = result["task_group_id"]
 
@@ -146,11 +197,14 @@ class TestDeleteReportSyncsTaskQueue:
         """删除单个任务报告后，内存队列中对应任务应被移除"""
         scheduler = _make_scheduler_with_stubs()
 
-        result = await scheduler.start_detection(1, {
-            "model_id": REAL_MODEL_ID,
-            "detection_type": "static",
-            "dataset_ids": [1, 2],
-        })
+        result = await scheduler.start_detection(
+            1,
+            {
+                "model_id": REAL_MODEL_ID,
+                "detection_type": "static",
+                "dataset_ids": [1, 2],
+            },
+        )
         assert result["success"] is True
         task_id = result["task_ids"][0]
 
@@ -168,11 +222,14 @@ class TestDeleteReportSyncsTaskQueue:
         report_mgr = _StubReportManagerForDelete(existing_groups=existing_groups)
         scheduler = _make_scheduler_with_stubs(report_mgr=report_mgr)
 
-        result = await scheduler.start_detection(1, {
-            "model_id": REAL_MODEL_ID,
-            "detection_type": "static",
-            "dataset_ids": [1],
-        })
+        result = await scheduler.start_detection(
+            1,
+            {
+                "model_id": REAL_MODEL_ID,
+                "detection_type": "static",
+                "dataset_ids": [1],
+            },
+        )
         task_group_id = result["task_group_id"]
 
         for tid in result["task_ids"]:
@@ -196,11 +253,14 @@ class TestDeleteReportSyncsTaskQueue:
         report_mgr = _StubReportManagerForDelete(existing_groups=existing_groups)
         scheduler = _make_scheduler_with_stubs(report_mgr=report_mgr)
 
-        result = await scheduler.start_detection(1, {
-            "model_id": REAL_MODEL_ID,
-            "detection_type": "static",
-            "dataset_ids": [1],
-        })
+        result = await scheduler.start_detection(
+            1,
+            {
+                "model_id": REAL_MODEL_ID,
+                "detection_type": "static",
+                "dataset_ids": [1],
+            },
+        )
         task_group_id = result["task_group_id"]
 
         progress = await scheduler.query_detection_progress()
@@ -213,11 +273,14 @@ class TestDeleteReportSyncsTaskQueue:
         """清理任务队列异常不应导致删除报告操作失败"""
         scheduler = _make_scheduler_with_stubs()
 
-        result = await scheduler.start_detection(1, {
-            "model_id": REAL_MODEL_ID,
-            "detection_type": "static",
-            "dataset_ids": [1],
-        })
+        result = await scheduler.start_detection(
+            1,
+            {
+                "model_id": REAL_MODEL_ID,
+                "detection_type": "static",
+                "dataset_ids": [1],
+            },
+        )
         task_group_id = result["task_group_id"]
 
         original_cleanup = scheduler._cleanup_task_queue_after_report_delete
@@ -234,19 +297,25 @@ class TestDeleteReportSyncsTaskQueue:
         """detecting 状态下 start_detection 应允许新任务入队（核心BUG修复验证）"""
         scheduler = _make_scheduler()
 
-        result1 = await scheduler.start_detection(1, {
-            "model_id": REAL_MODEL_ID,
-            "detection_type": "static",
-            "dataset_ids": [1],
-        })
+        result1 = await scheduler.start_detection(
+            1,
+            {
+                "model_id": REAL_MODEL_ID,
+                "detection_type": "static",
+                "dataset_ids": [1],
+            },
+        )
         assert result1["success"] is True
         assert _state_val(scheduler) == "detecting"
 
-        result2 = await scheduler.start_detection(1, {
-            "model_id": REAL_MODEL_ID,
-            "detection_type": "static",
-            "dataset_ids": [2],
-        })
+        result2 = await scheduler.start_detection(
+            1,
+            {
+                "model_id": REAL_MODEL_ID,
+                "detection_type": "static",
+                "dataset_ids": [2],
+            },
+        )
         assert result2["success"] is True
         assert result2["task_group_id"] is not None
         assert len(result2["task_ids"]) == 1
@@ -256,30 +325,39 @@ class TestDeleteReportSyncsTaskQueue:
         """detecting 状态下连续多次入队均应成功"""
         scheduler = _make_scheduler()
 
-        await scheduler.start_detection(1, {
-            "model_id": REAL_MODEL_ID,
-            "detection_type": "static",
-            "dataset_ids": [1],
-        })
-
-        for i in range(3):
-            result = await scheduler.start_detection(1, {
+        await scheduler.start_detection(
+            1,
+            {
                 "model_id": REAL_MODEL_ID,
                 "detection_type": "static",
-                "dataset_ids": [10 + i],
-            })
-            assert result["success"] is True, f"第{i+1}次入队应成功"
+                "dataset_ids": [1],
+            },
+        )
+
+        for i in range(3):
+            result = await scheduler.start_detection(
+                1,
+                {
+                    "model_id": REAL_MODEL_ID,
+                    "detection_type": "static",
+                    "dataset_ids": [10 + i],
+                },
+            )
+            assert result["success"] is True, f"第{i + 1}次入队应成功"
 
     async def test_generating_report_state_rejects_detection(self):
         """generating_report 状态下应拒绝启动检测"""
         scheduler = _make_scheduler()
         scheduler._fsm.start_report()
 
-        result = await scheduler.start_detection(1, {
-            "model_id": REAL_MODEL_ID,
-            "detection_type": "static",
-            "dataset_ids": [1],
-        })
+        result = await scheduler.start_detection(
+            1,
+            {
+                "model_id": REAL_MODEL_ID,
+                "detection_type": "static",
+                "dataset_ids": [1],
+            },
+        )
 
         assert result["success"] is False
         assert "不允许" in result["error"]
@@ -289,11 +367,14 @@ class TestDeleteReportSyncsTaskQueue:
         scheduler = _make_scheduler()
         scheduler._fsm.to_error()
 
-        result = await scheduler.start_detection(1, {
-            "model_id": REAL_MODEL_ID,
-            "detection_type": "static",
-            "dataset_ids": [1],
-        })
+        result = await scheduler.start_detection(
+            1,
+            {
+                "model_id": REAL_MODEL_ID,
+                "detection_type": "static",
+                "dataset_ids": [1],
+            },
+        )
 
         assert result["success"] is False
         assert "不允许" in result["error"]
@@ -303,11 +384,14 @@ class TestDeleteReportSyncsTaskQueue:
         scheduler = _make_scheduler()
         scheduler._fsm.start_configuring()
 
-        result = await scheduler.start_detection(1, {
-            "model_id": REAL_MODEL_ID,
-            "detection_type": "static",
-            "dataset_ids": [1],
-        })
+        result = await scheduler.start_detection(
+            1,
+            {
+                "model_id": REAL_MODEL_ID,
+                "detection_type": "static",
+                "dataset_ids": [1],
+            },
+        )
 
         assert result["success"] is False
         assert "不允许" in result["error"]
@@ -316,20 +400,26 @@ class TestDeleteReportSyncsTaskQueue:
         """idle→detecting→idle 后应能正常再次入队"""
         scheduler = _make_scheduler()
 
-        await scheduler.start_detection(1, {
-            "model_id": REAL_MODEL_ID,
-            "detection_type": "static",
-            "dataset_ids": [1],
-        })
+        await scheduler.start_detection(
+            1,
+            {
+                "model_id": REAL_MODEL_ID,
+                "detection_type": "static",
+                "dataset_ids": [1],
+            },
+        )
         assert _state_val(scheduler) == "detecting"
 
         scheduler._fsm.detection_done()
         assert _state_val(scheduler) == "idle"
 
-        result = await scheduler.start_detection(1, {
-            "model_id": REAL_MODEL_ID,
-            "detection_type": "static",
-            "dataset_ids": [2],
-        })
+        result = await scheduler.start_detection(
+            1,
+            {
+                "model_id": REAL_MODEL_ID,
+                "detection_type": "static",
+                "dataset_ids": [2],
+            },
+        )
         assert result["success"] is True
         assert _state_val(scheduler) == "detecting"

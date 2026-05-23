@@ -20,6 +20,7 @@ async def async_session():
     """创建测试用的异步数据库会话"""
     from sdpj.infrastructure.database.user_db.models import User  # noqa
     from sdpj.infrastructure.database.sample_db.models import Dataset  # noqa
+
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
 
     async with engine.begin() as conn:
@@ -28,15 +29,19 @@ async def async_session():
     async_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async with async_session_maker() as session:
-        session.add_all([
-            User(username="user_001", password="pw"),
-            User(username="user_002", password="pw"),
-        ])
+        session.add_all(
+            [
+                User(username="user_001", password="pw"),
+                User(username="user_002", password="pw"),
+            ]
+        )
         await session.flush()
-        session.add_all([
-            Dataset(name="dataset_001", risk_type="jailbreak"),
-            Dataset(name="dataset_002", risk_type="injection"),
-        ])
+        session.add_all(
+            [
+                Dataset(name="dataset_001", risk_type="jailbreak"),
+                Dataset(name="dataset_002", risk_type="injection"),
+            ]
+        )
         await session.commit()
 
     async with async_session_maker() as session:
@@ -47,6 +52,7 @@ async def async_session():
 
 
 # ==================== TaskGroupRepository 测试 ====================
+
 
 @pytest.mark.asyncio
 async def test_task_group_repo_create(async_session):
@@ -111,6 +117,7 @@ async def test_task_group_repo_delete(async_session):
 
 # ==================== TaskRepository 测试 ====================
 
+
 @pytest.mark.asyncio
 async def test_task_repo_create(async_session):
     """测试创建检测任务"""
@@ -124,6 +131,7 @@ async def test_task_repo_create(async_session):
     assert task.task_id == "task_001"
     assert task.task_status == "running"
     assert task.end_time is None
+
 
 @pytest.mark.asyncio
 async def test_task_repo_get_by_id(async_session):
@@ -194,7 +202,9 @@ async def test_task_repo_delete(async_session):
     task = await repo.get_by_id("task_001")
     assert task is None
 
+
 # ==================== ReportRepository 测试 ====================
+
 
 @pytest.mark.asyncio
 async def test_report_repo_create(async_session):
@@ -255,6 +265,7 @@ async def test_report_repo_list_all(async_session):
 
 # ==================== ResultDataRepository 测试 ====================
 
+
 @pytest.mark.asyncio
 async def test_result_data_repo_create(async_session):
     """测试创建结果数据"""
@@ -269,12 +280,7 @@ async def test_result_data_repo_create(async_session):
 
     repo = ResultDataRepository(async_session)
     result_data = await repo.create(
-        "result_001",
-        "report_001",
-        "prompt_injection",
-        "Test PoC",
-        "Test output",
-        "non_compliant"
+        "result_001", "report_001", "prompt_injection", "Test PoC", "Test output", "non_compliant"
     )
 
     assert result_data.result_data_id == "result_001"
@@ -294,7 +300,9 @@ async def test_result_data_repo_list_by_report(async_session):
     await report_repo.create("report_001", "task_001")
 
     repo = ResultDataRepository(async_session)
-    await repo.create("result_001", "report_001", "prompt_injection", "PoC 1", "Output 1", "non_compliant")
+    await repo.create(
+        "result_001", "report_001", "prompt_injection", "PoC 1", "Output 1", "non_compliant"
+    )
     await repo.create("result_002", "report_001", "jailbreak", "PoC 2", "Output 2", "compliant")
 
     result_data_list = await repo.list_by_report("report_001")
@@ -314,7 +322,9 @@ async def test_result_data_repo_delete(async_session):
     await report_repo.create("report_001", "task_001")
 
     repo = ResultDataRepository(async_session)
-    await repo.create("result_001", "report_001", "prompt_injection", "PoC", "Output", "non_compliant")
+    await repo.create(
+        "result_001", "report_001", "prompt_injection", "PoC", "Output", "non_compliant"
+    )
 
     result = await repo.delete("result_001")
     assert result is True

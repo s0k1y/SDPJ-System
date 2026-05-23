@@ -41,7 +41,9 @@ def create_config(ctx, model, request_format, api_key, base_url, timeout, max_rp
     }
     user_id = ctx.obj.require_login()
     result = asyncio.run(
-        ctx.obj.scheduler.schedule_config_operation("create", {"user_id": user_id, "config_content": content})
+        ctx.obj.scheduler.schedule_config_operation(
+            "create", {"user_id": user_id, "config_content": content}
+        )
     )
     data = unwrap(result)
     output.success(f"配置已创建, ID: {data.get('config_id')}")
@@ -59,7 +61,14 @@ def list_configs(ctx):
     if not configs:
         output.info("暂无配置")
         return
-    rows = [[str(c.get("config_id", "")), c.get("content", {}).get("model_id") or c.get("content", {}).get("model", ""), c.get("content", {}).get("request_format", "")] for c in configs]
+    rows = [
+        [
+            str(c.get("config_id", "")),
+            c.get("content", {}).get("model_id") or c.get("content", {}).get("model", ""),
+            c.get("content", {}).get("request_format", ""),
+        ]
+        for c in configs
+    ]
     output.table(["ID", "模型", "请求格式"], rows)
 
 
@@ -70,7 +79,9 @@ def view_config(ctx, config_id):
     """读取私有检测配置"""
     user_id = ctx.obj.require_login()
     result = asyncio.run(
-        ctx.obj.scheduler.schedule_config_operation("read", {"user_id": user_id, "config_id": config_id})
+        ctx.obj.scheduler.schedule_config_operation(
+            "read", {"user_id": user_id, "config_id": config_id}
+        )
     )
     data = unwrap(result, required="config")
     output.kv(data["config"])
@@ -86,7 +97,9 @@ def view_config(ctx, config_id):
 @click.option("--max-rps", required=True, type=float, help="每秒最大请求数")
 @click.option("--max-concurrency", required=True, type=int, help="最大并发数")
 @click.pass_context
-def update_config(ctx, config_id, model, request_format, api_key, base_url, timeout, max_rps, max_concurrency):
+def update_config(
+    ctx, config_id, model, request_format, api_key, base_url, timeout, max_rps, max_concurrency
+):
     """更新私有检测配置"""
     content = {
         "model": model,
@@ -116,7 +129,9 @@ def delete_config(ctx, config_id):
     """删除私有检测配置"""
     user_id = ctx.obj.require_login()
     result = asyncio.run(
-        ctx.obj.scheduler.schedule_config_operation("delete", {"user_id": user_id, "config_id": config_id})
+        ctx.obj.scheduler.schedule_config_operation(
+            "delete", {"user_id": user_id, "config_id": config_id}
+        )
     )
     unwrap(result)
     output.success("配置已删除")
@@ -137,7 +152,9 @@ def import_config(ctx, file_path):
     with open(abs_path, "r", encoding="utf-8") as f:
         content = f.read()
     result = asyncio.run(
-        ctx.obj.scheduler.schedule_config_operation("import", {"user_id": user_id, "file_content": content})
+        ctx.obj.scheduler.schedule_config_operation(
+            "import", {"user_id": user_id, "file_content": content}
+        )
     )
     data = unwrap(result)
     output.success(f"配置已导入, ID: {data.get('config_id')}")
@@ -178,7 +195,9 @@ def verify_config(ctx, config_id):
     """测试私有检测配置的可用性"""
     user_id = ctx.obj.require_login()
     result = asyncio.run(
-        ctx.obj.scheduler.schedule_config_operation("verify", {"user_id": user_id, "config_id": config_id})
+        ctx.obj.scheduler.schedule_config_operation(
+            "verify", {"user_id": user_id, "config_id": config_id}
+        )
     )
     data = unwrap(result)
     status_info = data.get("result", {})
@@ -195,7 +214,9 @@ def verify_config(ctx, config_id):
     label = status_labels.get(status, f"未知状态 ({status})")
 
     if status == "ok":
-        output.success(f"{label}  |  模型: {status_info.get('model', '-')}  |  延迟: {status_info.get('latency_ms', '-')}ms")
+        output.success(
+            f"{label}  |  模型: {status_info.get('model', '-')}  |  延迟: {status_info.get('latency_ms', '-')}ms"
+        )
         preview = status_info.get("response_preview", "")
         if preview:
             output.info(f"响应预览: {preview}")
@@ -252,7 +273,9 @@ def remove_dataset(ctx, dataset_id, resource_id):
     params = {"user_id": user_id, "dataset_id": dataset_id}
     if resource_id is not None:
         params["resource_id"] = resource_id
-    result = asyncio.run(ctx.obj.scheduler.schedule_private_resource_operation("remove_dataset", params))
+    result = asyncio.run(
+        ctx.obj.scheduler.schedule_private_resource_operation("remove_dataset", params)
+    )
     unwrap(result)
     output.success("数据集已移除")
 
@@ -302,7 +325,10 @@ def dataset_list(ctx):
     if not ds_list:
         output.info("暂无可用数据集")
         return
-    rows = [[str(d.get("dataset_id", "")), d.get("name", ""), str(d.get("sample_count", 0))] for d in ds_list]
+    rows = [
+        [str(d.get("dataset_id", "")), d.get("name", ""), str(d.get("sample_count", 0))]
+        for d in ds_list
+    ]
     output.table(["ID", "名称", "样本数"], rows)
 
 

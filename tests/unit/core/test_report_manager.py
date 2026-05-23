@@ -59,16 +59,20 @@ async def test_generate_static_report():
 @pytest.mark.asyncio
 async def test_list_reports():
     mgr, dp, uc = make_manager()
-    dp.list_reports_summary = AsyncMock(return_value=[{
-        "task_group_id": "tg_1",
-        "user_id": "1",
-        "model_id": "gpt-4",
-        "compliance_rate": 80.0,
-        "risk_level": "中风险",
-        "subtype_compliance": [],
-        "status": "completed",
-        "children": [],
-    }])
+    dp.list_reports_summary = AsyncMock(
+        return_value=[
+            {
+                "task_group_id": "tg_1",
+                "user_id": "1",
+                "model_id": "gpt-4",
+                "compliance_rate": 80.0,
+                "risk_level": "中风险",
+                "subtype_compliance": [],
+                "status": "completed",
+                "children": [],
+            }
+        ]
+    )
     uc.get_user_by_id = AsyncMock(return_value={"username": "alice"})
     result = await mgr.list_reports()
     assert len(result) == 1
@@ -198,4 +202,3 @@ async def test_export_report_with_none_task_group_id_still_proceeds():
     filename, content = await mgr.export_report(None, "jsonl", user_id=1)
     assert dp.aggregate_task_group_results.call_count == 2
     dp.export_report_file.assert_called_once()
-

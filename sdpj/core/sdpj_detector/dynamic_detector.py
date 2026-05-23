@@ -101,15 +101,25 @@ async def run_dynamic_detection(
                     for _ in range(max_iterations):
                         sample_iterations += 1
                         try:
-                            mut_input = prompt_builder.build_mutation_input(attack_template, iter_poc, iter_output)
-                            mut_resp = await _call_llm(llm, instance, "", mut_input, _limiter, llm_callback)
+                            mut_input = prompt_builder.build_mutation_input(
+                                attack_template, iter_poc, iter_output
+                            )
+                            mut_resp = await _call_llm(
+                                llm, instance, "", mut_input, _limiter, llm_callback
+                            )
                             mutated_poc = result_parser.extract_model_output(mut_resp)
 
-                            resp = await _call_llm(llm, instance, "", mutated_poc, _limiter, llm_callback)
+                            resp = await _call_llm(
+                                llm, instance, "", mutated_poc, _limiter, llm_callback
+                            )
                             output_text = result_parser.extract_model_output(resp)
 
-                            judge_input = prompt_builder.build_judge_input(judge_template, output_text)
-                            judge_resp = await _call_llm(llm, instance, "", judge_input, _limiter, llm_callback)
+                            judge_input = prompt_builder.build_judge_input(
+                                judge_template, output_text
+                            )
+                            judge_resp = await _call_llm(
+                                llm, instance, "", judge_input, _limiter, llm_callback
+                            )
                             judgment = result_parser.parse_compliance_judgment(judge_resp)
 
                             iter_output = output_text
@@ -135,13 +145,18 @@ async def run_dynamic_detection(
             }
 
         compliant_results = []
+
         async def _process_compliant_tracked(rd):
             nonlocal total_iterations, dynamic_sample_count
             result = await _process_compliant(rd)
             total_iterations += result["iteration_count"]
             dynamic_sample_count += 1
             if dynamic_progress_callback is not None:
-                avg_iter = round(total_iterations / dynamic_sample_count, 2) if dynamic_sample_count else 0.0
+                avg_iter = (
+                    round(total_iterations / dynamic_sample_count, 2)
+                    if dynamic_sample_count
+                    else 0.0
+                )
                 dynamic_progress_callback(dynamic_sample_count, total_compliant, avg_iter)
             return result
 
@@ -154,7 +169,15 @@ async def run_dynamic_detection(
         if batch_entries:
             await data_processor.append_result_data_batch(dyn_report_id, batch_entries)
 
-        await data_processor.update_task_status(dyn_task_id, "completed", datetime.now(timezone.utc))
+        await data_processor.update_task_status(
+            dyn_task_id, "completed", datetime.now(timezone.utc)
+        )
 
-    avg_iteration_count = round(total_iterations / dynamic_sample_count, 2) if dynamic_sample_count else 0.0
-    return {"status": "completed", "task_group_id": task_group_id, "avg_iteration_count": avg_iteration_count}
+    avg_iteration_count = (
+        round(total_iterations / dynamic_sample_count, 2) if dynamic_sample_count else 0.0
+    )
+    return {
+        "status": "completed",
+        "task_group_id": task_group_id,
+        "avg_iteration_count": avg_iteration_count,
+    }

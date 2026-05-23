@@ -1,4 +1,5 @@
 """AccountManager 单元测试"""
+
 import pytest
 from unittest.mock import AsyncMock
 
@@ -30,7 +31,9 @@ class TestRegister:
         assert not ok and uid is None
 
     async def test_duplicate_raises(self):
-        def _raise(u, p): raise ValueError("已存在")
+        def _raise(u, p):
+            raise ValueError("已存在")
+
         mgr = AccountManager(_uc(register_user=_raise))
         ok, uid, msg = await mgr.register("alice", "password123")
         assert not ok and uid is None and "已存在" in msg
@@ -64,25 +67,31 @@ class TestLogout:
 @pytest.mark.asyncio
 class TestChangePassword:
     async def test_user_not_found(self):
-        mgr = AccountManager(_uc(
-            get_user_by_id=lambda uid: None,
-        ))
+        mgr = AccountManager(
+            _uc(
+                get_user_by_id=lambda uid: None,
+            )
+        )
         ok, msg = await mgr.change_password_for_user(0, "old", "newpass123")
         assert not ok
 
     async def test_wrong_old_password(self):
-        mgr = AccountManager(_uc(
-            get_user_by_id=lambda uid: {"username": "alice"},
-            verify_credentials=lambda u, p: (False, None, "密码错误"),
-        ))
+        mgr = AccountManager(
+            _uc(
+                get_user_by_id=lambda uid: {"username": "alice"},
+                verify_credentials=lambda u, p: (False, None, "密码错误"),
+            )
+        )
         ok, _ = await mgr.change_password_for_user(1, "wrong", "newpass123")
         assert not ok
 
     async def test_success(self):
-        mgr = AccountManager(_uc(
-            get_user_by_id=lambda uid: {"username": "alice"},
-            verify_credentials=lambda u, p: (True, 1, ""),
-            update_user_password=lambda uid, pw: True,
-        ))
+        mgr = AccountManager(
+            _uc(
+                get_user_by_id=lambda uid: {"username": "alice"},
+                verify_credentials=lambda u, p: (True, 1, ""),
+                update_user_password=lambda uid, pw: True,
+            )
+        )
         ok, _ = await mgr.change_password_for_user(1, "old", "newpass123")
         assert ok

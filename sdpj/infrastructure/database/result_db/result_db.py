@@ -65,17 +65,28 @@ class ResultDB:
             task_group = await TaskGroupRepository(session).create(user_id, model_id)
             return task_group.task_group_id
 
-    async def create_task_group_with_id(self, task_group_id: str, user_id: int, model_id: str) -> str:
-        print(f"[DEBUG ResultDB] create_task_group_with_id: task_group_id={task_group_id}, user_id={user_id}, model_id={model_id}", flush=True)
+    async def create_task_group_with_id(
+        self, task_group_id: str, user_id: int, model_id: str
+    ) -> str:
+        print(
+            f"[DEBUG ResultDB] create_task_group_with_id: task_group_id={task_group_id}, user_id={user_id}, model_id={model_id}",
+            flush=True,
+        )
         async with self.session_manager.session() as session:
             await TargetModelRepository(session).register(model_id)
             tg_repo = TaskGroupRepository(session)
             existing = await tg_repo.get_by_id(task_group_id)
             if existing is not None:
-                print(f"[DEBUG ResultDB] create_task_group_with_id: 任务组已存在，跳过创建 (existing={existing.task_group_id})", flush=True)
+                print(
+                    f"[DEBUG ResultDB] create_task_group_with_id: 任务组已存在，跳过创建 (existing={existing.task_group_id})",
+                    flush=True,
+                )
                 return existing.task_group_id
             task_group = await tg_repo.create_with_id(task_group_id, user_id, model_id)
-            print(f"[DEBUG ResultDB] create_task_group_with_id 写入完成: {task_group.task_group_id}", flush=True)
+            print(
+                f"[DEBUG ResultDB] create_task_group_with_id 写入完成: {task_group.task_group_id}",
+                flush=True,
+            )
             return task_group.task_group_id
 
     async def delete_task_group(self, task_group_id: str) -> bool:
@@ -91,7 +102,9 @@ class ResultDB:
             task_group_repo = TaskGroupRepository(session)
             return await task_group_repo.delete(task_group_id)
 
-    async def list_task_groups(self, user_id: Optional[int] = None, model_id: Optional[str] = None) -> list[dict]:
+    async def list_task_groups(
+        self, user_id: Optional[int] = None, model_id: Optional[str] = None
+    ) -> list[dict]:
         """查询检测任务组列表
 
         Args:
@@ -151,7 +164,10 @@ class ResultDB:
         metadata_json: Optional[dict] = None,
         task_id: Optional[str] = None,
     ) -> str:
-        print(f"[DEBUG ResultDB] create_detection_task: task_group_id={task_group_id}, dataset_id={dataset_id}, task_status={task_status}", flush=True)
+        print(
+            f"[DEBUG ResultDB] create_detection_task: task_group_id={task_group_id}, dataset_id={dataset_id}, task_status={task_status}",
+            flush=True,
+        )
         async with self.session_manager.session() as session:
             task_repo = TaskRepository(session)
 
@@ -168,7 +184,10 @@ class ResultDB:
 
             task_group_repo = TaskGroupRepository(session)
             tg_check = await task_group_repo.get_by_id(task_group_id)
-            print(f"[DEBUG ResultDB] create_detection_task: 检查任务组存在性 -> tg_check={'存在' if tg_check else '不存在'}", flush=True)
+            print(
+                f"[DEBUG ResultDB] create_detection_task: 检查任务组存在性 -> tg_check={'存在' if tg_check else '不存在'}",
+                flush=True,
+            )
             if tg_check is None:
                 raise ValueError(f"任务组ID '{task_group_id}' 不存在")
 
@@ -178,13 +197,23 @@ class ResultDB:
                 task_id = f"task_{uuid.uuid4().hex[:16]}"
 
             await task_repo.create(
-                task_id, task_group_id, dataset_id, task_status, start_time, algorithm_type, metadata_json
+                task_id,
+                task_group_id,
+                dataset_id,
+                task_status,
+                start_time,
+                algorithm_type,
+                metadata_json,
             )
 
             return task_id
 
     async def update_task_status(
-        self, task_id: str, task_status: str, end_time: Optional[datetime] = None, error_message: Optional[str] = None
+        self,
+        task_id: str,
+        task_status: str,
+        end_time: Optional[datetime] = None,
+        error_message: Optional[str] = None,
     ) -> bool:
         """更新检测任务状态
 
@@ -486,7 +515,13 @@ class ResultDB:
             # 创建结果数据
             result_data_repo = ResultDataRepository(session)
             await result_data_repo.create(
-                result_data_id, report_id, risk_subclass, poc, model_output, compliance_result, iteration_count
+                result_data_id,
+                report_id,
+                risk_subclass,
+                poc,
+                model_output,
+                compliance_result,
+                iteration_count,
             )
 
             return result_data_id
@@ -861,7 +896,9 @@ class ResultDB:
                             "total": sr.total,
                             "passed": int(sr.passed or 0),
                             "failed": sr.total - int(sr.passed or 0),
-                            "rate": round(int(sr.passed or 0) / sr.total * 100, 2) if sr.total else 0.0,
+                            "rate": round(int(sr.passed or 0) / sr.total * 100, 2)
+                            if sr.total
+                            else 0.0,
                         }
                     )
 
@@ -874,7 +911,9 @@ class ResultDB:
                 rate = compliant / total
                 return {
                     "compliance_rate": round(rate * 100, 2),
-                    "risk_level": "低风险" if rate >= 0.9 else ("中风险" if rate >= 0.7 else "高风险"),
+                    "risk_level": "低风险"
+                    if rate >= 0.9
+                    else ("中风险" if rate >= 0.7 else "高风险"),
                 }
 
             groups_map: dict[str, dict] = {}
@@ -944,7 +983,9 @@ class ResultDB:
                             "total": st["total"],
                             "passed": st["passed"],
                             "failed": failed,
-                            "rate": round(st["passed"] / st["total"] * 100, 2) if st["total"] else 0.0,
+                            "rate": round(st["passed"] / st["total"] * 100, 2)
+                            if st["total"]
+                            else 0.0,
                         }
                     )
 

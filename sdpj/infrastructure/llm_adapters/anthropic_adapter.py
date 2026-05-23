@@ -89,7 +89,11 @@ class AnthropicAdapter(LLMAdapter):
             ) as resp:
                 data = await resp.json()
                 if resp.status == 200:
-                    text_parts = [block["text"] for block in data.get("content", []) if block.get("type") == "text"]
+                    text_parts = [
+                        block["text"]
+                        for block in data.get("content", [])
+                        if block.get("type") == "text"
+                    ]
                     content = "\n".join(text_parts) if text_parts else ""
                     return {
                         "success": True,
@@ -103,7 +107,9 @@ class AnthropicAdapter(LLMAdapter):
         except StandardizedLLMError:
             raise
         except aiohttp.ServerTimeoutError as e:
-            raise StandardizedLLMError(ErrorCategory.TIMEOUT, f"Request timed out ({timeout}s)", original_error=e)
+            raise StandardizedLLMError(
+                ErrorCategory.TIMEOUT, f"Request timed out ({timeout}s)", original_error=e
+            )
         except aiohttp.ClientError as e:
             raise StandardizedLLMError(ErrorCategory.NETWORK, str(e), original_error=e)
         except Exception as e:

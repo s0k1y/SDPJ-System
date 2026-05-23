@@ -62,10 +62,12 @@ def _page_output(text: str) -> None:
         if offset + page_height >= total:
             break
         current = min(offset + page_height, total)
-        click.echo(click.style(
-            f"\n—— {current}/{total} (Space/Enter 下一页，b 上一页，q 退出) ——",
-            fg="bright_black",
-        ))
+        click.echo(
+            click.style(
+                f"\n—— {current}/{total} (Space/Enter 下一页，b 上一页，q 退出) ——",
+                fg="bright_black",
+            )
+        )
         try:
             key = click.getchar()
         except (KeyboardInterrupt, EOFError):
@@ -137,7 +139,11 @@ def system_logs(ctx, category, source_module, user_id, page, page_size):
     for e in logs_list:
         ts = e.get("timestamp", "") if isinstance(e, dict) else getattr(e, "timestamp", "")
         cat = e.get("category", "") if isinstance(e, dict) else getattr(e, "category", "")
-        desc = e.get("description", str(e)) if isinstance(e, dict) else getattr(e, "description", str(e))
+        desc = (
+            e.get("description", str(e))
+            if isinstance(e, dict)
+            else getattr(e, "description", str(e))
+        )
         lines.append(f"  [{ts}] [{cat}] {desc}")
     _page_output("\n".join(lines))
 
@@ -222,6 +228,7 @@ def cli(ctx):
         if not db_path.exists():
             click.echo(click.style("[Init] 数据库不存在，正在初始化...", fg="yellow"), err=True)
             import asyncio
+
             try:
                 asyncio.run(scheduler.startup())
                 click.echo(click.style("[Init] 数据库初始化完成", fg="green"), err=True)

@@ -49,7 +49,9 @@ class TaskGroupRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def list_all(self, user_id: Optional[int] = None, model_id: Optional[str] = None) -> list[TaskGroup]:
+    async def list_all(
+        self, user_id: Optional[int] = None, model_id: Optional[str] = None
+    ) -> list[TaskGroup]:
         """查询任务组列表
 
         Args:

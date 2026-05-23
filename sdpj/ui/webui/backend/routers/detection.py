@@ -147,10 +147,14 @@ async def import_dataset(
     try:
         content = await file.read()
 
-        result = await scheduler.import_dataset_file(user_id=user_id, filename=file.filename, content=content)
+        result = await scheduler.import_dataset_file(
+            user_id=user_id, filename=file.filename, content=content
+        )
 
         if result.get("success"):
-            return success_response(data={"dataset_id": result.get("dataset_id")}, message="导入成功")
+            return success_response(
+                data={"dataset_id": result.get("dataset_id")}, message="导入成功"
+            )
         else:
             return error_response(message=result.get("error", "导入失败"))
     except Exception as e:
@@ -178,4 +182,6 @@ async def resource_operation(
     scheduler: StateSchedulerInterface = Depends(get_scheduler),
 ):
     params = {**req.params, "user_id": request.state.user_id}
-    return wrap_scheduler_result(await scheduler.schedule_private_resource_operation(req.operation, params))
+    return wrap_scheduler_result(
+        await scheduler.schedule_private_resource_operation(req.operation, params)
+    )

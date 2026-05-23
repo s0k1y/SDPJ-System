@@ -27,7 +27,13 @@ def task_group():
 
 @task_group.command("start")
 @click.option("--model-id", required=True, help="目标被测大模型标识（支持模型名或数字型配置ID）")
-@click.option("--type", "detection_type", default="static", type=click.Choice(["static", "dynamic"]), help="检测类型")
+@click.option(
+    "--type",
+    "detection_type",
+    default="static",
+    type=click.Choice(["static", "dynamic"]),
+    help="检测类型",
+)
 @click.option("--dataset", "dataset_ids", multiple=True, type=int, help="检测数据集ID (可多选)")
 @click.option(
     "--jailbreak-dataset",
@@ -40,7 +46,16 @@ def task_group():
 @click.option("--max-iter", default=3, type=int, help="动态算法最大迭代次数")
 @click.option("--force-refresh", is_flag=True, default=False, help="强制重新构建PoC池缓存")
 @click.pass_context
-def task_start(ctx, model_id, detection_type, dataset_ids, jailbreak_dataset_ids, config_id, max_iter, force_refresh):
+def task_start(
+    ctx,
+    model_id,
+    detection_type,
+    dataset_ids,
+    jailbreak_dataset_ids,
+    config_id,
+    max_iter,
+    force_refresh,
+):
     """启动检测任务"""
     cli_ctx = ctx.obj
     user_id = cli_ctx.require_login()
@@ -91,8 +106,12 @@ def task_progress(ctx, task_id):
         failed = prog.get("failed", 0)
         running = prog.get("running", 0)
         pending = prog.get("pending", 0)
-        click.echo(click.style(f"  任务组 {group_id_short}  模型: {model_name}  状态: {status}", fg="cyan"))
-        click.echo(f"    进度: {completed}/{total} 完成, {running} 执行中, {pending} 等待, {failed} 失败")
+        click.echo(
+            click.style(f"  任务组 {group_id_short}  模型: {model_name}  状态: {status}", fg="cyan")
+        )
+        click.echo(
+            f"    进度: {completed}/{total} 完成, {running} 执行中, {pending} 等待, {failed} 失败"
+        )
         children = g.get("children", [])
         if children:
             child_rows = []

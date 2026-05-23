@@ -1,10 +1,15 @@
 import pytest
 from sdpj.infrastructure.utils.encoding import (
-    base64_encode, base64_decode,
-    url_encode, url_decode,
-    unicode_escape_encode, unicode_escape_decode,
-    hex_encode, hex_decode,
-    encode_text, decode_text,
+    base64_encode,
+    base64_decode,
+    url_encode,
+    url_decode,
+    unicode_escape_encode,
+    unicode_escape_decode,
+    hex_encode,
+    hex_decode,
+    encode_text,
+    decode_text,
 )
 
 

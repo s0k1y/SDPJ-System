@@ -33,4 +33,8 @@ async def sample_user(user_db):
 async def sample_resource(user_db, sample_user):
     """创建示例资源"""
     resource_id = await user_db.register_resource("private_config", sample_user["user_id"])
-    return {"resource_id": resource_id, "resource_type": "private_config", "owner_user_id": sample_user["user_id"]}
+    return {
+        "resource_id": resource_id,
+        "resource_type": "private_config",
+        "owner_user_id": sample_user["user_id"],
+    }

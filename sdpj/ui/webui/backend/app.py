@@ -48,7 +48,12 @@ def create_app() -> FastAPI:
     setup_cors(app)
     app.add_middleware(_SecurityHeadersMiddleware)
     app.add_middleware(AuthMiddleware)
-    app.add_middleware(SessionMiddleware, secret_key=get_settings().resolve_secret_key(), same_site="lax", https_only=True)
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=get_settings().resolve_secret_key(),
+        same_site="lax",
+        https_only=True,
+    )
 
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):

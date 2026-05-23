@@ -130,7 +130,9 @@ class DataProcessorInterface(Protocol):
         """
         ...
 
-    async def create_task_group_with_id(self, task_group_id: str, user_id: str, model_id: str) -> str:
+    async def create_task_group_with_id(
+        self, task_group_id: str, user_id: str, model_id: str
+    ) -> str:
         """以指定ID开设检测任务组（幂等）
 
         Args:
@@ -162,7 +164,9 @@ class DataProcessorInterface(Protocol):
         """
         ...
 
-    async def update_task_status(self, task_id: str, task_status: str, end_time: Optional[datetime] = None) -> bool:
+    async def update_task_status(
+        self, task_id: str, task_status: str, end_time: Optional[datetime] = None
+    ) -> bool:
         """更新检测子任务状态
 
         Args:
@@ -244,7 +248,9 @@ class DataProcessorInterface(Protocol):
 
     # ==================== 检测报告数据的汇总与产出 ====================
 
-    async def aggregate_task_group_results(self, task_group_id: str, task_id: str | None = None) -> dict:
+    async def aggregate_task_group_results(
+        self, task_group_id: str, task_id: str | None = None
+    ) -> dict:
         """汇总任务组下全部检测明细
 
         Args:
@@ -275,7 +281,9 @@ class DataProcessorInterface(Protocol):
         """
         ...
 
-    async def list_task_groups(self, user_id: Optional[str] = None, model_id: Optional[str] = None) -> list[dict]:
+    async def list_task_groups(
+        self, user_id: Optional[str] = None, model_id: Optional[str] = None
+    ) -> list[dict]:
         """查询检测任务组清单
 
         Args:
@@ -290,7 +298,9 @@ class DataProcessorInterface(Protocol):
         """
         ...
 
-    async def list_reports_summary(self, user_id: Optional[str] = None, model_id: Optional[str] = None) -> list[dict]:
+    async def list_reports_summary(
+        self, user_id: Optional[str] = None, model_id: Optional[str] = None
+    ) -> list[dict]:
         """查询检测报告列表摘要（高性能，使用 SQL 聚合查询）
 
         避免对每个任务组单独查询并加载全部 result_data 大文本字段，
@@ -439,7 +449,9 @@ class DataProcessorInterface(Protocol):
 
     # ==================== 多模态与多编码的样本构造及响应处理 ====================
 
-    def construct_multimodal_sample(self, poc: str, target_modality: Literal["image", "audio", "video"]) -> bytes:
+    def construct_multimodal_sample(
+        self, poc: str, target_modality: Literal["image", "audio", "video"]
+    ) -> bytes:
         """构造多模态检测样本
 
         Args:
@@ -507,7 +519,9 @@ class DataProcessorInterface(Protocol):
 
     # ==================== 文件导入及结构化数据序列化 ====================
 
-    def read_file(self, file_path: Union[Path, str], mode: Literal["text", "binary"] = "text") -> Union[str, bytes]:
+    def read_file(
+        self, file_path: Union[Path, str], mode: Literal["text", "binary"] = "text"
+    ) -> Union[str, bytes]:
         """读取本地数据集/配置文件
 
         Args:

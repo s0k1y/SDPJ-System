@@ -64,10 +64,7 @@ def mock_utils_lib():
 @pytest.fixture
 def llm_registry(mock_adapter_lib, mock_utils_lib):
     """创建 LLMRegistry 实例"""
-    return LLMRegistry(
-        adapter_lib=mock_adapter_lib,
-        utils_lib=mock_utils_lib
-    )
+    return LLMRegistry(adapter_lib=mock_adapter_lib, utils_lib=mock_utils_lib)
 
 
 @pytest.mark.asyncio
@@ -76,7 +73,11 @@ class TestLLMRegistryInitialize:
 
     async def test_initialize_success(self, llm_registry, mock_adapter_lib):
         """测试成功批量注册已入库大模型"""
-        metadata1 = {"model_id": REAL_MODEL_ID, "adapter_name": "DeepSeek V4 Pro", "version": "1.0.0"}
+        metadata1 = {
+            "model_id": REAL_MODEL_ID,
+            "adapter_name": "DeepSeek V4 Pro",
+            "version": "1.0.0",
+        }
         metadata2 = {"model_id": REAL_MODEL_ID_2, "adapter_name": "GLM-4 Flash", "version": "1.0.0"}
 
         service1 = MockServiceInstance(REAL_MODEL_ID)
@@ -94,7 +95,11 @@ class TestLLMRegistryInitialize:
 
     async def test_initialize_with_missing_instance(self, llm_registry, mock_adapter_lib):
         """测试批量注册时部分服务实例不存在"""
-        metadata1 = {"model_id": REAL_MODEL_ID, "adapter_name": "DeepSeek V4 Pro", "version": "1.0.0"}
+        metadata1 = {
+            "model_id": REAL_MODEL_ID,
+            "adapter_name": "DeepSeek V4 Pro",
+            "version": "1.0.0",
+        }
         metadata2 = {"model_id": REAL_MODEL_ID_2, "adapter_name": "GLM-4 Flash", "version": "1.0.0"}
 
         service1 = MockServiceInstance(REAL_MODEL_ID)
@@ -102,7 +107,7 @@ class TestLLMRegistryInitialize:
         mock_adapter_lib.list_adapters.return_value = [metadata1, metadata2]
         mock_adapter_lib.get_service_instance.side_effect = [
             service1,
-            AdapterNotFoundError("服务实例未创建")
+            AdapterNotFoundError("服务实例未创建"),
         ]
 
         result = await llm_registry.initialize()
@@ -127,24 +132,21 @@ class TestLLMRegistryListModels:
         """测试成功查询已注册大模型清单"""
         service1 = MockServiceInstance(REAL_MODEL_ID)
         service2 = MockServiceInstance(REAL_MODEL_ID_2)
-        llm_registry._registry = {
-            REAL_MODEL_ID: service1,
-            REAL_MODEL_ID_2: service2
-        }
+        llm_registry._registry = {REAL_MODEL_ID: service1, REAL_MODEL_ID_2: service2}
 
         metadata1 = {
             "model_id": REAL_MODEL_ID,
             "adapter_name": "DeepSeek V4 Pro",
             "version": "1.0.0",
             "description": "GPT-4 模型",
-            "supported_features": ["chat", "completion"]
+            "supported_features": ["chat", "completion"],
         }
         metadata2 = {
             "model_id": REAL_MODEL_ID_2,
             "adapter_name": "GLM-4 Flash",
             "version": "1.0.0",
             "description": "Claude 3 模型",
-            "supported_features": ["chat"]
+            "supported_features": ["chat"],
         }
 
         mock_adapter_lib.get_adapter_info.side_effect = [metadata1, metadata2]
@@ -165,20 +167,17 @@ class TestLLMRegistryListModels:
         """测试查询时部分元信息不存在"""
         service1 = MockServiceInstance(REAL_MODEL_ID)
         service2 = MockServiceInstance(REAL_MODEL_ID_2)
-        llm_registry._registry = {
-            REAL_MODEL_ID: service1,
-            REAL_MODEL_ID_2: service2
-        }
+        llm_registry._registry = {REAL_MODEL_ID: service1, REAL_MODEL_ID_2: service2}
 
         metadata1 = {
             "model_id": REAL_MODEL_ID,
             "adapter_name": "DeepSeek V4 Pro",
-            "version": "1.0.0"
+            "version": "1.0.0",
         }
 
         mock_adapter_lib.get_adapter_info.side_effect = [
             metadata1,
-            AdapterNotFoundError("元信息不存在")
+            AdapterNotFoundError("元信息不存在"),
         ]
 
         models = await llm_registry.list_registered_models()
@@ -228,12 +227,14 @@ class TestLLMRegistryRegisterPrivateModel:
         self, llm_registry, mock_adapter_lib, mock_utils_lib
     ):
         """测试成功注册私有大模型"""
-        adapter_content = json.dumps({
-            "adapter_name": "DeepSeek V4 Pro",
-            "version": "1.0.0",
-            "description": "自定义 GPT 模型",
-            "supported_features": ["chat"]
-        })
+        adapter_content = json.dumps(
+            {
+                "adapter_name": "DeepSeek V4 Pro",
+                "version": "1.0.0",
+                "description": "自定义 GPT 模型",
+                "supported_features": ["chat"],
+            }
+        )
         model_id = REAL_MODEL_ID
         service = MockServiceInstance(model_id)
 
@@ -242,8 +243,7 @@ class TestLLMRegistryRegisterPrivateModel:
         mock_adapter_lib.install_adapter.return_value = service
 
         success, registered_id, error = await llm_registry.register_private_model(
-            adapter_content=adapter_content,
-            model_id=model_id
+            adapter_content=adapter_content, model_id=model_id
         )
 
         assert success is True
@@ -251,9 +251,7 @@ class TestLLMRegistryRegisterPrivateModel:
         assert error == ""
         assert model_id in llm_registry._registry
 
-    async def test_register_private_model_invalid_format(
-        self, llm_registry, mock_utils_lib
-    ):
+    async def test_register_private_model_invalid_format(self, llm_registry, mock_utils_lib):
         """测试文件格式校验失败"""
         adapter_content = "invalid json"
         model_id = REAL_MODEL_ID
@@ -261,8 +259,7 @@ class TestLLMRegistryRegisterPrivateModel:
         mock_utils_lib.validate_file_format.return_value = (False, "JSON 格式错误")
 
         success, registered_id, error = await llm_registry.register_private_model(
-            adapter_content=adapter_content,
-            model_id=model_id
+            adapter_content=adapter_content, model_id=model_id
         )
 
         assert success is False
@@ -281,8 +278,7 @@ class TestLLMRegistryRegisterPrivateModel:
         mock_adapter_lib.install_adapter.side_effect = AdapterValidationError("适配器不符合规范")
 
         success, registered_id, error = await llm_registry.register_private_model(
-            adapter_content=adapter_content,
-            model_id=model_id
+            adapter_content=adapter_content, model_id=model_id
         )
 
         assert success is False
@@ -301,8 +297,7 @@ class TestLLMRegistryRegisterPrivateModel:
         mock_adapter_lib.install_adapter.side_effect = AdapterAlreadyExistsError("适配器已存在")
 
         success, registered_id, error = await llm_registry.register_private_model(
-            adapter_content=adapter_content,
-            model_id=model_id
+            adapter_content=adapter_content, model_id=model_id
         )
 
         assert success is False
@@ -314,9 +309,7 @@ class TestLLMRegistryRegisterPrivateModel:
 class TestLLMRegistryUnregisterPrivateModel:
     """测试注销用户移除的私有大模型"""
 
-    async def test_unregister_private_model_success(
-        self, llm_registry, mock_adapter_lib
-    ):
+    async def test_unregister_private_model_success(self, llm_registry, mock_adapter_lib):
         """测试成功注销私有大模型"""
         model_id = REAL_MODEL_ID
         service = MockServiceInstance(model_id)
@@ -335,9 +328,7 @@ class TestLLMRegistryUnregisterPrivateModel:
         assert success is False
         assert "未注册" in error
 
-    async def test_unregister_private_model_exception(
-        self, llm_registry, mock_adapter_lib
-    ):
+    async def test_unregister_private_model_exception(self, llm_registry, mock_adapter_lib):
         """测试注销时发生异常"""
         model_id = REAL_MODEL_ID
         service = MockServiceInstance(model_id)
@@ -373,10 +364,7 @@ class TestLLMRegistryShutdown:
         service2 = MockServiceInstance(REAL_MODEL_ID_2)
         llm_registry._registry = {REAL_MODEL_ID: service1, REAL_MODEL_ID_2: service2}
 
-        mock_adapter_lib.destroy_service_instance.side_effect = [
-            Exception("销毁失败"),
-            True
-        ]
+        mock_adapter_lib.destroy_service_instance.side_effect = [Exception("销毁失败"), True]
 
         result = await llm_registry.shutdown()
 

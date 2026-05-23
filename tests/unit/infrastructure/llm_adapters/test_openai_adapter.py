@@ -17,11 +17,13 @@ async def test_call_success():
     a = make_adapter()
     mock_resp = MagicMock()
     mock_resp.status = 200
-    mock_resp.json = AsyncMock(return_value={
-        "choices": [{"message": {"content": "ok"}}],
-        "model": "gpt-4",
-        "usage": {},
-    })
+    mock_resp.json = AsyncMock(
+        return_value={
+            "choices": [{"message": {"content": "ok"}}],
+            "model": "gpt-4",
+            "usage": {},
+        }
+    )
     mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
     mock_resp.__aexit__ = AsyncMock(return_value=False)
     mock_session = MagicMock()

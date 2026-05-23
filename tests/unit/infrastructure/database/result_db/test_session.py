@@ -14,6 +14,7 @@ async def session_manager():
     manager = SessionManager("sqlite+aiosqlite:///:memory:", echo=False)
     await manager.create_tables()
     from sdpj.infrastructure.database.user_db.models import User
+
     async with manager.session() as session:
         session.add(User(username="test_user", password="pw"))
         session.add(TargetModel(model_id="m1"))
@@ -40,7 +41,10 @@ async def test_create_tables(session_manager):
         await session.commit()
 
         from sqlalchemy import select
-        result = await session.execute(select(TaskGroup).where(TaskGroup.task_group_id == "test-tg"))
+
+        result = await session.execute(
+            select(TaskGroup).where(TaskGroup.task_group_id == "test-tg")
+        )
         retrieved = result.scalar_one_or_none()
         assert retrieved is not None
         assert retrieved.task_group_id == "test-tg"
@@ -55,7 +59,10 @@ async def test_session_context_manager(session_manager):
 
     async with session_manager.session() as session:
         from sqlalchemy import select
-        result = await session.execute(select(TaskGroup).where(TaskGroup.task_group_id == "context-test"))
+
+        result = await session.execute(
+            select(TaskGroup).where(TaskGroup.task_group_id == "context-test")
+        )
         retrieved = result.scalar_one_or_none()
         assert retrieved is not None
 
@@ -74,7 +81,10 @@ async def test_session_rollback_on_exception(session_manager):
 
     async with session_manager.session() as session:
         from sqlalchemy import select
-        result = await session.execute(select(TaskGroup).where(TaskGroup.task_group_id == "rollback-test"))
+
+        result = await session.execute(
+            select(TaskGroup).where(TaskGroup.task_group_id == "rollback-test")
+        )
         retrieved = result.scalar_one_or_none()
         assert retrieved is None
 
@@ -83,6 +93,7 @@ async def test_session_rollback_on_exception(session_manager):
 async def test_drop_tables():
     """测试删除表"""
     from sdpj.infrastructure.database.user_db.models import User
+
     manager = SessionManager("sqlite+aiosqlite:///:memory:")
     await manager.create_tables()
 
@@ -98,6 +109,7 @@ async def test_drop_tables():
 
     async with manager.session() as session:
         from sqlalchemy import select
+
         result = await session.execute(select(TaskGroup))
         items = result.scalars().all()
         assert len(items) == 0

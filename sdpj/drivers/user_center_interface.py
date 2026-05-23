@@ -133,7 +133,9 @@ class UserCenterInterface(Protocol):
 
     # ==================== 凭据校验 ====================
 
-    async def verify_credentials(self, username: str, password: str) -> tuple[bool, Optional[int], str]:
+    async def verify_credentials(
+        self, username: str, password: str
+    ) -> tuple[bool, Optional[int], str]:
         """登录凭据校验
 
         Args:

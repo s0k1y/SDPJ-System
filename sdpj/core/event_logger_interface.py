@@ -51,7 +51,9 @@ class EventLoggerInterface(Protocol):
     该接口定义了日志记录和查询的核心能力，被 StateScheduler 调用。
     """
 
-    def log_operation(self, user_id: str, operation_type: str, context: dict, timestamp: datetime | None = None) -> str:
+    def log_operation(
+        self, user_id: str, operation_type: str, context: dict, timestamp: datetime | None = None
+    ) -> str:
         """
         记录用户操作日志
 
@@ -67,7 +69,11 @@ class EventLoggerInterface(Protocol):
         ...
 
     def log_runtime(
-        self, source_module: str, event_type: str, description: str, timestamp: datetime | None = None
+        self,
+        source_module: str,
+        event_type: str,
+        description: str,
+        timestamp: datetime | None = None,
     ) -> str:
         """
         记录系统运行日志
@@ -84,7 +90,11 @@ class EventLoggerInterface(Protocol):
         ...
 
     def log_error(
-        self, source_module: str, error_type: str, description: str, timestamp: datetime | None = None
+        self,
+        source_module: str,
+        error_type: str,
+        description: str,
+        timestamp: datetime | None = None,
     ) -> str:
         """
         记录系统错误日志

@@ -1,4 +1,5 @@
 from tests.fixtures.sample_data import REAL_MODEL_ID, REAL_MODEL_ID_2
+
 """ResultDB 主实现类单元测试
 
 测试 ResultDB 类实现的所有接口能力。
@@ -19,21 +20,27 @@ async def result_db():
     await db.register_target_model(REAL_MODEL_ID_2)
     from sdpj.infrastructure.database.user_db.models import User
     from sdpj.infrastructure.database.sample_db.models import Dataset
+
     async with session_manager.session() as session:
-        session.add_all([
-            User(username="user_001", password="pw"),
-            User(username="user_002", password="pw"),
-        ])
+        session.add_all(
+            [
+                User(username="user_001", password="pw"),
+                User(username="user_002", password="pw"),
+            ]
+        )
         await session.flush()
-        session.add_all([
-            Dataset(name="dataset_001", risk_type="jailbreak"),
-            Dataset(name="dataset_002", risk_type="injection"),
-        ])
+        session.add_all(
+            [
+                Dataset(name="dataset_001", risk_type="jailbreak"),
+                Dataset(name="dataset_002", risk_type="injection"),
+            ]
+        )
     yield db
     await session_manager.close()
 
 
 # ==================== 检测任务组级能力测试 ====================
+
 
 @pytest.mark.asyncio
 async def test_create_task_group(result_db):
@@ -91,15 +98,14 @@ async def test_delete_task_group(result_db):
 
 # ==================== 检测任务级能力测试 ====================
 
+
 @pytest.mark.asyncio
 async def test_create_detection_task(result_db):
     """测试创建检测任务"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
 
     start_time = datetime.now()
-    task_id = await result_db.create_detection_task(
-        task_group_id, 1, "running", start_time
-    )
+    task_id = await result_db.create_detection_task(task_group_id, 1, "running", start_time)
     assert task_id.startswith("task_")
 
 
@@ -107,31 +113,26 @@ async def test_create_detection_task(result_db):
 async def test_create_detection_task_invalid_group(result_db):
     """测试创建任务时任务组不存在"""
     with pytest.raises(ValueError, match="不存在"):
-        await result_db.create_detection_task(
-            "non-existent", 1, "running", datetime.now()
-        )
+        await result_db.create_detection_task("non-existent", 1, "running", datetime.now())
 
 
 @pytest.mark.asyncio
 async def test_get_detection_task(result_db):
     """测试查询单个检测任务"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
-    task_id = await result_db.create_detection_task(
-        task_group_id, 1, "running", datetime.now()
-    )
+    task_id = await result_db.create_detection_task(task_group_id, 1, "running", datetime.now())
 
     task = await result_db.get_detection_task(task_id)
     assert task["task_id"] == task_id
     assert task["task_status"] == "running"
     assert task["dataset_id"] == 1
 
+
 @pytest.mark.asyncio
 async def test_update_task_status(result_db):
     """测试更新任务状态"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
-    task_id = await result_db.create_detection_task(
-        task_group_id, 1, "running", datetime.now()
-    )
+    task_id = await result_db.create_detection_task(task_group_id, 1, "running", datetime.now())
 
     end_time = datetime.now()
     result = await result_db.update_task_status(task_id, "completed", end_time)
@@ -147,12 +148,8 @@ async def test_list_tasks_by_group(result_db):
     """测试按任务组查询任务列表"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
 
-    await result_db.create_detection_task(
-        task_group_id, 1, "running", datetime.now()
-    )
-    await result_db.create_detection_task(
-        task_group_id, 2, "completed", datetime.now()
-    )
+    await result_db.create_detection_task(task_group_id, 1, "running", datetime.now())
+    await result_db.create_detection_task(task_group_id, 2, "completed", datetime.now())
 
     tasks = await result_db.list_tasks_by_group(task_group_id)
     assert len(tasks) == 2
@@ -162,9 +159,7 @@ async def test_list_tasks_by_group(result_db):
 async def test_delete_detection_task(result_db):
     """测试删除检测任务"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
-    task_id = await result_db.create_detection_task(
-        task_group_id, 1, "running", datetime.now()
-    )
+    task_id = await result_db.create_detection_task(task_group_id, 1, "running", datetime.now())
 
     result = await result_db.delete_detection_task(task_id)
     assert result is True
@@ -175,16 +170,16 @@ async def test_delete_detection_task(result_db):
 
 # ==================== 检测报告级能力测试 ====================
 
+
 @pytest.mark.asyncio
 async def test_create_detection_report(result_db):
     """测试创建检测报告"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
-    task_id = await result_db.create_detection_task(
-        task_group_id, 1, "completed", datetime.now()
-    )
+    task_id = await result_db.create_detection_task(task_group_id, 1, "completed", datetime.now())
 
     report_id = await result_db.create_detection_report(task_id)
     assert report_id.startswith("report_")
+
 
 @pytest.mark.asyncio
 async def test_create_detection_report_invalid_task(result_db):
@@ -197,9 +192,7 @@ async def test_create_detection_report_invalid_task(result_db):
 async def test_get_detection_report(result_db):
     """测试查询单份检测报告"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
-    task_id = await result_db.create_detection_task(
-        task_group_id, 1, "completed", datetime.now()
-    )
+    task_id = await result_db.create_detection_task(task_group_id, 1, "completed", datetime.now())
     report_id = await result_db.create_detection_report(task_id)
 
     report = await result_db.get_detection_report(report_id)
@@ -211,9 +204,7 @@ async def test_get_detection_report(result_db):
 async def test_get_report_by_task(result_db):
     """测试按任务ID查询报告"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
-    task_id = await result_db.create_detection_task(
-        task_group_id, 1, "completed", datetime.now()
-    )
+    task_id = await result_db.create_detection_task(task_group_id, 1, "completed", datetime.now())
     report_id = await result_db.create_detection_report(task_id)
 
     report = await result_db.get_report_by_task(task_id)
@@ -246,9 +237,7 @@ async def test_list_detection_reports(result_db):
 async def test_delete_detection_report(result_db):
     """测试删除检测报告"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
-    task_id = await result_db.create_detection_task(
-        task_group_id, 1, "completed", datetime.now()
-    )
+    task_id = await result_db.create_detection_task(task_group_id, 1, "completed", datetime.now())
     report_id = await result_db.create_detection_report(task_id)
 
     result = await result_db.delete_detection_report(report_id)
@@ -257,15 +246,15 @@ async def test_delete_detection_report(result_db):
     with pytest.raises(ValueError):
         await result_db.get_detection_report(report_id)
 
+
 # ==================== 检测结果数据级能力测试 ====================
+
 
 @pytest.mark.asyncio
 async def test_append_result_data(result_db):
     """测试追加检测结果数据"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
-    task_id = await result_db.create_detection_task(
-        task_group_id, 1, "completed", datetime.now()
-    )
+    task_id = await result_db.create_detection_task(task_group_id, 1, "completed", datetime.now())
     report_id = await result_db.create_detection_report(task_id)
 
     result_data_id = await result_db.append_result_data(
@@ -287,12 +276,12 @@ async def test_append_result_data_invalid_report(result_db):
 async def test_list_result_data_by_report(result_db):
     """测试按报告ID查询结果数据"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
-    task_id = await result_db.create_detection_task(
-        task_group_id, 1, "completed", datetime.now()
-    )
+    task_id = await result_db.create_detection_task(task_group_id, 1, "completed", datetime.now())
     report_id = await result_db.create_detection_report(task_id)
 
-    await result_db.append_result_data(report_id, "prompt_injection", "PoC1", "Output 1", "non_compliant")
+    await result_db.append_result_data(
+        report_id, "prompt_injection", "PoC1", "Output 1", "non_compliant"
+    )
     await result_db.append_result_data(report_id, "jailbreak", "PoC2", "Output 2", "compliant")
 
     result_data_list = await result_db.list_result_data_by_report(report_id)
@@ -303,9 +292,7 @@ async def test_list_result_data_by_report(result_db):
 async def test_append_result_data_with_iteration_count(result_db):
     """测试追加结果数据时包含迭代次数"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
-    task_id = await result_db.create_detection_task(
-        task_group_id, 1, "completed", datetime.now()
-    )
+    task_id = await result_db.create_detection_task(task_group_id, 1, "completed", datetime.now())
     report_id = await result_db.create_detection_report(task_id)
 
     result_data_id = await result_db.append_result_data(
@@ -322,9 +309,7 @@ async def test_append_result_data_with_iteration_count(result_db):
 async def test_append_result_data_without_iteration_count(result_db):
     """测试追加结果数据时不传迭代次数（静态检测）"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
-    task_id = await result_db.create_detection_task(
-        task_group_id, 1, "completed", datetime.now()
-    )
+    task_id = await result_db.create_detection_task(task_group_id, 1, "completed", datetime.now())
     report_id = await result_db.create_detection_report(task_id)
 
     result_data_id = await result_db.append_result_data(
@@ -341,9 +326,7 @@ async def test_append_result_data_without_iteration_count(result_db):
 async def test_append_result_data_zero_iterations(result_db):
     """测试追加结果数据时迭代次数为0（动态检测中静态就违规的样本）"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
-    task_id = await result_db.create_detection_task(
-        task_group_id, 1, "completed", datetime.now()
-    )
+    task_id = await result_db.create_detection_task(task_group_id, 1, "completed", datetime.now())
     report_id = await result_db.create_detection_report(task_id)
 
     result_data_id = await result_db.append_result_data(
@@ -360,9 +343,7 @@ async def test_append_result_data_zero_iterations(result_db):
 async def test_delete_result_data(result_db):
     """测试删除结果数据"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
-    task_id = await result_db.create_detection_task(
-        task_group_id, 1, "completed", datetime.now()
-    )
+    task_id = await result_db.create_detection_task(task_group_id, 1, "completed", datetime.now())
     report_id = await result_db.create_detection_report(task_id)
     result_data_id = await result_db.append_result_data(
         report_id, "prompt_injection", "PoC", "Output", "non_compliant"
@@ -377,13 +358,12 @@ async def test_delete_result_data(result_db):
 
 # ==================== 级联删除测试 ====================
 
+
 @pytest.mark.asyncio
 async def test_cascade_delete_full_chain(result_db):
     """测试完整的级联删除链"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
-    task_id = await result_db.create_detection_task(
-        task_group_id, 1, "completed", datetime.now()
-    )
+    task_id = await result_db.create_detection_task(task_group_id, 1, "completed", datetime.now())
     report_id = await result_db.create_detection_report(task_id)
     await result_db.append_result_data(
         report_id, "prompt_injection", "PoC", "Output", "non_compliant"
@@ -405,6 +385,7 @@ async def test_cascade_delete_full_chain(result_db):
 
 
 # ==================== PoC 池缓存能力测试 ====================
+
 
 @pytest.mark.asyncio
 async def test_save_and_get_poc_pool_cache(result_db):
@@ -487,17 +468,14 @@ async def test_cache_isolation_between_models(result_db):
 
 # ==================== create_detection_task 幂等性测试 ====================
 
+
 @pytest.mark.asyncio
 async def test_create_detection_task_idempotent_same_group_and_dataset(result_db):
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
 
-    task_id_1 = await result_db.create_detection_task(
-        task_group_id, 1, "pending", datetime.now()
-    )
+    task_id_1 = await result_db.create_detection_task(task_group_id, 1, "pending", datetime.now())
 
-    task_id_2 = await result_db.create_detection_task(
-        task_group_id, 1, "running", datetime.now()
-    )
+    task_id_2 = await result_db.create_detection_task(task_group_id, 1, "running", datetime.now())
 
     assert task_id_1 == task_id_2
 
@@ -509,13 +487,9 @@ async def test_create_detection_task_idempotent_same_group_and_dataset(result_db
 async def test_create_detection_task_different_dataset_creates_new(result_db):
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
 
-    task_id_1 = await result_db.create_detection_task(
-        task_group_id, 1, "pending", datetime.now()
-    )
+    task_id_1 = await result_db.create_detection_task(task_group_id, 1, "pending", datetime.now())
 
-    task_id_2 = await result_db.create_detection_task(
-        task_group_id, 2, "pending", datetime.now()
-    )
+    task_id_2 = await result_db.create_detection_task(task_group_id, 2, "pending", datetime.now())
 
     assert task_id_1 != task_id_2
 
@@ -533,9 +507,7 @@ async def test_create_detection_task_with_custom_task_id_idempotent(result_db):
     )
     assert task_id_1 == custom_id
 
-    task_id_2 = await result_db.create_detection_task(
-        task_group_id, 1, "running", datetime.now()
-    )
+    task_id_2 = await result_db.create_detection_task(task_group_id, 1, "running", datetime.now())
 
     assert task_id_2 == custom_id
 

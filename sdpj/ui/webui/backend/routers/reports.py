@@ -78,7 +78,9 @@ async def export_report(
     scheduler: StateSchedulerInterface = Depends(get_scheduler),
 ):
     user_id: int = request.state.user_id
-    result = await scheduler.export_report(req.task_group_id, req.target_format, user_id=user_id, task_id=req.task_id)
+    result = await scheduler.export_report(
+        req.task_group_id, req.target_format, user_id=user_id, task_id=req.task_id
+    )
     if not result.get("success"):
         return wrap_scheduler_result(result)
     filename = result.get("filename", f"report.{req.target_format}")
@@ -103,7 +105,9 @@ async def task_visualization(
     scheduler: StateSchedulerInterface = Depends(get_scheduler),
 ):
     user_id: int = request.state.user_id
-    return wrap_scheduler_result(await scheduler.prepare_task_visualization_data(task_id, user_id=user_id))
+    return wrap_scheduler_result(
+        await scheduler.prepare_task_visualization_data(task_id, user_id=user_id)
+    )
 
 
 @router.get("/{task_group_id}/visualization")
@@ -113,4 +117,6 @@ async def visualization(
     scheduler: StateSchedulerInterface = Depends(get_scheduler),
 ):
     user_id: int = request.state.user_id
-    return wrap_scheduler_result(await scheduler.prepare_visualization_data(task_group_id, user_id=user_id))
+    return wrap_scheduler_result(
+        await scheduler.prepare_visualization_data(task_group_id, user_id=user_id)
+    )

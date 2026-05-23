@@ -4,6 +4,7 @@
 - subtype_compliance: 按风险子类型统计合规率
 - avg_iteration_count: 动态检测平均迭代次数
 """
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
@@ -40,22 +41,46 @@ class TestSubtypeComplianceIntegration:
     ):
         """测试可视化数据包含子类型合规率"""
         # Mock 聚合数据
-        mock_data_processor.aggregate_task_group_results = AsyncMock(return_value={
-            "user_id": "1",
-            "model_id": "gpt-4",
-            "tasks": [{
-                "dataset_id": 1,
-                "report": {
-                    "result_data": [
-                        {"compliance_result": "合规", "risk_subclass": "越狱攻击", "iteration_count": None},
-                        {"compliance_result": "合规", "risk_subclass": "越狱攻击", "iteration_count": None},
-                        {"compliance_result": "违规", "risk_subclass": "越狱攻击", "iteration_count": None},
-                        {"compliance_result": "合规", "risk_subclass": "提示词注入", "iteration_count": None},
-                        {"compliance_result": "违规", "risk_subclass": "提示词注入", "iteration_count": None},
-                    ]
-                }
-            }]
-        })
+        mock_data_processor.aggregate_task_group_results = AsyncMock(
+            return_value={
+                "user_id": "1",
+                "model_id": "gpt-4",
+                "tasks": [
+                    {
+                        "dataset_id": 1,
+                        "report": {
+                            "result_data": [
+                                {
+                                    "compliance_result": "合规",
+                                    "risk_subclass": "越狱攻击",
+                                    "iteration_count": None,
+                                },
+                                {
+                                    "compliance_result": "合规",
+                                    "risk_subclass": "越狱攻击",
+                                    "iteration_count": None,
+                                },
+                                {
+                                    "compliance_result": "违规",
+                                    "risk_subclass": "越狱攻击",
+                                    "iteration_count": None,
+                                },
+                                {
+                                    "compliance_result": "合规",
+                                    "risk_subclass": "提示词注入",
+                                    "iteration_count": None,
+                                },
+                                {
+                                    "compliance_result": "违规",
+                                    "risk_subclass": "提示词注入",
+                                    "iteration_count": None,
+                                },
+                            ]
+                        },
+                    }
+                ],
+            }
+        )
 
         viz_data = await report_manager.prepare_visualization_data("tg_1")
 
@@ -79,15 +104,15 @@ class TestSubtypeComplianceIntegration:
         assert injection["rate"] == 50.0
 
     @pytest.mark.asyncio
-    async def test_subtype_compliance_with_empty_results(
-        self, report_manager, mock_data_processor
-    ):
+    async def test_subtype_compliance_with_empty_results(self, report_manager, mock_data_processor):
         """测试空结果时的子类型合规率"""
-        mock_data_processor.aggregate_task_group_results = AsyncMock(return_value={
-            "user_id": "1",
-            "model_id": "gpt-4",
-            "tasks": [{"dataset_id": 1, "report": {"result_data": []}}]
-        })
+        mock_data_processor.aggregate_task_group_results = AsyncMock(
+            return_value={
+                "user_id": "1",
+                "model_id": "gpt-4",
+                "tasks": [{"dataset_id": 1, "report": {"result_data": []}}],
+            }
+        )
 
         viz_data = await report_manager.prepare_visualization_data("tg_1")
 
@@ -104,21 +129,41 @@ class TestIterationCountIntegration:
     ):
         """测试可视化数据包含平均迭代次数"""
         # Mock 动态检测数据（包含迭代次数）
-        mock_data_processor.aggregate_task_group_results = AsyncMock(return_value={
-            "user_id": "1",
-            "model_id": "gpt-4",
-            "tasks": [{
-                "dataset_id": 1,
-                "report": {
-                    "result_data": [
-                        {"compliance_result": "违规", "risk_subclass": "越狱攻击", "iteration_count": 0},
-                        {"compliance_result": "合规", "risk_subclass": "越狱攻击", "iteration_count": 3},
-                        {"compliance_result": "违规", "risk_subclass": "提示词注入", "iteration_count": 5},
-                        {"compliance_result": "合规", "risk_subclass": "提示词注入", "iteration_count": 2},
-                    ]
-                }
-            }]
-        })
+        mock_data_processor.aggregate_task_group_results = AsyncMock(
+            return_value={
+                "user_id": "1",
+                "model_id": "gpt-4",
+                "tasks": [
+                    {
+                        "dataset_id": 1,
+                        "report": {
+                            "result_data": [
+                                {
+                                    "compliance_result": "违规",
+                                    "risk_subclass": "越狱攻击",
+                                    "iteration_count": 0,
+                                },
+                                {
+                                    "compliance_result": "合规",
+                                    "risk_subclass": "越狱攻击",
+                                    "iteration_count": 3,
+                                },
+                                {
+                                    "compliance_result": "违规",
+                                    "risk_subclass": "提示词注入",
+                                    "iteration_count": 5,
+                                },
+                                {
+                                    "compliance_result": "合规",
+                                    "risk_subclass": "提示词注入",
+                                    "iteration_count": 2,
+                                },
+                            ]
+                        },
+                    }
+                ],
+            }
+        )
 
         viz_data = await report_manager.prepare_visualization_data("tg_1")
 
@@ -132,21 +177,41 @@ class TestIterationCountIntegration:
     ):
         """测试平均迭代次数忽略 NULL 值（静态检测）"""
         # 混合静态和动态检测结果
-        mock_data_processor.aggregate_task_group_results = AsyncMock(return_value={
-            "user_id": "1",
-            "model_id": "gpt-4",
-            "tasks": [{
-                "dataset_id": 1,
-                "report": {
-                    "result_data": [
-                        {"compliance_result": "合规", "risk_subclass": "A", "iteration_count": None},  # 静态
-                        {"compliance_result": "违规", "risk_subclass": "B", "iteration_count": 0},     # 动态-静态违规
-                        {"compliance_result": "合规", "risk_subclass": "C", "iteration_count": 4},     # 动态-迭代
-                        {"compliance_result": "违规", "risk_subclass": "D", "iteration_count": 2},     # 动态-迭代
-                    ]
-                }
-            }]
-        })
+        mock_data_processor.aggregate_task_group_results = AsyncMock(
+            return_value={
+                "user_id": "1",
+                "model_id": "gpt-4",
+                "tasks": [
+                    {
+                        "dataset_id": 1,
+                        "report": {
+                            "result_data": [
+                                {
+                                    "compliance_result": "合规",
+                                    "risk_subclass": "A",
+                                    "iteration_count": None,
+                                },  # 静态
+                                {
+                                    "compliance_result": "违规",
+                                    "risk_subclass": "B",
+                                    "iteration_count": 0,
+                                },  # 动态-静态违规
+                                {
+                                    "compliance_result": "合规",
+                                    "risk_subclass": "C",
+                                    "iteration_count": 4,
+                                },  # 动态-迭代
+                                {
+                                    "compliance_result": "违规",
+                                    "risk_subclass": "D",
+                                    "iteration_count": 2,
+                                },  # 动态-迭代
+                            ]
+                        },
+                    }
+                ],
+            }
+        )
 
         viz_data = await report_manager.prepare_visualization_data("tg_1")
 
@@ -159,19 +224,31 @@ class TestIterationCountIntegration:
     ):
         """测试纯静态检测时平均迭代次数为 None"""
         # 纯静态检测结果（所有 iteration_count 为 None）
-        mock_data_processor.aggregate_task_group_results = AsyncMock(return_value={
-            "user_id": "1",
-            "model_id": "gpt-4",
-            "tasks": [{
-                "dataset_id": 1,
-                "report": {
-                    "result_data": [
-                        {"compliance_result": "合规", "risk_subclass": "A", "iteration_count": None},
-                        {"compliance_result": "违规", "risk_subclass": "B", "iteration_count": None},
-                    ]
-                }
-            }]
-        })
+        mock_data_processor.aggregate_task_group_results = AsyncMock(
+            return_value={
+                "user_id": "1",
+                "model_id": "gpt-4",
+                "tasks": [
+                    {
+                        "dataset_id": 1,
+                        "report": {
+                            "result_data": [
+                                {
+                                    "compliance_result": "合规",
+                                    "risk_subclass": "A",
+                                    "iteration_count": None,
+                                },
+                                {
+                                    "compliance_result": "违规",
+                                    "risk_subclass": "B",
+                                    "iteration_count": None,
+                                },
+                            ]
+                        },
+                    }
+                ],
+            }
+        )
 
         viz_data = await report_manager.prepare_visualization_data("tg_1")
 
@@ -182,32 +259,62 @@ class TestReportFeaturesEndToEnd:
     """端到端测试：完整报告生成流程"""
 
     @pytest.mark.asyncio
-    async def test_complete_report_with_all_features(
-        self, report_manager, mock_data_processor
-    ):
+    async def test_complete_report_with_all_features(self, report_manager, mock_data_processor):
         """测试完整报告包含所有新功能"""
         # Mock 完整的检测结果
-        mock_data_processor.aggregate_task_group_results = AsyncMock(return_value={
-            "user_id": "1",
-            "model_id": "gpt-4",
-            "tasks": [{
-                "dataset_id": 1,
-                "report": {
-                    "result_data": [
-                        # 越狱攻击 - 动态检测
-                        {"compliance_result": "违规", "risk_subclass": "越狱攻击", "iteration_count": 0},
-                        {"compliance_result": "合规", "risk_subclass": "越狱攻击", "iteration_count": 3},
-                        {"compliance_result": "违规", "risk_subclass": "越狱攻击", "iteration_count": 1},
-                        # 提示词注入 - 动态检测
-                        {"compliance_result": "合规", "risk_subclass": "提示词注入", "iteration_count": 5},
-                        {"compliance_result": "合规", "risk_subclass": "提示词注入", "iteration_count": 2},
-                        # 劫持攻击 - 静态检测
-                        {"compliance_result": "合规", "risk_subclass": "劫持攻击", "iteration_count": None},
-                        {"compliance_result": "违规", "risk_subclass": "劫持攻击", "iteration_count": None},
-                    ]
-                }
-            }]
-        })
+        mock_data_processor.aggregate_task_group_results = AsyncMock(
+            return_value={
+                "user_id": "1",
+                "model_id": "gpt-4",
+                "tasks": [
+                    {
+                        "dataset_id": 1,
+                        "report": {
+                            "result_data": [
+                                # 越狱攻击 - 动态检测
+                                {
+                                    "compliance_result": "违规",
+                                    "risk_subclass": "越狱攻击",
+                                    "iteration_count": 0,
+                                },
+                                {
+                                    "compliance_result": "合规",
+                                    "risk_subclass": "越狱攻击",
+                                    "iteration_count": 3,
+                                },
+                                {
+                                    "compliance_result": "违规",
+                                    "risk_subclass": "越狱攻击",
+                                    "iteration_count": 1,
+                                },
+                                # 提示词注入 - 动态检测
+                                {
+                                    "compliance_result": "合规",
+                                    "risk_subclass": "提示词注入",
+                                    "iteration_count": 5,
+                                },
+                                {
+                                    "compliance_result": "合规",
+                                    "risk_subclass": "提示词注入",
+                                    "iteration_count": 2,
+                                },
+                                # 劫持攻击 - 静态检测
+                                {
+                                    "compliance_result": "合规",
+                                    "risk_subclass": "劫持攻击",
+                                    "iteration_count": None,
+                                },
+                                {
+                                    "compliance_result": "违规",
+                                    "risk_subclass": "劫持攻击",
+                                    "iteration_count": None,
+                                },
+                            ]
+                        },
+                    }
+                ],
+            }
+        )
 
         viz_data = await report_manager.prepare_visualization_data("tg_1")
 

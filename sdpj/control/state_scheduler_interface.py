@@ -42,7 +42,9 @@ class StateSchedulerInterface(Protocol):
 
     # ── 报告管理调度 (职责 5-8) ──
 
-    async def generate_report(self, task_group_id: str, detection_type: str, *, user_id: int | None = None) -> dict:
+    async def generate_report(
+        self, task_group_id: str, detection_type: str, *, user_id: int | None = None
+    ) -> dict:
         """生成检测报告
 
         Args:
@@ -65,11 +67,15 @@ class StateSchedulerInterface(Protocol):
         """查询检测报告列表"""
         ...
 
-    async def delete_report(self, target_id: str, caller_user_id: int, granularity: str = "task_group") -> dict:
+    async def delete_report(
+        self, target_id: str, caller_user_id: int, granularity: str = "task_group"
+    ) -> dict:
         """删除检测报告"""
         ...
 
-    async def export_report(self, task_group_id: str, target_format: str, *, user_id: int | None = None) -> dict:
+    async def export_report(
+        self, task_group_id: str, target_format: str, *, user_id: int | None = None
+    ) -> dict:
         """导出检测报告文件
 
         Args:
@@ -79,7 +85,9 @@ class StateSchedulerInterface(Protocol):
         """
         ...
 
-    async def prepare_visualization_data(self, task_group_id: str, *, user_id: int | None = None) -> dict:
+    async def prepare_visualization_data(
+        self, task_group_id: str, *, user_id: int | None = None
+    ) -> dict:
         """准备可视化图表数据
 
         Args:
@@ -88,7 +96,9 @@ class StateSchedulerInterface(Protocol):
         """
         ...
 
-    async def prepare_task_visualization_data(self, task_id: str, *, user_id: int | None = None) -> dict:
+    async def prepare_task_visualization_data(
+        self, task_id: str, *, user_id: int | None = None
+    ) -> dict:
         """准备单个任务的可视化图表数据
 
         Args:
@@ -201,7 +211,9 @@ class StateSchedulerInterface(Protocol):
         """查询可用检测数据集清单"""
         ...
 
-    async def query_dataset_detail(self, dataset_id: int, user_id: int | None = None) -> dict | None:
+    async def query_dataset_detail(
+        self, dataset_id: int, user_id: int | None = None
+    ) -> dict | None:
         """查询数据集详情"""
         ...
 

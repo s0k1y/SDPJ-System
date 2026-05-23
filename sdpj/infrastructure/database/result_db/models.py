@@ -33,7 +33,10 @@ class TaskGroup(Base):
         Integer, ForeignKey("User.user_id", ondelete="CASCADE"), nullable=False, comment="用户ID"
     )
     model_id: Mapped[str] = mapped_column(
-        String(255), ForeignKey("TargetModel.model_id", ondelete="RESTRICT"), nullable=False, comment="模型ID"
+        String(255),
+        ForeignKey("TargetModel.model_id", ondelete="RESTRICT"),
+        nullable=False,
+        comment="模型ID",
     )
 
     detection_tasks: Mapped[list["DetectionTask"]] = relationship(
@@ -54,16 +57,26 @@ class DetectionTask(Base):
 
     task_id: Mapped[str] = mapped_column(String(255), primary_key=True, comment="任务ID")
     task_group_id: Mapped[str] = mapped_column(
-        String(255), ForeignKey("TaskGroup.task_group_id", ondelete="CASCADE"), nullable=False, comment="任务组ID"
+        String(255),
+        ForeignKey("TaskGroup.task_group_id", ondelete="CASCADE"),
+        nullable=False,
+        comment="任务组ID",
     )
     dataset_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("Dataset.dataset_id", ondelete="CASCADE"), nullable=False, comment="数据集ID"
+        Integer,
+        ForeignKey("Dataset.dataset_id", ondelete="CASCADE"),
+        nullable=False,
+        comment="数据集ID",
     )
     task_status: Mapped[str] = mapped_column(String(50), nullable=False, comment="任务状态")
-    algorithm_type: Mapped[str] = mapped_column(String(20), nullable=False, default="static", comment="算法类型")
+    algorithm_type: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="static", comment="算法类型"
+    )
     metadata_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, comment="任务元信息")
     start_time: Mapped[datetime] = mapped_column(DateTime, nullable=False, comment="开始时间")
-    end_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, comment="结束时间")
+    end_time: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, nullable=True, comment="结束时间"
+    )
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="错误信息")
 
     # 关系
@@ -113,13 +126,20 @@ class ResultData(Base):
 
     result_data_id: Mapped[str] = mapped_column(String(255), primary_key=True, comment="结果数据ID")
     report_id: Mapped[str] = mapped_column(
-        String(255), ForeignKey("DetectionReport.report_id", ondelete="CASCADE"), nullable=False, comment="检测报告ID"
+        String(255),
+        ForeignKey("DetectionReport.report_id", ondelete="CASCADE"),
+        nullable=False,
+        comment="检测报告ID",
     )
     risk_subclass: Mapped[str] = mapped_column(String(255), nullable=False, comment="风险具体子类")
     poc: Mapped[str] = mapped_column(Text, nullable=False, server_default="", comment="原始PoC")
     model_output: Mapped[str] = mapped_column(Text, nullable=False, comment="被测大模型输出内容")
-    compliance_result: Mapped[str] = mapped_column(String(50), nullable=False, comment="合规判断结果")
-    iteration_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, comment="动态检测迭代次数")
+    compliance_result: Mapped[str] = mapped_column(
+        String(50), nullable=False, comment="合规判断结果"
+    )
+    iteration_count: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True, comment="动态检测迭代次数"
+    )
 
     # 关系
     detection_report: Mapped["DetectionReport"] = relationship(back_populates="result_data")
@@ -147,7 +167,9 @@ class PocPoolCache(Base):
     subtype: Mapped[str] = mapped_column(String(255), nullable=False, comment="越狱攻击子类型")
     poc_text: Mapped[str] = mapped_column(Text, nullable=False, comment="预处理后的PoC文本")
     score: Mapped[int] = mapped_column(Integer, nullable=False, comment="PoC评分(1-5)")
-    dataset_version: Mapped[str] = mapped_column(String(255), nullable=False, comment="数据集版本标识")
+    dataset_version: Mapped[str] = mapped_column(
+        String(255), nullable=False, comment="数据集版本标识"
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, comment="创建时间")
 
     def __repr__(self) -> str:
@@ -163,11 +185,23 @@ class SystemLog(Base):
     __tablename__ = "SystemLog"
 
     log_id: Mapped[str] = mapped_column(String(255), primary_key=True, comment="日志ID")
-    category: Mapped[str] = mapped_column(String(50), nullable=False, index=True, comment="日志类别")
+    category: Mapped[str] = mapped_column(
+        String(50), nullable=False, index=True, comment="日志类别"
+    )
     level: Mapped[str] = mapped_column(String(20), nullable=False, index=True, comment="日志级别")
-    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True, comment="时间戳")
-    source_module: Mapped[str] = mapped_column(String(255), nullable=False, index=True, comment="来源模块")
-    user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("User.user_id", ondelete="SET NULL"), nullable=True, index=True, comment="用户ID")
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, index=True, comment="时间戳"
+    )
+    source_module: Mapped[str] = mapped_column(
+        String(255), nullable=False, index=True, comment="来源模块"
+    )
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("User.user_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="用户ID",
+    )
     event_type: Mapped[str] = mapped_column(String(255), nullable=False, comment="事件类型")
     description: Mapped[str] = mapped_column(Text, nullable=False, comment="事件描述")
     context: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, comment="上下文信息")

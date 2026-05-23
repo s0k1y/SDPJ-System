@@ -10,7 +10,12 @@ import uuid
 from datetime import datetime, timezone
 from typing import Dict
 
-from .task_queue_manager_interface import Task, TaskPersistence, TaskQueueManagerInterface, TaskStatus
+from .task_queue_manager_interface import (
+    Task,
+    TaskPersistence,
+    TaskQueueManagerInterface,
+    TaskStatus,
+)
 
 
 class TaskQueueManager(TaskQueueManagerInterface):
@@ -154,7 +159,9 @@ class TaskQueueManager(TaskQueueManagerInterface):
             tasks.append(task)
         return tasks
 
-    async def update_task_status(self, task_id: str, status: TaskStatus, error_message: str = "") -> bool:
+    async def update_task_status(
+        self, task_id: str, status: TaskStatus, error_message: str = ""
+    ) -> bool:
         async with self._lock:
             if task_id not in self._tasks:
                 return False
@@ -281,7 +288,10 @@ class TaskQueueManager(TaskQueueManagerInterface):
 
     async def _persist_task(self, task: Task, task_group_id: str) -> None:
         if self._persistence is None:
-            print(f"[DEBUG _persist_task] _persistence 为 None，跳过持久化 task_group_id={task_group_id}", flush=True)
+            print(
+                f"[DEBUG _persist_task] _persistence 为 None，跳过持久化 task_group_id={task_group_id}",
+                flush=True,
+            )
             return
         try:
             try:
@@ -297,7 +307,10 @@ class TaskQueueManager(TaskQueueManagerInterface):
                     )
                     print(f"[DEBUG _persist_task] 任务组创建成功: {task_group_id}", flush=True)
                 except Exception as e:
-                    print(f"[ERROR _persist_task] 创建任务组失败: task_group_id={task_group_id}, error={type(e).__name__}: {e}", flush=True)
+                    print(
+                        f"[ERROR _persist_task] 创建任务组失败: task_group_id={task_group_id}, error={type(e).__name__}: {e}",
+                        flush=True,
+                    )
 
             try:
                 dataset_id = int(task.dataset_id) if str(task.dataset_id).isdigit() else 0
@@ -310,15 +323,29 @@ class TaskQueueManager(TaskQueueManagerInterface):
                     metadata_json=task.metadata,
                     task_id=task.task_id,
                 )
-                print(f"[DEBUG _persist_task] 检测任务创建成功: task_id={task.task_id}, task_group_id={task_group_id}", flush=True)
+                print(
+                    f"[DEBUG _persist_task] 检测任务创建成功: task_id={task.task_id}, task_group_id={task_group_id}",
+                    flush=True,
+                )
             except Exception as e:
-                print(f"[ERROR _persist_task] 创建检测任务失败: task_id={task.task_id}, task_group_id={task_group_id}, error={type(e).__name__}: {e}", flush=True)
+                print(
+                    f"[ERROR _persist_task] 创建检测任务失败: task_id={task.task_id}, task_group_id={task_group_id}, error={type(e).__name__}: {e}",
+                    flush=True,
+                )
         except Exception as e:
-            print(f"[ERROR _persist_task] 持久化异常: task_group_id={task_group_id}, error={type(e).__name__}: {e}", flush=True)
+            print(
+                f"[ERROR _persist_task] 持久化异常: task_group_id={task_group_id}, error={type(e).__name__}: {e}",
+                flush=True,
+            )
 
-    async def _persist_status(self, task_id: str, status: TaskStatus, error_message: str = "") -> None:
+    async def _persist_status(
+        self, task_id: str, status: TaskStatus, error_message: str = ""
+    ) -> None:
         if self._persistence is None:
-            print(f"[DEBUG _persist_status] _persistence 为 None，跳过持久化状态 task_id={task_id}", flush=True)
+            print(
+                f"[DEBUG _persist_status] _persistence 为 None，跳过持久化状态 task_id={task_id}",
+                flush=True,
+            )
             return
         try:
             end_time = None
@@ -328,6 +355,12 @@ class TaskQueueManager(TaskQueueManagerInterface):
             if error_message:
                 kwargs["error_message"] = error_message
             await self._persistence.update_task_status(task_id, status.value, end_time, **kwargs)
-            print(f"[DEBUG _persist_status] 状态更新成功: task_id={task_id}, status={status.value}", flush=True)
+            print(
+                f"[DEBUG _persist_status] 状态更新成功: task_id={task_id}, status={status.value}",
+                flush=True,
+            )
         except Exception as e:
-            print(f"[ERROR _persist_status] 状态更新失败: task_id={task_id}, status={status.value}, error={type(e).__name__}: {e}", flush=True)
+            print(
+                f"[ERROR _persist_status] 状态更新失败: task_id={task_id}, status={status.value}, error={type(e).__name__}: {e}",
+                flush=True,
+            )

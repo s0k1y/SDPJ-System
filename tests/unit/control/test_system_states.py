@@ -1,7 +1,11 @@
 from sdpj.control.system_states import (
     SystemStateMachine,
-    STATE_IDLE, STATE_DETECTING, STATE_GENERATING_REPORT,
-    STATE_CONFIGURING, STATE_ERROR, ALL_STATES,
+    STATE_IDLE,
+    STATE_DETECTING,
+    STATE_GENERATING_REPORT,
+    STATE_CONFIGURING,
+    STATE_ERROR,
+    ALL_STATES,
 )
 
 
@@ -47,6 +51,9 @@ def test_error_and_recover():
 
 def test_all_states_constant():
     assert set(ALL_STATES) == {
-        STATE_IDLE, STATE_DETECTING, STATE_GENERATING_REPORT,
-        STATE_CONFIGURING, STATE_ERROR,
+        STATE_IDLE,
+        STATE_DETECTING,
+        STATE_GENERATING_REPORT,
+        STATE_CONFIGURING,
+        STATE_ERROR,
     }

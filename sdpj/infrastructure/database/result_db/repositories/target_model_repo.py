@@ -11,7 +11,9 @@ class TargetModelRepository:
         self.session = session
 
     async def get_by_id(self, model_id: str) -> Optional[TargetModel]:
-        result = await self.session.execute(select(TargetModel).where(TargetModel.model_id == model_id))
+        result = await self.session.execute(
+            select(TargetModel).where(TargetModel.model_id == model_id)
+        )
         return result.scalar_one_or_none()
 
     async def register(self, model_id: str) -> TargetModel:

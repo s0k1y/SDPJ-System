@@ -1,6 +1,7 @@
 """
 SecureCommManager 单元测试
 """
+
 from sdpj.core.secure_comm_manager import SecureCommManager
 
 

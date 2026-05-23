@@ -2,6 +2,7 @@
 
 测试通过 WebUI API 访问子类型合规率和平均迭代次数功能
 """
+
 import pytest
 import uuid
 from fastapi.testclient import TestClient
@@ -19,14 +20,12 @@ class TestReportVisualizationAPI:
 
     def _register_and_login(self):
         """辅助方法: 注册并登录"""
-        self.client.post("/api/auth/register", json={
-            "username": self.unique_username,
-            "password": self.password
-        })
-        login_response = self.client.post("/api/auth/login", json={
-            "username": self.unique_username,
-            "password": self.password
-        })
+        self.client.post(
+            "/api/auth/register", json={"username": self.unique_username, "password": self.password}
+        )
+        login_response = self.client.post(
+            "/api/auth/login", json={"username": self.unique_username, "password": self.password}
+        )
         return login_response
 
     def test_visualization_endpoint_includes_subtype_compliance(self):
@@ -70,14 +69,12 @@ class TestReportListAPI:
 
     def _register_and_login(self):
         """辅助方法: 注册并登录"""
-        self.client.post("/api/auth/register", json={
-            "username": self.unique_username,
-            "password": self.password
-        })
-        return self.client.post("/api/auth/login", json={
-            "username": self.unique_username,
-            "password": self.password
-        })
+        self.client.post(
+            "/api/auth/register", json={"username": self.unique_username, "password": self.password}
+        )
+        return self.client.post(
+            "/api/auth/login", json={"username": self.unique_username, "password": self.password}
+        )
 
     def test_report_list_endpoint(self):
         """测试报告列表端点"""
@@ -125,23 +122,20 @@ class TestReportExportAPI:
 
     def _register_and_login(self):
         """辅助方法: 注册并登录"""
-        self.client.post("/api/auth/register", json={
-            "username": self.unique_username,
-            "password": self.password
-        })
-        return self.client.post("/api/auth/login", json={
-            "username": self.unique_username,
-            "password": self.password
-        })
+        self.client.post(
+            "/api/auth/register", json={"username": self.unique_username, "password": self.password}
+        )
+        return self.client.post(
+            "/api/auth/login", json={"username": self.unique_username, "password": self.password}
+        )
 
     def test_export_jsonl_format(self):
         """测试导出 JSONL 格式"""
         self._register_and_login()
 
-        response = self.client.post("/api/reports/export", json={
-            "task_group_id": "test_tg_id",
-            "format": "jsonl"
-        })
+        response = self.client.post(
+            "/api/reports/export", json={"task_group_id": "test_tg_id", "format": "jsonl"}
+        )
 
         # 即使 task_group_id 不存在，API 也应该能响应
         assert response.status_code in [200, 401, 404, 500]
@@ -150,10 +144,9 @@ class TestReportExportAPI:
         """测试导出 JSON 格式"""
         self._register_and_login()
 
-        response = self.client.post("/api/reports/export", json={
-            "task_group_id": "test_tg_id",
-            "format": "json"
-        })
+        response = self.client.post(
+            "/api/reports/export", json={"task_group_id": "test_tg_id", "format": "json"}
+        )
 
         assert response.status_code in [200, 401, 404, 500]
 
@@ -161,10 +154,9 @@ class TestReportExportAPI:
         """测试导出 YAML 格式"""
         self._register_and_login()
 
-        response = self.client.post("/api/reports/export", json={
-            "task_group_id": "test_tg_id",
-            "format": "yaml"
-        })
+        response = self.client.post(
+            "/api/reports/export", json={"task_group_id": "test_tg_id", "format": "yaml"}
+        )
 
         assert response.status_code in [200, 401, 404, 500]
 
@@ -172,10 +164,13 @@ class TestReportExportAPI:
         """测试导出不支持的格式"""
         self._register_and_login()
 
-        response = self.client.post("/api/reports/export", json={
-            "task_group_id": "test_tg_id",
-            "format": "pdf"  # 不支持的格式
-        })
+        response = self.client.post(
+            "/api/reports/export",
+            json={
+                "task_group_id": "test_tg_id",
+                "format": "pdf",  # 不支持的格式
+            },
+        )
 
         # 应该返回错误
         assert response.status_code in [400, 401, 422, 500]
@@ -194,17 +189,15 @@ class TestReportFeaturesFullWorkflow:
         """测试完整报告流程: 注册 -> 登录 -> 查看报告列表 -> 查看可视化 -> 导出"""
 
         # 1. 用户注册
-        reg_response = self.client.post("/api/auth/register", json={
-            "username": self.unique_username,
-            "password": self.password
-        })
+        reg_response = self.client.post(
+            "/api/auth/register", json={"username": self.unique_username, "password": self.password}
+        )
         assert reg_response.status_code in [200, 400, 500]
 
         # 2. 用户登录
-        login_response = self.client.post("/api/auth/login", json={
-            "username": self.unique_username,
-            "password": self.password
-        })
+        login_response = self.client.post(
+            "/api/auth/login", json={"username": self.unique_username, "password": self.password}
+        )
         assert login_response.status_code in [200, 500]
 
         # 3. 查询报告列表
@@ -231,13 +224,14 @@ class TestReportFeaturesFullWorkflow:
             if "subtype_compliance" in viz_data:
                 assert isinstance(viz_data["subtype_compliance"], list)
             if "avg_iteration_count" in viz_data:
-                assert viz_data["avg_iteration_count"] is None or isinstance(viz_data["avg_iteration_count"], (int, float))
+                assert viz_data["avg_iteration_count"] is None or isinstance(
+                    viz_data["avg_iteration_count"], (int, float)
+                )
 
         # 6. 导出报告
-        export_response = self.client.post("/api/reports/export", json={
-            "task_group_id": "test_tg_id",
-            "format": "jsonl"
-        })
+        export_response = self.client.post(
+            "/api/reports/export", json={"task_group_id": "test_tg_id", "format": "jsonl"}
+        )
         assert export_response.status_code in [200, 401, 404, 500]
 
 
@@ -256,16 +250,12 @@ class TestReportAPIValidation:
 
     def test_export_missing_task_group_id(self):
         """测试导出端点缺少 task_group_id"""
-        response = self.client.post("/api/reports/export", json={
-            "format": "jsonl"
-        })
+        response = self.client.post("/api/reports/export", json={"format": "jsonl"})
         assert response.status_code in [400, 401, 422, 500]
 
     def test_export_missing_format(self):
         """测试导出端点缺少 format"""
-        response = self.client.post("/api/reports/export", json={
-            "task_group_id": "test_tg_id"
-        })
+        response = self.client.post("/api/reports/export", json={"task_group_id": "test_tg_id"})
         # format 有默认值，应该能成功或返回 404（task_group_id 不存在）
         assert response.status_code in [200, 401, 404, 500]
 
@@ -304,6 +294,6 @@ class TestReportDataIntegrity:
             if "avg_iteration_count" in data:
                 # 应该是 None 或非负数
                 assert data["avg_iteration_count"] is None or (
-                    isinstance(data["avg_iteration_count"], (int, float)) and
-                    data["avg_iteration_count"] >= 0
+                    isinstance(data["avg_iteration_count"], (int, float))
+                    and data["avg_iteration_count"] >= 0
                 )

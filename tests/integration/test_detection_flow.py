@@ -1,4 +1,5 @@
 """检测流程集成测试 — StateScheduler 核心调度"""
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
@@ -33,11 +34,14 @@ class TestStartDetection:
         tq = AsyncMock()
         tq.enqueue_task = AsyncMock(side_effect=["t1", "t2"])
         s = _make_scheduler(task_queue_manager=tq)
-        result = await s.start_detection(1, {
-            "model_id": REAL_MODEL_ID,
-            "detection_type": "static",
-            "dataset_ids": ["ds1", "ds2"],
-        })
+        result = await s.start_detection(
+            1,
+            {
+                "model_id": REAL_MODEL_ID,
+                "detection_type": "static",
+                "dataset_ids": ["ds1", "ds2"],
+            },
+        )
         assert result["success"]
         assert len(result["task_ids"]) == 2
         assert tq.enqueue_task.call_count == 2
@@ -61,6 +65,7 @@ class TestQueryDetectionProgress:
 
     async def test_task_found(self):
         from sdpj.core.task_queue_manager_interface import TaskStatus
+
         tq = AsyncMock()
         tq.get_task_status = AsyncMock(return_value=TaskStatus.RUNNING)
         s = _make_scheduler(task_queue_manager=tq)

@@ -83,7 +83,9 @@ class TaskQueueManagerInterface(Protocol):
         """
         ...
 
-    async def update_task_status(self, task_id: str, status: TaskStatus, error_message: str = "") -> bool:
+    async def update_task_status(
+        self, task_id: str, status: TaskStatus, error_message: str = ""
+    ) -> bool:
         """
         更新单个任务的执行状态
 
@@ -199,7 +201,9 @@ class TaskPersistence(Protocol):
         """查询单个任务组，不存在时抛出 ValueError"""
         ...
 
-    async def create_task_group_with_id(self, task_group_id: str, user_id: int, model_id: str) -> str:
+    async def create_task_group_with_id(
+        self, task_group_id: str, user_id: int, model_id: str
+    ) -> str:
         """使用指定ID创建任务组"""
         ...
 

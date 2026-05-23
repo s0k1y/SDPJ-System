@@ -14,7 +14,10 @@ _SESSION_TTL = timedelta(hours=24)
 
 def save_session(user_id: int) -> None:
     _SESSION_FILE.write_text(
-        json.dumps({"user_id": user_id, "logged_in_at": datetime.now(timezone.utc).isoformat()}, ensure_ascii=False),
+        json.dumps(
+            {"user_id": user_id, "logged_in_at": datetime.now(timezone.utc).isoformat()},
+            ensure_ascii=False,
+        ),
         encoding="utf-8",
     )
 

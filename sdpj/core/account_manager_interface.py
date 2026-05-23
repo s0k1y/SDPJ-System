@@ -41,7 +41,9 @@ class AccountManagerInterface(Protocol):
         """通过用户ID查询用户资料"""
         ...
 
-    async def change_password_for_user(self, user_id: int, old_password: str, new_password: str) -> tuple[bool, str]:
+    async def change_password_for_user(
+        self, user_id: int, old_password: str, new_password: str
+    ) -> tuple[bool, str]:
         """修改指定用户密码"""
         ...
 

@@ -1,9 +1,10 @@
 """独立测试脚本 - 验证 iteration_count 功能"""
+
 import sys
 import io
 
 # 修复 Windows 控制台编码问题
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
 
 def test_calculate_statistics_with_iteration_count():
@@ -30,13 +31,15 @@ def test_calculate_statistics_with_iteration_count():
     for cat, st in subtype_stats.items():
         failed = st["total"] - st["passed"]
         st_rate = round(st["passed"] / st["total"] * 100, 2) if st["total"] else 0.0
-        subtype_compliance.append({
-            "category": cat,
-            "total": st["total"],
-            "passed": st["passed"],
-            "failed": failed,
-            "rate": st_rate,
-        })
+        subtype_compliance.append(
+            {
+                "category": cat,
+                "total": st["total"],
+                "passed": st["passed"],
+                "failed": failed,
+                "rate": st_rate,
+            }
+        )
 
     print("✓ subtype_compliance 计算正确")
     assert len(subtype_compliance) == 2
@@ -58,12 +61,10 @@ def test_avg_iteration_count_calculation():
     ]
 
     iteration_counts = [
-        r["iteration_count"] for r in all_results
-        if r.get("iteration_count") is not None
+        r["iteration_count"] for r in all_results if r.get("iteration_count") is not None
     ]
     avg_iteration_count = (
-        round(sum(iteration_counts) / len(iteration_counts), 2)
-        if iteration_counts else None
+        round(sum(iteration_counts) / len(iteration_counts), 2) if iteration_counts else None
     )
 
     print("✓ avg_iteration_count 计算正确")
@@ -113,7 +114,7 @@ def test_result_data_structure():
         "poc": "原始PoC",
         "model_output": "大模型输出",
         "compliance_result": "违规",
-        "iteration_count": 5
+        "iteration_count": 5,
     }
 
     assert "iteration_count" in result_data

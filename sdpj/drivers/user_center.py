@@ -77,7 +77,11 @@ class UserCenter:
             return None
 
         # 移除敏感字段（存储密码）
-        return {"user_id": user["user_id"], "username": user["username"], "created_at": user["created_at"]}
+        return {
+            "user_id": user["user_id"],
+            "username": user["username"],
+            "created_at": user["created_at"],
+        }
 
     async def get_user_by_id(self, user_id: int) -> Optional[dict]:
         """按用户 ID 查询用户信息
@@ -94,11 +98,17 @@ class UserCenter:
             return None
 
         # 移除敏感字段（存储密码）
-        return {"user_id": user["user_id"], "username": user["username"], "created_at": user["created_at"]}
+        return {
+            "user_id": user["user_id"],
+            "username": user["username"],
+            "created_at": user["created_at"],
+        }
 
     # ==================== 凭据校验 ====================
 
-    async def verify_credentials(self, username: str, password: str) -> tuple[bool, Optional[int], str]:
+    async def verify_credentials(
+        self, username: str, password: str
+    ) -> tuple[bool, Optional[int], str]:
         """登录凭据校验
 
         Args:
@@ -127,7 +137,12 @@ class UserCenter:
         """
         users = await self._user_db.get_all_users()
         return [
-            {"user_id": u["user_id"], "username": u["username"], "created_at": u.get("created_at", "-")} for u in users
+            {
+                "user_id": u["user_id"],
+                "username": u["username"],
+                "created_at": u.get("created_at", "-"),
+            }
+            for u in users
         ]
 
     # ==================== 资源登记与查询 ====================

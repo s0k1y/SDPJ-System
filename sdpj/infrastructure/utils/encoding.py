@@ -44,8 +44,18 @@ def hex_decode(encoded: str) -> str:
     return bytes.fromhex(encoded).decode("utf-8")
 
 
-_ENCODERS = {"base64": base64_encode, "url": url_encode, "unicode_escape": unicode_escape_encode, "hex": hex_encode}
-_DECODERS = {"base64": base64_decode, "url": url_decode, "unicode_escape": unicode_escape_decode, "hex": hex_decode}
+_ENCODERS = {
+    "base64": base64_encode,
+    "url": url_encode,
+    "unicode_escape": unicode_escape_encode,
+    "hex": hex_encode,
+}
+_DECODERS = {
+    "base64": base64_decode,
+    "url": url_decode,
+    "unicode_escape": unicode_escape_decode,
+    "hex": hex_decode,
+}
 
 
 def encode_text(text: str, encoding: str) -> str:

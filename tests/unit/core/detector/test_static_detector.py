@@ -28,12 +28,14 @@ def _make_mock_llm():
     llm.assemble_request = MagicMock(return_value={"model": "test-model", "messages": []})
 
     # 默认成功响应
-    llm.invoke_llm = AsyncMock(return_value={
-        "success": True,
-        "content": "I cannot comply with that request. Score: 1",
-        "model": "test-model",
-        "usage": {},
-    })
+    llm.invoke_llm = AsyncMock(
+        return_value={
+            "success": True,
+            "content": "I cannot comply with that request. Score: 1",
+            "model": "test-model",
+            "usage": {},
+        }
+    )
     return llm, instance
 
 
@@ -47,9 +49,11 @@ def _make_mock_data_processor(poc_pool_cache=None, save_cache_error=None):
     dp = AsyncMock()
 
     # 数据集查询
-    dp.get_all_datasets = AsyncMock(return_value=[
-        {"dataset_id": 1, "risk_type": "injection", "name": "test_injection"},
-    ])
+    dp.get_all_datasets = AsyncMock(
+        return_value=[
+            {"dataset_id": 1, "risk_type": "injection", "name": "test_injection"},
+        ]
+    )
     dp.load_dataset_by_risk_type = AsyncMock(return_value=[])
 
     # TargetModel 注册
@@ -174,19 +178,23 @@ async def test_save_poc_pool_cache_error_in_select_poc_path():
     )
 
     # select_poc_pool 需要加载越狱数据集
-    dp.load_dataset_by_risk_type = AsyncMock(return_value=[
-        {
-            "dataset_id": 10,
-            "dataset_name": "jailbreak_llm",
-            "risk_type": "jailbreak",
-            "samples": [
-                {"poc": "jailbreak prompt 1", "subtype": "模板化越狱"},
-                {"poc": "jailbreak prompt 2", "subtype": "default_jailbreak"},
-            ],
-        }
-    ])
+    dp.load_dataset_by_risk_type = AsyncMock(
+        return_value=[
+            {
+                "dataset_id": 10,
+                "dataset_name": "jailbreak_llm",
+                "risk_type": "jailbreak",
+                "samples": [
+                    {"poc": "jailbreak prompt 1", "subtype": "模板化越狱"},
+                    {"poc": "jailbreak prompt 2", "subtype": "default_jailbreak"},
+                ],
+            }
+        ]
+    )
 
-    with patch("sdpj.core.sdpj_detector.static_detector._call_llm", new_callable=AsyncMock) as mock_call:
+    with patch(
+        "sdpj.core.sdpj_detector.static_detector._call_llm", new_callable=AsyncMock
+    ) as mock_call:
         # 第一次调用：LLM 输出；第二次调用：评分
         mock_call.side_effect = [
             {"content": "I cannot help with that.", "model": "test-model", "usage": {}},
@@ -231,7 +239,9 @@ class TestStandardizedLLMErrorEmptyMessage:
 
     def test_whitespace_message(self):
         """纯空白消息 → 视为空消息"""
-        err = StandardizedLLMError(ErrorCategory.NETWORK, "   ", original_error=ConnectionError("timeout"))
+        err = StandardizedLLMError(
+            ErrorCategory.NETWORK, "   ", original_error=ConnectionError("timeout")
+        )
         assert "timeout" in err.message
 
     def test_normal_message_unchanged(self):

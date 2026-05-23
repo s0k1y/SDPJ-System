@@ -91,7 +91,9 @@ class StateScheduler(StateSchedulerInterface):
                 if available:
                     await self._config.unregister_private_model(model_id)
                 adapter_content = json.dumps(content, ensure_ascii=False)
-                success, _, error = await self._config.register_private_model(adapter_content, model_id)
+                success, _, error = await self._config.register_private_model(
+                    adapter_content, model_id
+                )
                 if success:
                     restored += 1
                     self._log_rt("adapter_restored", f"启动时恢复适配器: {model_id}")
@@ -113,7 +115,10 @@ class StateScheduler(StateSchedulerInterface):
     def start_task_consumer(self, interval: float = 2.0, max_concurrency: int = 3) -> None:
         if self._consumer_task is None or self._consumer_task.done():
             self._consumer_task = asyncio.create_task(self._consume_loop(interval, max_concurrency))
-            self._log_rt("consumer_started", f"后台任务消费者已启动 (间隔={interval}s, 并发={max_concurrency})")
+            self._log_rt(
+                "consumer_started",
+                f"后台任务消费者已启动 (间隔={interval}s, 并发={max_concurrency})",
+            )
 
     async def stop_task_consumer(self) -> None:
         if self._consumer_task is not None and not self._consumer_task.done():
@@ -145,7 +150,9 @@ class StateScheduler(StateSchedulerInterface):
     def _log_state_transition(self, from_state: str, to_state: str, trigger: str) -> None:
         """记录状态转移日志"""
         self._logger.log_runtime(
-            "StateScheduler", "state_transition", f"状态转移: {from_state} → {to_state} (触发: {trigger})"
+            "StateScheduler",
+            "state_transition",
+            f"状态转移: {from_state} → {to_state} (触发: {trigger})",
         )
 
     def _log_err(self, err_type: str, desc: str) -> None:
@@ -201,7 +208,10 @@ class StateScheduler(StateSchedulerInterface):
                     return {"success": False, "error": f"模型适配器注册失败: {err}"}
                 self._log_rt("adapter_auto_registered", f"适配器 '{model_id}' 已自动注册")
             else:
-                return {"success": False, "error": f"模型适配器 '{model_id}' 未注册且无配置信息可用"}
+                return {
+                    "success": False,
+                    "error": f"模型适配器 '{model_id}' 未注册且无配置信息可用",
+                }
 
         if not dataset_ids:
             return {"success": False, "error": "必须指定至少一个检测数据集 (dataset_ids)"}
@@ -221,8 +231,14 @@ class StateScheduler(StateSchedulerInterface):
             return {"success": False, "error": f"系统当前状态为'{current_state}'，不允许启动检测"}
 
         task_group_id = str(uuid.uuid4())
-        print(f"\n[DEBUG StateScheduler.start_detection] 生成 task_group_id={task_group_id} (仅在内存，未持久化)", flush=True)
-        print(f"[DEBUG StateScheduler.start_detection] user_id={user_id}, model_id={model_id}, type={detection_type}, dataset_ids={dataset_ids}, force_refresh={force_refresh}", flush=True)
+        print(
+            f"\n[DEBUG StateScheduler.start_detection] 生成 task_group_id={task_group_id} (仅在内存，未持久化)",
+            flush=True,
+        )
+        print(
+            f"[DEBUG StateScheduler.start_detection] user_id={user_id}, model_id={model_id}, type={detection_type}, dataset_ids={dataset_ids}, force_refresh={force_refresh}",
+            flush=True,
+        )
         task_ids: list[str] = []
         try:
             for ds_id in dataset_ids:
@@ -252,7 +268,9 @@ class StateScheduler(StateSchedulerInterface):
                 "task_ids": task_ids,
             },
         )
-        self._log_rt("detection_queued", f"任务组 {task_group_id} 已入队, 共 {len(task_ids)} 个子任务")
+        self._log_rt(
+            "detection_queued", f"任务组 {task_group_id} 已入队, 共 {len(task_ids)} 个子任务"
+        )
 
         return {"success": True, "task_group_id": task_group_id, "task_ids": task_ids}
 
@@ -275,9 +293,18 @@ class StateScheduler(StateSchedulerInterface):
         force_refresh = task_params.get("force_refresh", False)
 
         print(f"\n[DEBUG StateScheduler.execute_detection_task] === 开始执行 ===", flush=True)
-        print(f"[DEBUG StateScheduler.execute_detection_task] task_id={task_id}, detection_type={detection_type}", flush=True)
-        print(f"[DEBUG StateScheduler.execute_detection_task] task_group_id={task_group_id}, model_id={model_id}, user_id={user_id}", flush=True)
-        print(f"[DEBUG StateScheduler.execute_detection_task] dataset_id={raw_ds_id}, jailbreak_ids={jailbreak_dataset_ids}, force_refresh={force_refresh}", flush=True)
+        print(
+            f"[DEBUG StateScheduler.execute_detection_task] task_id={task_id}, detection_type={detection_type}",
+            flush=True,
+        )
+        print(
+            f"[DEBUG StateScheduler.execute_detection_task] task_group_id={task_group_id}, model_id={model_id}, user_id={user_id}",
+            flush=True,
+        )
+        print(
+            f"[DEBUG StateScheduler.execute_detection_task] dataset_id={raw_ds_id}, jailbreak_ids={jailbreak_dataset_ids}, force_refresh={force_refresh}",
+            flush=True,
+        )
 
         actual_model_name = model_id
         try:
@@ -299,7 +326,11 @@ class StateScheduler(StateSchedulerInterface):
             pass
 
         def _poc_progress_cb(
-            processed: int, total: int, found: int, score_counts: dict = None, subtype_stats: dict = None
+            processed: int,
+            total: int,
+            found: int,
+            score_counts: dict = None,
+            subtype_stats: dict = None,
         ) -> None:
             self._log_rt(
                 "poc_progress",
@@ -314,7 +345,9 @@ class StateScheduler(StateSchedulerInterface):
             }
             if subtype_stats is not None:
                 progress["subtype_stats"] = subtype_stats
-                remaining = [st for st, info in subtype_stats.items() if not info.get("event_set", False)]
+                remaining = [
+                    st for st, info in subtype_stats.items() if not info.get("event_set", False)
+                ]
                 progress["remaining_subtypes"] = remaining
             if not hasattr(_poc_progress_cb, "_started"):
                 _poc_progress_cb._started = True
@@ -330,7 +363,8 @@ class StateScheduler(StateSchedulerInterface):
         def _dynamic_progress_cb(processed: int, total: int, avg_iterations: float) -> None:
             asyncio.ensure_future(
                 self._task_queue.update_dynamic_progress(
-                    task_group_id, {"processed": processed, "total": total, "avg_iterations": avg_iterations}
+                    task_group_id,
+                    {"processed": processed, "total": total, "avg_iterations": avg_iterations},
                 )
             )
 
@@ -447,7 +481,9 @@ class StateScheduler(StateSchedulerInterface):
                     }
             current_status = await self._task_queue.get_task_status(task_id)
             if current_status == TaskStatus.CANCELLED:
-                self._log_rt("task_cancelled_during_execution", f"子任务 {task_id} 在执行期间被取消")
+                self._log_rt(
+                    "task_cancelled_during_execution", f"子任务 {task_id} 在执行期间被取消"
+                )
                 return {"success": False, "task_id": task_id, "error": "任务已取消"}
             await self._task_queue.update_task_status(task_id, TaskStatus.COMPLETED)
             self._log_rt("task_completed", f"子任务 {task_id} 执行完成")
@@ -495,7 +531,10 @@ class StateScheduler(StateSchedulerInterface):
             self._running_tasks.add(bg_task)
             bg_task.add_done_callback(self._running_tasks.discard)
 
-        return {"success": True, "tasks": [{"task_id": t.task_id, "status": "launched"} for t in batch]}
+        return {
+            "success": True,
+            "tasks": [{"task_id": t.task_id, "status": "launched"} for t in batch],
+        }
 
     def _cleanup_running_tasks(self) -> None:
         self._running_tasks = {t for t in self._running_tasks if not t.done()}
@@ -514,7 +553,9 @@ class StateScheduler(StateSchedulerInterface):
             self._log_err("BackgroundTaskError", f"后台任务 {task_id} 异常: {e}")
         finally:
             queue_view = await self._task_queue.get_queue_view()
-            has_active = any(t.status in (TaskStatus.PENDING, TaskStatus.RUNNING) for t in queue_view)
+            has_active = any(
+                t.status in (TaskStatus.PENDING, TaskStatus.RUNNING) for t in queue_view
+            )
             if not has_active:
                 self._transition_detection_done("task_finished")
 
@@ -550,7 +591,10 @@ class StateScheduler(StateSchedulerInterface):
         terminal_group_ids = {
             gid
             for gid, tasks in task_group_map.items()
-            if all(t.status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED) for t in tasks)
+            if all(
+                t.status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED)
+                for t in tasks
+            )
         }
         if terminal_group_ids:
             try:
@@ -571,7 +615,9 @@ class StateScheduler(StateSchedulerInterface):
                 except Exception:
                     pass
             if orphan_tasks:
-                self._log_rt("orphan_cleanup", f"清理孤儿任务组 {orphan_id}, 移除 {len(orphan_tasks)} 个任务")
+                self._log_rt(
+                    "orphan_cleanup", f"清理孤儿任务组 {orphan_id}, 移除 {len(orphan_tasks)} 个任务"
+                )
 
         groups = []
         config_ids_to_read = []
@@ -592,7 +638,9 @@ class StateScheduler(StateSchedulerInterface):
             try:
                 config = configs_map.get(int(first.model_id))
                 if config:
-                    model_id_content = config.get("model_id") or config.get("model") or first.model_id
+                    model_id_content = (
+                        config.get("model_id") or config.get("model") or first.model_id
+                    )
                     request_format = config.get("request_format", "")
                     format_labels = {"openai": "OpenAI", "anthropic": "Anthropic", "azure": "Azure"}
                     label = format_labels.get(request_format)
@@ -600,7 +648,13 @@ class StateScheduler(StateSchedulerInterface):
             except (ValueError, TypeError):
                 pass
 
-            status_counts = {"pending": 0, "running": 0, "completed": 0, "failed": 0, "cancelled": 0}
+            status_counts = {
+                "pending": 0,
+                "running": 0,
+                "completed": 0,
+                "failed": 0,
+                "cancelled": 0,
+            }
             children = []
             for t in tasks:
                 status_counts[t.status.value] = status_counts.get(t.status.value, 0) + 1
@@ -640,7 +694,11 @@ class StateScheduler(StateSchedulerInterface):
                             cnt = sc.get(str(s), sc.get(s, 0))
                             if cnt > 0:
                                 score_parts.append(f"{s}分{cnt}条")
-                        found_info = "、".join(score_parts) if score_parts else f"有效 {poc_progress['found']} 条"
+                        found_info = (
+                            "、".join(score_parts)
+                            if score_parts
+                            else f"有效 {poc_progress['found']} 条"
+                        )
                         poc_child = {
                             "task_id": f"poc_{group_id}",
                             "status": "running",
@@ -706,9 +764,15 @@ class StateScheduler(StateSchedulerInterface):
                             if slow_subtypes:
                                 stage_info["slow_subtypes"] = slow_subtypes
                     else:
-                        stage_info = {"stage": "poc_selecting", "remaining_subtypes": remaining_subtypes}
+                        stage_info = {
+                            "stage": "poc_selecting",
+                            "remaining_subtypes": remaining_subtypes,
+                        }
                 else:
-                    stage_info = {"stage": "poc_selecting", "remaining_subtypes": remaining_subtypes}
+                    stage_info = {
+                        "stage": "poc_selecting",
+                        "remaining_subtypes": remaining_subtypes,
+                    }
 
             total = len(tasks)
             if status_counts["failed"] > 0:
@@ -741,12 +805,16 @@ class StateScheduler(StateSchedulerInterface):
                     eta_seconds = max(task_etas)
                     stage_info = {
                         "stage": "static_detecting",
-                        "tasks_remaining": sum(1 for c in children if c.get("status") in ("pending", "running")),
+                        "tasks_remaining": sum(
+                            1 for c in children if c.get("status") in ("pending", "running")
+                        ),
                     }
                 elif eta_seconds < 0:
                     stage_info = {
                         "stage": "static_detecting",
-                        "tasks_remaining": sum(1 for c in children if c.get("status") in ("pending", "running")),
+                        "tasks_remaining": sum(
+                            1 for c in children if c.get("status") in ("pending", "running")
+                        ),
                     }
 
             dynamic_prog = await self._task_queue.get_dynamic_progress(group_id)
@@ -784,7 +852,11 @@ class StateScheduler(StateSchedulerInterface):
                 dyn_processed = dynamic_prog.get("processed", 0)
                 dyn_total = dynamic_prog.get("total", 0)
                 dyn_avg_iter = dynamic_prog.get("avg_iterations", 0.0)
-                dyn_name = f"动态检测 ({dyn_processed}/{dyn_total}，平均 {dyn_avg_iter} 轮)" if dyn_total > 0 else "动态检测（初始化中...）"
+                dyn_name = (
+                    f"动态检测 ({dyn_processed}/{dyn_total}，平均 {dyn_avg_iter} 轮)"
+                    if dyn_total > 0
+                    else "动态检测（初始化中...）"
+                )
                 dyn_child = {
                     "task_id": f"dyn_{group_id}",
                     "status": "running",
@@ -795,7 +867,9 @@ class StateScheduler(StateSchedulerInterface):
                         "processed": dyn_processed,
                         "total": dyn_total,
                         "avg_iterations": dyn_avg_iter,
-                    } if dyn_total > 0 else None,
+                    }
+                    if dyn_total > 0
+                    else None,
                 }
                 children.append(dyn_child)
                 status_counts["running"] += 1
@@ -863,11 +937,17 @@ class StateScheduler(StateSchedulerInterface):
             "task_group_cancelled",
             f"任务组 {task_group_id} 已取消, 共取消 {cancelled_count} 个子任务, 已从队列移除 {len(group_tasks)} 个任务",
         )
-        return {"success": True, "cancelled_count": cancelled_count, "removed_count": len(group_tasks)}
+        return {
+            "success": True,
+            "cancelled_count": cancelled_count,
+            "removed_count": len(group_tasks),
+        }
 
     # ── 报告管理调度 (职责 5-8) ──
 
-    async def generate_report(self, task_group_id: str, detection_type: str, *, user_id: int | None = None) -> dict:
+    async def generate_report(
+        self, task_group_id: str, detection_type: str, *, user_id: int | None = None
+    ) -> dict:
         try:
             old_state = self.get_system_state()
             self._fsm.start_report()
@@ -906,7 +986,9 @@ class StateScheduler(StateSchedulerInterface):
             model_id=f.get("model_id"),
         )
 
-    async def delete_report(self, target_id: str, caller_user_id: int, granularity: str = "task_group") -> dict:
+    async def delete_report(
+        self, target_id: str, caller_user_id: int, granularity: str = "task_group"
+    ) -> dict:
         kwargs: dict = {}
         if granularity == "task_group":
             kwargs["task_group_id"] = target_id
@@ -918,7 +1000,9 @@ class StateScheduler(StateSchedulerInterface):
             kwargs["result_data_id"] = target_id
 
         ok, msg = await self._report.delete_report(user_id=caller_user_id, **kwargs)
-        self._log_op(caller_user_id, "delete_report", {"target_id": target_id, "granularity": granularity})
+        self._log_op(
+            caller_user_id, "delete_report", {"target_id": target_id, "granularity": granularity}
+        )
 
         if ok:
             try:
@@ -928,7 +1012,9 @@ class StateScheduler(StateSchedulerInterface):
 
         return {"success": ok, "message": msg}
 
-    async def _cleanup_task_queue_after_report_delete(self, target_id: str, granularity: str) -> None:
+    async def _cleanup_task_queue_after_report_delete(
+        self, target_id: str, granularity: str
+    ) -> None:
         queue_view = await self._task_queue.get_queue_view()
 
         if granularity == "task_group":
@@ -945,13 +1031,24 @@ class StateScheduler(StateSchedulerInterface):
         elif granularity == "task":
             task = next((t for t in queue_view if t.task_id == target_id), None)
             if task:
-                if task.status not in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED):
+                if task.status not in (
+                    TaskStatus.COMPLETED,
+                    TaskStatus.FAILED,
+                    TaskStatus.CANCELLED,
+                ):
                     await self._task_queue.cancel_task(task.task_id)
                 await self._task_queue.remove_task(task.task_id)
-                self._log_rt("queue_cleaned_after_report_delete", f"删除报告后清理任务队列: 任务 {target_id}")
+                self._log_rt(
+                    "queue_cleaned_after_report_delete", f"删除报告后清理任务队列: 任务 {target_id}"
+                )
 
     async def export_report(
-        self, task_group_id: str, target_format: str, *, user_id: int | None = None, task_id: str | None = None
+        self,
+        task_group_id: str,
+        target_format: str,
+        *,
+        user_id: int | None = None,
+        task_id: str | None = None,
     ) -> dict:
         filename, content = await self._report.export_report(
             task_group_id, target_format, user_id=user_id, task_id=task_id
@@ -959,13 +1056,17 @@ class StateScheduler(StateSchedulerInterface):
         self._log_rt("report_exported", f"报告 {task_group_id} 已导出为 {target_format}")
         return {"success": True, "filename": filename, "content": content}
 
-    async def prepare_visualization_data(self, task_group_id: str, *, user_id: int | None = None) -> dict:
+    async def prepare_visualization_data(
+        self, task_group_id: str, *, user_id: int | None = None
+    ) -> dict:
         data = await self._report.prepare_visualization_data(task_group_id, user_id=user_id)
         if isinstance(data, dict) and "error" in data and "risk_distribution" not in data:
             return {"success": False, "error": data["error"]}
         return {"success": True, "data": data}
 
-    async def prepare_task_visualization_data(self, task_id: str, *, user_id: int | None = None) -> dict:
+    async def prepare_task_visualization_data(
+        self, task_id: str, *, user_id: int | None = None
+    ) -> dict:
         data = await self._report.prepare_task_visualization_data(task_id, user_id=user_id)
         if isinstance(data, dict) and "error" in data and "risk_distribution" not in data:
             return {"success": False, "error": data["error"]}
@@ -1126,7 +1227,11 @@ class StateScheduler(StateSchedulerInterface):
         """获取所有用户列表"""
         users = await self._account.list_all_users()
         return [
-            {"user_id": u.get("user_id"), "username": u.get("username"), "created_at": u.get("created_at", "-")}
+            {
+                "user_id": u.get("user_id"),
+                "username": u.get("username"),
+                "created_at": u.get("created_at", "-"),
+            }
             for u in users
         ]
 
@@ -1329,7 +1434,9 @@ class StateScheduler(StateSchedulerInterface):
                 return {"success": True, "configs": configs}
 
             if operation == "export":
-                content = await self._config.export_config(params["config_id"], params.get("format", "json"))
+                content = await self._config.export_config(
+                    params["config_id"], params.get("format", "json")
+                )
                 self._log_op(user_id, "export_config", {"config_id": params["config_id"]})
                 return {"success": True, "content": content}
 
@@ -1359,15 +1466,23 @@ class StateScheduler(StateSchedulerInterface):
 
         ok, _, err = await self._config.register_private_model(adapter_content, temp_model_id)
         if not ok:
-            return {"success": False, "result": {"status": "config_error", "error": f"适配器注册失败: {err}"}}
+            return {
+                "success": False,
+                "result": {"status": "config_error", "error": f"适配器注册失败: {err}"},
+            }
 
         try:
             _, instance = await self._config.is_model_available(temp_model_id)
             if instance is None:
-                return {"success": False, "result": {"status": "config_error", "error": "适配器实例创建失败"}}
+                return {
+                    "success": False,
+                    "result": {"status": "config_error", "error": "适配器实例创建失败"},
+                }
 
             result = await self._detector.verify_connectivity(instance, timeout=30.0)
-            self._log_op(user_id, "verify_config", {"config_id": config_id, "status": result["status"]})
+            self._log_op(
+                user_id, "verify_config", {"config_id": config_id, "status": result["status"]}
+            )
             return {"success": result["success"], "result": result}
         finally:
             try:
@@ -1399,7 +1514,9 @@ class StateScheduler(StateSchedulerInterface):
             self._log_op(user_id, "query_datasets", {})
         return filtered
 
-    async def query_dataset_detail(self, dataset_id: int, user_id: int | None = None) -> dict | None:
+    async def query_dataset_detail(
+        self, dataset_id: int, user_id: int | None = None
+    ) -> dict | None:
         """查询数据集详情"""
         datasets = await self._config.query_datasets()
         for ds in datasets:
@@ -1461,7 +1578,11 @@ class StateScheduler(StateSchedulerInterface):
         username = profile["username"] if profile else str(user_id)
         result = await self._config.import_dataset_file(user_id, filename, content, username)
         if result.get("success"):
-            self._log_op(user_id, "import_dataset", {"filename": filename, "dataset_id": result.get("dataset_id")})
+            self._log_op(
+                user_id,
+                "import_dataset",
+                {"filename": filename, "dataset_id": result.get("dataset_id")},
+            )
         return result
 
     async def schedule_private_resource_operation(self, operation: str, params: dict) -> dict:

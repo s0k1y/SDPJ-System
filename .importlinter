@@ -1,0 +1,12 @@
+[importlinter]
+root_package = sdpj
+
+[importlinter:contract:five-layer-no-reverse-dependency]
+name = Five-layer architecture: no reverse dependency
+type = layers
+layers =
+    sdpj.ui
+    sdpj.control
+    sdpj.core
+    sdpj.drivers
+    sdpj.infrastructure

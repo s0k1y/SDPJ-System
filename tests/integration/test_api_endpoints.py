@@ -1,4 +1,5 @@
 """API 端点集成测试"""
+
 import pytest
 from fastapi.testclient import TestClient
 from sdpj.ui.webui.backend.app import app
@@ -12,8 +13,11 @@ def client():
 class TestAuthEndpoints:
     def test_register_success(self, client):
         import uuid
+
         username = f"int_{uuid.uuid4().hex[:8]}"
-        resp = client.post("/api/auth/register", json={"username": username, "password": "pass123456"})
+        resp = client.post(
+            "/api/auth/register", json={"username": username, "password": "pass123456"}
+        )
         assert resp.status_code in (200, 400, 500)
 
     def test_register_missing_field(self, client):

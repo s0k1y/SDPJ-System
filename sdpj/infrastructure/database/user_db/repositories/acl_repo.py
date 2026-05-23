@@ -89,7 +89,9 @@ class ACLRepository:
         result = await self._session.execute(stmt)
         return list(result.scalars().unique().all())
 
-    async def get_by_resource_and_grantee(self, resource_id: int, grantee_user_id: int) -> Optional[AccessControl]:
+    async def get_by_resource_and_grantee(
+        self, resource_id: int, grantee_user_id: int
+    ) -> Optional[AccessControl]:
         """按资源 ID 和被授权用户 ID 查询访问控制项
 
         Args:
@@ -100,7 +102,10 @@ class ACLRepository:
             访问控制项对象，不存在时返回 None
         """
         stmt = select(AccessControl).where(
-            and_(AccessControl.resource_id == resource_id, AccessControl.grantee_user_id == grantee_user_id)
+            and_(
+                AccessControl.resource_id == resource_id,
+                AccessControl.grantee_user_id == grantee_user_id,
+            )
         )
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()

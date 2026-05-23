@@ -100,7 +100,9 @@ class LLMRegistryInterface(Protocol):
         """
         ...
 
-    async def register_private_model(self, adapter_content: str, model_id: str) -> Tuple[bool, str, str]:
+    async def register_private_model(
+        self, adapter_content: str, model_id: str
+    ) -> Tuple[bool, str, str]:
         """
         注册用户上传的私有大模型
 

@@ -26,7 +26,9 @@ def user_group():
 def register(ctx, username, password):
     """注册新用户"""
     params = AuthParams(username=username, password=password)
-    result = asyncio.run(ctx.obj.scheduler.schedule_user_auth(params.username, params.password, "register"))
+    result = asyncio.run(
+        ctx.obj.scheduler.schedule_user_auth(params.username, params.password, "register")
+    )
     data = unwrap(result)
     output.success(data.get("message", "注册成功"))
 
@@ -38,7 +40,9 @@ def register(ctx, username, password):
 def login(ctx, username, password):
     """用户登录"""
     params = AuthParams(username=username, password=password)
-    result = asyncio.run(ctx.obj.scheduler.schedule_user_auth(params.username, params.password, "login"))
+    result = asyncio.run(
+        ctx.obj.scheduler.schedule_user_auth(params.username, params.password, "login")
+    )
     data = unwrap(result, required="user_id")
     ctx.obj.current_user_id = data["user_id"]
     save_session(data["user_id"])
@@ -64,7 +68,9 @@ def logout(ctx):
 def switch(ctx, username, password):
     """切换账号"""
     result = asyncio.run(
-        ctx.obj.scheduler.schedule_account_operation("switch_account", {"username": username, "password": password})
+        ctx.obj.scheduler.schedule_account_operation(
+            "switch_account", {"username": username, "password": password}
+        )
     )
     data = unwrap(result, required="user_id")
     ctx.obj.current_user_id = data["user_id"]
@@ -80,7 +86,9 @@ def switch(ctx, username, password):
 def profile(ctx):
     """查询当前用户资料"""
     user_id = ctx.obj.require_login()
-    result = asyncio.run(ctx.obj.scheduler.schedule_account_operation("get_profile", {"user_id": user_id}))
+    result = asyncio.run(
+        ctx.obj.scheduler.schedule_account_operation("get_profile", {"user_id": user_id})
+    )
     data = unwrap(result, required="profile")
     output.kv(data["profile"])
 
@@ -94,7 +102,8 @@ def change_password(ctx, old_password, new_password):
     user_id = ctx.obj.require_login()
     result = asyncio.run(
         ctx.obj.scheduler.schedule_account_operation(
-            "change_password", {"user_id": user_id, "old_password": old_password, "new_password": new_password}
+            "change_password",
+            {"user_id": user_id, "old_password": old_password, "new_password": new_password},
         )
     )
     unwrap(result)
@@ -110,7 +119,9 @@ def change_password(ctx, old_password, new_password):
 def unregister(ctx):
     """注销当前账号"""
     user_id = ctx.obj.require_login()
-    result = asyncio.run(ctx.obj.scheduler.schedule_account_operation("unregister", {"user_id": user_id}))
+    result = asyncio.run(
+        ctx.obj.scheduler.schedule_account_operation("unregister", {"user_id": user_id})
+    )
     unwrap(result)
     ctx.obj.current_user_id = None
     clear_session()
@@ -122,7 +133,9 @@ def unregister(ctx):
 def resources(ctx):
     """列出当前用户拥有的受控资源"""
     user_id = ctx.obj.require_login()
-    result = asyncio.run(ctx.obj.scheduler.schedule_account_operation("list_resources", {"user_id": user_id}))
+    result = asyncio.run(
+        ctx.obj.scheduler.schedule_account_operation("list_resources", {"user_id": user_id})
+    )
     res_list = result.get("resources", [])
     shared_list = result.get("shared_resources", [])
     if not res_list and not shared_list:
@@ -130,11 +143,25 @@ def resources(ctx):
         return
     if res_list:
         output.info("自有资源:")
-        rows = [[str(r.get("resource_id", "")), r.get("resource_type", ""), (r.get("dataset_name") or r.get("model_id") or "")] for r in res_list]
+        rows = [
+            [
+                str(r.get("resource_id", "")),
+                r.get("resource_type", ""),
+                (r.get("dataset_name") or r.get("model_id") or ""),
+            ]
+            for r in res_list
+        ]
         output.table(["ID", "类型", "名称"], rows)
     if shared_list:
         output.info("共享资源:")
-        rows = [[str(r.get("resource_id", "")), r.get("resource_type", ""), (r.get("dataset_name") or r.get("model_id") or "")] for r in shared_list]
+        rows = [
+            [
+                str(r.get("resource_id", "")),
+                r.get("resource_type", ""),
+                (r.get("dataset_name") or r.get("model_id") or ""),
+            ]
+            for r in shared_list
+        ]
         output.table(["ID", "类型", "名称"], rows)
 
 
@@ -206,7 +233,10 @@ def show_acl(ctx, resource_id):
     if not acl_list:
         output.info("暂无授权记录")
         return
-    rows = [[str(a.get("acl_id", "")), str(a.get("grantee_user_id", "")), a.get("grantee_username", "")] for a in acl_list]
+    rows = [
+        [str(a.get("acl_id", "")), str(a.get("grantee_user_id", "")), a.get("grantee_username", "")]
+        for a in acl_list
+    ]
     output.table(["ACL-ID", "用户ID", "用户名"], rows)
 
 
@@ -234,7 +264,9 @@ def list_users(ctx):
     if not users:
         output.info("暂无用户")
         return
-    rows = [[str(u.get("user_id", "")), u.get("username", ""), u.get("created_at", "-")] for u in users]
+    rows = [
+        [str(u.get("user_id", "")), u.get("username", ""), u.get("created_at", "-")] for u in users
+    ]
     output.table(["用户ID", "用户名", "创建时间"], rows)
 
 
@@ -244,6 +276,8 @@ def list_users(ctx):
 @click.pass_context
 def delete_user(ctx, user_id):
     """管理员删除用户"""
-    result = asyncio.run(ctx.obj.scheduler.schedule_account_operation("admin_delete_user", {"user_id": user_id}))
+    result = asyncio.run(
+        ctx.obj.scheduler.schedule_account_operation("admin_delete_user", {"user_id": user_id})
+    )
     data = unwrap(result)
     output.success(data.get("message", "用户已删除"))

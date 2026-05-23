@@ -29,7 +29,9 @@ async def profile(
     scheduler: StateSchedulerInterface = Depends(get_scheduler),
 ):
     return wrap_scheduler_result(
-        await scheduler.schedule_account_operation("get_profile", {"user_id": request.state.user_id})
+        await scheduler.schedule_account_operation(
+            "get_profile", {"user_id": request.state.user_id}
+        )
     )
 
 
@@ -39,7 +41,9 @@ async def resources(
     scheduler: StateSchedulerInterface = Depends(get_scheduler),
 ):
     return wrap_scheduler_result(
-        await scheduler.schedule_account_operation("list_resources", {"user_id": request.state.user_id})
+        await scheduler.schedule_account_operation(
+            "list_resources", {"user_id": request.state.user_id}
+        )
     )
 
 

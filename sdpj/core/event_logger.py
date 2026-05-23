@@ -82,7 +82,9 @@ class EventLogger(EventLoggerInterface):
                 ts = ts.replace(tzinfo=timezone.utc)
         return ts
 
-    def log_operation(self, user_id: str, operation_type: str, context: dict, timestamp: datetime | None = None) -> str:
+    def log_operation(
+        self, user_id: str, operation_type: str, context: dict, timestamp: datetime | None = None
+    ) -> str:
         """
         记录用户操作日志
 
@@ -114,7 +116,11 @@ class EventLogger(EventLoggerInterface):
         return log_id
 
     def log_runtime(
-        self, source_module: str, event_type: str, description: str, timestamp: datetime | None = None
+        self,
+        source_module: str,
+        event_type: str,
+        description: str,
+        timestamp: datetime | None = None,
     ) -> str:
         """
         记录系统运行日志
@@ -147,7 +153,11 @@ class EventLogger(EventLoggerInterface):
         return log_id
 
     def log_error(
-        self, source_module: str, error_type: str, description: str, timestamp: datetime | None = None
+        self,
+        source_module: str,
+        error_type: str,
+        description: str,
+        timestamp: datetime | None = None,
     ) -> str:
         """
         记录系统错误日志
@@ -243,7 +253,9 @@ class EventLogger(EventLoggerInterface):
 
         memory_matches: list[LogEntry] = []
         for entry in self._logs:
-            if not self._filter_entry(entry, category, level, ts_start, ts_end, source_module, user_id, user_ids):
+            if not self._filter_entry(
+                entry, category, level, ts_start, ts_end, source_module, user_id, user_ids
+            ):
                 continue
             memory_matches.append(entry)
 
@@ -274,7 +286,11 @@ class EventLogger(EventLoggerInterface):
             db_ids = {e.log_id for e in db_entries}
             memory_only = [e for e in memory_matches if e.log_id not in db_ids]
             memory_only.sort(
-                key=lambda e: e.timestamp.replace(tzinfo=timezone.utc) if e.timestamp.tzinfo is None else e.timestamp,
+                key=lambda e: (
+                    e.timestamp.replace(tzinfo=timezone.utc)
+                    if e.timestamp.tzinfo is None
+                    else e.timestamp
+                ),
                 reverse=True,
             )
 
@@ -308,7 +324,11 @@ class EventLogger(EventLoggerInterface):
                     self._logger.error(f"从数据库查询日志失败: {e}")
 
             results.sort(
-                key=lambda e: e.timestamp.replace(tzinfo=timezone.utc) if e.timestamp.tzinfo is None else e.timestamp,
+                key=lambda e: (
+                    e.timestamp.replace(tzinfo=timezone.utc)
+                    if e.timestamp.tzinfo is None
+                    else e.timestamp
+                ),
                 reverse=True,
             )
             return results, len(results)
@@ -513,7 +533,9 @@ class EventLogger(EventLoggerInterface):
             "log_id": entry.log_id,
             "category": entry.category.value,
             "level": entry.level.value,
-            "timestamp": entry.timestamp.isoformat() if isinstance(entry.timestamp, datetime) else str(entry.timestamp),
+            "timestamp": entry.timestamp.isoformat()
+            if isinstance(entry.timestamp, datetime)
+            else str(entry.timestamp),
             "source_module": entry.source_module,
             "user_id": entry.user_id,
             "event_type": entry.event_type,

@@ -1,4 +1,5 @@
 """数据库集成测试 — UserRepository + PrivateConfigRepository"""
+
 import pytest
 import pytest_asyncio
 from sqlalchemy import event
@@ -8,7 +9,9 @@ from sqlalchemy.pool import StaticPool
 from sdpj.infrastructure.database.user_db.models import Base
 from sdpj.infrastructure.database.user_db.repositories.user_repo import UserRepository
 from sdpj.infrastructure.database.user_db.repositories.resource_repo import ResourceRepository
-from sdpj.infrastructure.database.user_db.repositories.private_config_repo import PrivateConfigRepository
+from sdpj.infrastructure.database.user_db.repositories.private_config_repo import (
+    PrivateConfigRepository,
+)
 
 
 @pytest_asyncio.fixture

@@ -39,7 +39,9 @@ class SystemStateMachine(StateMachine):
     report_done = generating_report.to(idle)
     start_configuring = idle.to(configuring)
     configuring_done = configuring.to(idle)
-    to_error = idle.to(error) | detecting.to(error) | generating_report.to(error) | configuring.to(error)
+    to_error = (
+        idle.to(error) | detecting.to(error) | generating_report.to(error) | configuring.to(error)
+    )
     recover = error.to(idle)
 
 

@@ -69,7 +69,11 @@ class LLMAdapter(ABC):
 
     @staticmethod
     def _raise_api_error(
-        status: int, error_msg: str, *, retry_after: str | None = None, extra_detail: dict | None = None
+        status: int,
+        error_msg: str,
+        *,
+        retry_after: str | None = None,
+        extra_detail: dict | None = None,
     ) -> None:
         """统一的 API 错误抛出逻辑（子类复用）
 
@@ -89,9 +93,17 @@ class LLMAdapter(ABC):
             detail = {**extra_detail, **(detail or {})} if detail else extra_detail
 
         if status == 401:
-            raise StandardizedLLMError(ErrorCategory.AUTH, error_msg, status_code=status, detail=detail)
+            raise StandardizedLLMError(
+                ErrorCategory.AUTH, error_msg, status_code=status, detail=detail
+            )
         if status == 429:
-            raise StandardizedLLMError(ErrorCategory.RATE_LIMIT, error_msg, status_code=status, detail=detail)
+            raise StandardizedLLMError(
+                ErrorCategory.RATE_LIMIT, error_msg, status_code=status, detail=detail
+            )
         if 400 <= status < 500:
-            raise StandardizedLLMError(ErrorCategory.INVALID_REQUEST, error_msg, status_code=status, detail=detail)
-        raise StandardizedLLMError(ErrorCategory.SERVER_ERROR, error_msg, status_code=status, detail=detail)
+            raise StandardizedLLMError(
+                ErrorCategory.INVALID_REQUEST, error_msg, status_code=status, detail=detail
+            )
+        raise StandardizedLLMError(
+            ErrorCategory.SERVER_ERROR, error_msg, status_code=status, detail=detail
+        )

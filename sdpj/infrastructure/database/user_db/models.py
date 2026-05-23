@@ -24,7 +24,9 @@ class User(Base):
     user_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     username: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     password: Mapped[str] = mapped_column(String(255), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
     # 关系：用户拥有的资源
     owned_resources: Mapped[list["Resource"]] = relationship(
@@ -48,19 +50,28 @@ class Resource(Base):
     owner_user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("User.user_id", ondelete="CASCADE"), nullable=False, index=True
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
     # 关系：资源拥有者
     owner: Mapped["User"] = relationship("User", back_populates="owned_resources")
 
     # 关系：资源的访问控制项
     access_controls: Mapped[list["AccessControl"]] = relationship(
-        "AccessControl", back_populates="resource", cascade="all, delete-orphan", passive_deletes=True
+        "AccessControl",
+        back_populates="resource",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     # 关系：私有检测配置内容（一对一）
     private_config: Mapped[Optional["PrivateConfig"]] = relationship(
-        "PrivateConfig", back_populates="resource", cascade="all, delete-orphan", passive_deletes=True, uselist=False
+        "PrivateConfig",
+        back_populates="resource",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        uselist=False,
     )
 
     def __repr__(self) -> str:
@@ -82,10 +93,14 @@ class AccessControl(Base):
     grantee_user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("User.user_id", ondelete="CASCADE"), nullable=False, index=True
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
     # 唯一约束：同一资源不能对同一用户重复授权
-    __table_args__ = (UniqueConstraint("resource_id", "grantee_user_id", name="uq_resource_grantee"),)
+    __table_args__ = (
+        UniqueConstraint("resource_id", "grantee_user_id", name="uq_resource_grantee"),
+    )
 
     # 关系：所属资源
     resource: Mapped["Resource"] = relationship("Resource", back_populates="access_controls")
@@ -94,9 +109,7 @@ class AccessControl(Base):
     grantee: Mapped["User"] = relationship("User")
 
     def __repr__(self) -> str:
-        return (
-            f"<AccessControl(acl_id={self.acl_id}, resource_id={self.resource_id}, grantee_id={self.grantee_user_id})>"
-        )
+        return f"<AccessControl(acl_id={self.acl_id}, resource_id={self.resource_id}, grantee_id={self.grantee_user_id})>"
 
 
 class PrivateConfig(Base):
@@ -111,7 +124,9 @@ class PrivateConfig(Base):
         Integer, ForeignKey("Resource.resource_id", ondelete="CASCADE"), primary_key=True
     )
     config_content: Mapped[str] = mapped_column(Text, nullable=False)  # 存储 JSON 字符串
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),

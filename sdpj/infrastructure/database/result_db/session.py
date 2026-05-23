@@ -31,7 +31,9 @@ class SessionManager:
         self.engine: Optional[AsyncEngine] = engine
         self.async_session_maker = None
         if engine is not None:
-            self.async_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+            self.async_session_maker = async_sessionmaker(
+                engine, class_=AsyncSession, expire_on_commit=False
+            )
 
     async def initialize(self) -> None:
         """初始化数据库引擎和会话工厂"""
@@ -60,7 +62,9 @@ class SessionManager:
                     cursor.execute("PRAGMA synchronous=NORMAL")
                     cursor.close()
 
-            self.async_session_maker = async_sessionmaker(self.engine, class_=AsyncSession, expire_on_commit=False)
+            self.async_session_maker = async_sessionmaker(
+                self.engine, class_=AsyncSession, expire_on_commit=False
+            )
 
     async def create_tables(self) -> None:
         from sdpj.infrastructure.database.result_db.models import SystemLog  # noqa
@@ -84,9 +88,13 @@ class SessionManager:
                     "ALTER TABLE DetectionTask ADD COLUMN algorithm_type VARCHAR(20) NOT NULL DEFAULT 'static'"
                 )
             if "metadata_json" not in columns:
-                await conn.exec_driver_sql("ALTER TABLE DetectionTask ADD COLUMN metadata_json JSON")
+                await conn.exec_driver_sql(
+                    "ALTER TABLE DetectionTask ADD COLUMN metadata_json JSON"
+                )
             if "error_message" not in columns:
-                await conn.exec_driver_sql("ALTER TABLE DetectionTask ADD COLUMN error_message TEXT")
+                await conn.exec_driver_sql(
+                    "ALTER TABLE DetectionTask ADD COLUMN error_message TEXT"
+                )
         except Exception:
             pass
 
@@ -151,7 +159,9 @@ class SessionManager:
                                 (new_ts, pk_val),
                             )
 
-            await conn.exec_driver_sql("CREATE TABLE _utc_migrated (done INTEGER NOT NULL DEFAULT 1)")
+            await conn.exec_driver_sql(
+                "CREATE TABLE _utc_migrated (done INTEGER NOT NULL DEFAULT 1)"
+            )
             await conn.exec_driver_sql("INSERT INTO _utc_migrated (done) VALUES (1)")
         except Exception:
             pass

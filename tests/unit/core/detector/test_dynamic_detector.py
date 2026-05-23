@@ -26,7 +26,9 @@ def mock_data_processor():
 
 
 @pytest.mark.asyncio
-async def test_dynamic_detection_static_violation_gets_zero_iterations(mock_llm, mock_data_processor):
+async def test_dynamic_detection_static_violation_gets_zero_iterations(
+    mock_llm, mock_data_processor
+):
     """静态就违规的样本，迭代次数应为 0"""
     llm, instance = mock_llm
     dp = mock_data_processor
@@ -36,26 +38,32 @@ async def test_dynamic_detection_static_violation_gets_zero_iterations(mock_llm,
         "status": "completed",
         "task_group_id": "static_tg_1",
         "poc_pool": ["test_poc"],
-        "judge_template": "test_template"
+        "judge_template": "test_template",
     }
 
-    dp.aggregate_task_group_results = AsyncMock(return_value={
-        "tasks": [{
-            "dataset_id": 1,
-            "report": {
-                "result_data": [
-                    {
-                        "risk_subclass": "越狱攻击",
-                        "poc": "test_poc",
-                        "model_output": "bad output",
-                        "compliance_result": "违规"
-                    }
-                ]
-            }
-        }]
-    })
+    dp.aggregate_task_group_results = AsyncMock(
+        return_value={
+            "tasks": [
+                {
+                    "dataset_id": 1,
+                    "report": {
+                        "result_data": [
+                            {
+                                "risk_subclass": "越狱攻击",
+                                "poc": "test_poc",
+                                "model_output": "bad output",
+                                "compliance_result": "违规",
+                            }
+                        ]
+                    },
+                }
+            ]
+        }
+    )
 
-    result = await run_dynamic_detection(llm, dp, "gpt-4", "user_1", static_result, max_iterations=3)
+    result = await run_dynamic_detection(
+        llm, dp, "gpt-4", "user_1", static_result, max_iterations=3
+    )
 
     assert result["status"] == "completed"
     assert result["task_group_id"] == "dyn_tg_1"
@@ -88,26 +96,32 @@ async def test_dynamic_detection_tracks_iterations(mock_llm, mock_data_processor
         "status": "completed",
         "task_group_id": "static_tg_1",
         "poc_pool": ["poc1"],
-        "judge_template": "template"
+        "judge_template": "template",
     }
 
-    dp.aggregate_task_group_results = AsyncMock(return_value={
-        "tasks": [{
-            "dataset_id": 1,
-            "report": {
-                "result_data": [
-                    {
-                        "risk_subclass": "越狱攻击",
-                        "poc": "original_poc",
-                        "model_output": "output",
-                        "compliance_result": "合规"
-                    }
-                ]
-            }
-        }]
-    })
+    dp.aggregate_task_group_results = AsyncMock(
+        return_value={
+            "tasks": [
+                {
+                    "dataset_id": 1,
+                    "report": {
+                        "result_data": [
+                            {
+                                "risk_subclass": "越狱攻击",
+                                "poc": "original_poc",
+                                "model_output": "output",
+                                "compliance_result": "合规",
+                            }
+                        ]
+                    },
+                }
+            ]
+        }
+    )
 
-    result = await run_dynamic_detection(llm, dp, "gpt-4", "user_1", static_result, max_iterations=3)
+    result = await run_dynamic_detection(
+        llm, dp, "gpt-4", "user_1", static_result, max_iterations=3
+    )
 
     assert result["status"] == "completed"
     # 应该调用了 append_result_data_batch
@@ -129,23 +143,39 @@ async def test_dynamic_detection_avg_iteration_count(mock_llm, mock_data_process
         "status": "completed",
         "task_group_id": "static_tg_1",
         "poc_pool": ["poc1"],
-        "judge_template": "template"
+        "judge_template": "template",
     }
 
     # 两个样本：一个静态违规（0次），一个需要迭代
-    dp.aggregate_task_group_results = AsyncMock(return_value={
-        "tasks": [{
-            "dataset_id": 1,
-            "report": {
-                "result_data": [
-                    {"risk_subclass": "A", "poc": "p1", "model_output": "o1", "compliance_result": "违规"},
-                    {"risk_subclass": "B", "poc": "p2", "model_output": "o2", "compliance_result": "合规"},
-                ]
-            }
-        }]
-    })
+    dp.aggregate_task_group_results = AsyncMock(
+        return_value={
+            "tasks": [
+                {
+                    "dataset_id": 1,
+                    "report": {
+                        "result_data": [
+                            {
+                                "risk_subclass": "A",
+                                "poc": "p1",
+                                "model_output": "o1",
+                                "compliance_result": "违规",
+                            },
+                            {
+                                "risk_subclass": "B",
+                                "poc": "p2",
+                                "model_output": "o2",
+                                "compliance_result": "合规",
+                            },
+                        ]
+                    },
+                }
+            ]
+        }
+    )
 
-    result = await run_dynamic_detection(llm, dp, "gpt-4", "user_1", static_result, max_iterations=3)
+    result = await run_dynamic_detection(
+        llm, dp, "gpt-4", "user_1", static_result, max_iterations=3
+    )
 
     assert "avg_iteration_count" in result
     assert isinstance(result["avg_iteration_count"], float)
@@ -159,7 +189,9 @@ async def test_dynamic_detection_no_static_base():
 
     static_result = {"status": "no_jailbreak_risk"}
 
-    result = await run_dynamic_detection(llm, dp, "gpt-4", "user_1", static_result, max_iterations=3)
+    result = await run_dynamic_detection(
+        llm, dp, "gpt-4", "user_1", static_result, max_iterations=3
+    )
 
     assert result["status"] == "no_static_base"
     assert result["task_group_id"] is None

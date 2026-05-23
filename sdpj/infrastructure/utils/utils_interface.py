@@ -4,7 +4,6 @@ from typing import Any, Protocol
 
 
 class UtilsInterface(Protocol):
-
     # 编码
     def encode_text(self, text: str, encoding: str) -> str: ...
     def decode_text(self, encoded: str, encoding: str) -> str: ...

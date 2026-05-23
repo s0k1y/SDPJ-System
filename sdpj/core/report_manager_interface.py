@@ -21,7 +21,9 @@ class ReportManagerInterface(Protocol):
         """计算报告统计指标"""
         ...
 
-    async def list_reports(self, user_id: Optional[str] = None, model_id: Optional[str] = None) -> list[dict]:
+    async def list_reports(
+        self, user_id: Optional[str] = None, model_id: Optional[str] = None
+    ) -> list[dict]:
         """查询检测报告列表"""
         ...
 
@@ -72,7 +74,9 @@ class ReportManagerInterface(Protocol):
         """
         ...
 
-    async def prepare_visualization_data(self, task_group_id: str, user_id: int | None = None) -> dict:
+    async def prepare_visualization_data(
+        self, task_group_id: str, user_id: int | None = None
+    ) -> dict:
         """准备可视化图表数据
 
         Args:
@@ -81,7 +85,9 @@ class ReportManagerInterface(Protocol):
         """
         ...
 
-    async def prepare_task_visualization_data(self, task_id: str, user_id: int | None = None) -> dict:
+    async def prepare_task_visualization_data(
+        self, task_id: str, user_id: int | None = None
+    ) -> dict:
         """准备单个任务的可视化图表数据
 
         Args:

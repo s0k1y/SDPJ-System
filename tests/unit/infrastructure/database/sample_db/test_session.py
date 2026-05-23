@@ -1,7 +1,10 @@
 """SampleDB 会话管理单元测试"""
 
 import pytest
-from sdpj.infrastructure.database.sample_db.session import SampleDBSessionManager, get_session_manager
+from sdpj.infrastructure.database.sample_db.session import (
+    SampleDBSessionManager,
+    get_session_manager,
+)
 from sdpj.infrastructure.database.sample_db.models import Base, Dataset
 
 
@@ -92,6 +95,7 @@ async def test_session_manager_rollback_on_error():
     # 验证数据已提交（异常发生在提交之后）
     async with manager.get_session() as session:
         from sqlalchemy import select
+
         stmt = select(Dataset).where(Dataset.name == "回滚测试")
         result = await session.execute(stmt)
         dataset = result.scalar_one_or_none()

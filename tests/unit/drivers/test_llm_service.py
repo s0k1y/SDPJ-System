@@ -2,7 +2,9 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 from sdpj.drivers.llm_service import LLMService
 from sdpj.infrastructure.llm_adapters.errors import (
-    StandardizedLLMError, ErrorCategory, LLMServiceInstance,
+    StandardizedLLMError,
+    ErrorCategory,
+    LLMServiceInstance,
 )
 
 

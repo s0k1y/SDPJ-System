@@ -14,11 +14,11 @@ def setup_cors(app: FastAPI) -> None:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
-            "https://localhost:5173",   # Vite 开发服务器 (HTTPS)
-            "https://localhost:3000",   # 备用端口 (HTTPS)
+            "https://localhost:5173",  # Vite 开发服务器 (HTTPS)
+            "https://localhost:3000",  # 备用端口 (HTTPS)
             "https://127.0.0.1:5173",
             "https://127.0.0.1:3000",
-            "http://localhost:5173",    # 回退（证书未就绪时）
+            "http://localhost:5173",  # 回退（证书未就绪时）
             "http://localhost:3000",
             "http://127.0.0.1:5173",
             "http://127.0.0.1:3000",

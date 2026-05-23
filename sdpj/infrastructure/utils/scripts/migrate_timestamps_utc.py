@@ -26,7 +26,9 @@ async def migrate_timestamps_to_utc():
     print(f"检测到系统本地时区偏移: UTC{'+' if offset_hours >= 0 else ''}{offset_hours:.0f}")
 
     async with session_manager.engine.begin() as conn:
-        result = await conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='SystemLog'")
+        result = await conn.exec_driver_sql(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='SystemLog'"
+        )
         if not result.fetchall():
             print("SystemLog表不存在，跳过迁移")
             return
@@ -89,7 +91,9 @@ async def migrate_timestamps_to_utc():
             "SELECT name FROM sqlite_master WHERE type='table' AND name='DetectionTask'"
         )
         if result.fetchall():
-            result = await conn.exec_driver_sql("SELECT task_id, start_time, end_time FROM DetectionTask")
+            result = await conn.exec_driver_sql(
+                "SELECT task_id, start_time, end_time FROM DetectionTask"
+            )
             task_rows = await result.fetchall()
             task_migrated = 0
             for row in task_rows:

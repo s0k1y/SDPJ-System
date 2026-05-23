@@ -65,7 +65,6 @@ class TestUserRepository:
         assert user is None
 
 
-
 @pytest.mark.asyncio
 class TestResourceRepository:
     """测试资源仓储"""
@@ -132,10 +131,14 @@ class TestACLRepository:
         grantee_id = await user_db.create_user("grantee3", "password")
         await user_db.add_access_control(sample_resource["resource_id"], grantee_id)
 
-        exists = await user_db.check_access_control_exists(sample_resource["resource_id"], grantee_id)
+        exists = await user_db.check_access_control_exists(
+            sample_resource["resource_id"], grantee_id
+        )
         assert exists is True
 
-        not_exists = await user_db.check_access_control_exists(sample_resource["resource_id"], 99999)
+        not_exists = await user_db.check_access_control_exists(
+            sample_resource["resource_id"], 99999
+        )
         assert not_exists is False
 
     async def test_get_access_controls_by_resource(self, user_db, sample_resource):
@@ -156,9 +159,10 @@ class TestACLRepository:
         assert result is True
 
         # 验证访问控制项已删除
-        exists = await user_db.check_access_control_exists(sample_resource["resource_id"], grantee_id)
+        exists = await user_db.check_access_control_exists(
+            sample_resource["resource_id"], grantee_id
+        )
         assert exists is False
-
 
 
 @pytest.mark.asyncio
@@ -249,7 +253,9 @@ class TestCascadeDelete:
         await user_db.delete_resource(sample_resource["resource_id"])
 
         # 验证访问控制项已被级联删除
-        exists = await user_db.check_access_control_exists(sample_resource["resource_id"], grantee_id)
+        exists = await user_db.check_access_control_exists(
+            sample_resource["resource_id"], grantee_id
+        )
         assert exists is False
 
     async def test_delete_resource_cascades_private_config(self, user_db, sample_resource):

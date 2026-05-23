@@ -91,7 +91,12 @@ class SDPJDetector(SDPJDetectorInterface):
             return "违规"
 
     async def write_result(
-        self, report_id: str, risk_subclass: str, poc: str, model_output: str, compliance_result: str
+        self,
+        report_id: str,
+        risk_subclass: str,
+        poc: str,
+        model_output: str,
+        compliance_result: str,
     ) -> str:
         return await self._data_processor.append_result_data(
             report_id, risk_subclass, poc, model_output, compliance_result
