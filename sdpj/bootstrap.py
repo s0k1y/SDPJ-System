@@ -1,12 +1,17 @@
 """组合根 — 唯一允许跨层实例化的模块"""
 
 from functools import lru_cache
+from typing import cast
 
 from sdpj.control.state_scheduler_interface import StateSchedulerInterface
+from sdpj.drivers.llm_service_interface import LLMServiceInterface
 
 
 @lru_cache(maxsize=1)
-def build_scheduler() -> StateSchedulerInterface:
+def build_scheduler(
+    skip_builtin_datasets: bool = False,
+    skip_adapter_restore: bool = False,
+) -> StateSchedulerInterface:
     from sdpj.control.state_scheduler import StateScheduler
     from sdpj.core.account_manager import AccountManager
     from sdpj.core.dac_manager import DACManager
@@ -62,11 +67,12 @@ def build_scheduler() -> StateSchedulerInterface:
         load_builtin_datasets,
     )
 
-    async def _init_db():
+    async def _init_db(skip_builtin_datasets: bool = False):
         await user_sm.create_tables()
         await sample_sm.create_tables()
         await result_sm.create_tables()
-        await load_builtin_datasets(sample_db)
+        if not skip_builtin_datasets:
+            await load_builtin_datasets(sample_db)
 
     sample_db = SampleDB(sample_sm)
     result_db = ResultDB(result_sm)
@@ -81,7 +87,7 @@ def build_scheduler() -> StateSchedulerInterface:
         dac_manager=DACManager(uc),
         config_manager=PrivateConfigManager(dp, uc, reg),
         report_manager=ReportManager(dp, uc),
-        detector=SDPJDetector(dp, llm),
+        detector=SDPJDetector(dp, cast("LLMServiceInterface", llm)),
         event_logger=EventLogger(
             result_db=result_db, output_targets={"memory", "database"}
         ),

@@ -3,7 +3,9 @@
 提供检测样本的 CRUD 操作。
 """
 
-from typing import Optional
+from typing import Optional, cast
+
+from sqlalchemy.engine import CursorResult
 
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import select
@@ -119,6 +121,15 @@ class SampleRepository:
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
+    async def count_by_dataset(self, dataset_id: int) -> int:
+        from sqlalchemy import func as sa_func
+
+        stmt = select(sa_func.count()).select_from(DetectionSample).where(
+            DetectionSample.dataset_id == dataset_id
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one()
+
     async def delete_by_dataset(self, dataset_id: int) -> int:
         """删除指定数据集下的所有样本
 
@@ -131,4 +142,4 @@ class SampleRepository:
         stmt = sa_delete(DetectionSample).where(DetectionSample.dataset_id == dataset_id)
         result = await self.session.execute(stmt)
         await self.session.flush()
-        return result.rowcount
+        return cast(CursorResult, result).rowcount

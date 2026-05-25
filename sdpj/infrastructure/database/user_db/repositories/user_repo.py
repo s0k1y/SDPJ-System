@@ -3,7 +3,9 @@
 负责用户表的 CRUD 操作。
 """
 
-from typing import Optional
+from typing import Optional, cast
+
+from sqlalchemy.engine import CursorResult
 
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
@@ -65,7 +67,7 @@ class UserRepository:
         stmt = delete(User).where(User.user_id == user_id)
         result = await self._session.execute(stmt)
         await self._session.flush()
-        return result.rowcount > 0
+        return cast(CursorResult, result).rowcount > 0
 
     async def update_password(self, user_id: int, new_password: str) -> bool:
         """更新用户密码

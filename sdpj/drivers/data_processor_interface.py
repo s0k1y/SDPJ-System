@@ -16,7 +16,6 @@ class DataProcessorInterface(Protocol):
     - 检测样本与数据集的查询与维护
     - 检测结果的持久化
     - 检测报告数据的汇总与产出
-    - 多模态与多编码的样本构造及响应处理
     - 文件导入及结构化数据序列化
     """
 
@@ -431,7 +430,7 @@ class DataProcessorInterface(Protocol):
         ...
 
     async def export_report_file(
-        self, report_data: dict, target_format: Literal["json", "yaml", "jsonl"]
+        self, report_data: dict, target_format: str
     ) -> tuple[str, str]:
         """导出检测报告文件
 
@@ -444,76 +443,6 @@ class DataProcessorInterface(Protocol):
 
         触发场景:
             用户下载检测报告
-        """
-        ...
-
-    # ==================== 多模态与多编码的样本构造及响应处理 ====================
-
-    def construct_multimodal_sample(
-        self, poc: str, target_modality: Literal["image", "audio", "video"]
-    ) -> bytes:
-        """构造多模态检测样本
-
-        Args:
-            poc: 文本形式的漏洞概念验证数据 PoC
-            target_modality: 目标模态（图像/音频/视频）
-
-        Returns:
-            目标模态形式的样本数据
-
-        触发场景:
-            静态/动态算法构造多模态注入样本
-        """
-        ...
-
-    def parse_multimodal_response(
-        self, response_data: bytes, source_modality: Literal["image", "audio", "video"]
-    ) -> str:
-        """解析大模型多模态响应
-
-        Args:
-            response_data: 大模型返回的多模态响应内容
-            source_modality: 源模态类型
-
-        Returns:
-            从中提取的文本内容
-
-        触发场景:
-            对大模型多模态回复的后处理
-        """
-        ...
-
-    def construct_encoded_sample(
-        self, poc: str, encoding_type: Literal["base64", "url", "unicode_escape", "hex"]
-    ) -> str:
-        """构造多编码检测样本
-
-        Args:
-            poc: 文本形式的 PoC
-            encoding_type: 目标编码形式
-
-        Returns:
-            目标编码下的样本文本
-
-        触发场景:
-            静态/动态算法构造多编码注入样本
-        """
-        ...
-
-    def decode_response_content(
-        self, encoded_content: str, encoding_type: Literal["base64", "url", "unicode_escape", "hex"]
-    ) -> str:
-        """还原编码响应内容
-
-        Args:
-            encoded_content: 大模型响应中的编码文本
-            encoding_type: 已知编码形式
-
-        Returns:
-            还原后的原始文本
-
-        触发场景:
-            对大模型响应中的编码内容做还原
         """
         ...
 
@@ -626,3 +555,5 @@ class DataProcessorInterface(Protocol):
             删除的条目数
         """
         ...
+
+    async def add_dataset_record(self, name: str, sample_count: int, file_path: str, risk_type: str = "", resource_id: int | None = None) -> int: ...

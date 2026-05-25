@@ -26,12 +26,13 @@ class SampleDBInterface(Protocol):
 
     # ==================== 数据集级能力 ====================
 
-    async def create_dataset(self, name: str, risk_type: str) -> int:
+    async def create_dataset(self, name: str, risk_type: str, resource_id: int | None = None) -> int:
         """创建检测数据集
 
         Args:
             name: 数据集名称
             risk_type: 安全风险类型（如「越狱攻击」「提示词注入」「安全基准」）
+            resource_id: 对应 UserDB Resource 表的 resource_id（可选）
 
         Returns:
             新创建数据集的数据集 ID

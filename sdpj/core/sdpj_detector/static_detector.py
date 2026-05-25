@@ -2,7 +2,7 @@
 
 import asyncio
 from datetime import datetime, timezone
-from typing import Callable, Optional
+from typing import Callable, Optional, cast
 
 from sdpj.drivers.data_processor_interface import DataProcessorInterface
 from sdpj.drivers.llm_service_interface import (
@@ -130,6 +130,7 @@ async def _call_llm(
             if llm_callback is not None:
                 llm_callback(request_info, {"error": "LLMError"})
             raise
+    return {}
 
 
 def _build_pool(successful: list[tuple[str, int, str]]) -> list[str]:
@@ -154,7 +155,7 @@ def _select_cache_entries(successful: list[tuple[str, int, str]]) -> list[tuple[
     for st in _JAILBREAKV_SUBTYPES:
         if st in groups:
             ranked = sorted(groups[st], key=lambda x: (-x[1], len(x[0])))
-            seen: set[str] = set()
+            seen = set()
             for entry in ranked:
                 if entry[0] not in seen:
                     seen.add(entry[0])
@@ -376,7 +377,7 @@ async def run_static_detection(
         entries = [(c["poc_text"], c["score"], c["subtype"]) for c in cached]
         poc_pool = _build_pool(entries)
         if poc_progress_callback is not None:
-            poc_progress_callback(len(poc_pool), len(poc_pool), len(poc_pool), {}, {})
+            poc_progress_callback(len(poc_pool), len(poc_pool), len(poc_pool), {})
     else:
         poc_pool, raw_entries = await select_poc_pool(
             llm,
@@ -385,7 +386,7 @@ async def run_static_detection(
             jailbreak_dataset_ids,
             max_rps=max_rps,
             max_concurrency=max_concurrency,
-            progress_callback=poc_progress_callback,
+            progress_callback=cast(Callable[[int, int, int, dict, dict | None], None], poc_progress_callback),  # type: ignore[arg-type]
             llm_callback=llm_callback,
         )
         print(
@@ -410,7 +411,7 @@ async def run_static_detection(
                 )
                 # 缓存写入失败不影响检测流程继续
     if not poc_pool:
-        print(f"[DEBUG static_detector] PoC池为空，标记 no_jailbreak_risk", flush=True)
+        print("[DEBUG static_detector] PoC池为空，标记 no_jailbreak_risk", flush=True)
         for ds_meta in non_jailbreak:
             task_id = await data_processor.create_detection_task(
                 task_group_id,
@@ -440,7 +441,7 @@ async def run_static_detection(
         report_id = await data_processor.create_detection_report(task_id)
 
         datasets = await data_processor.load_dataset_by_risk_type(ds_meta["risk_type"])
-        samples = next((ds.get("samples", []) for ds in datasets if ds["dataset_id"] == ds_id), [])
+        samples: list[dict] = next((ds.get("samples", []) for ds in datasets if ds["dataset_id"] == ds_id), [])
         sample_total = len(samples)
         if task_progress_callback is not None:
             task_progress_callback(task_id, 0, sample_total)

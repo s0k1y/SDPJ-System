@@ -4,7 +4,7 @@
 依赖：UserDB, UtilsLib
 """
 
-from typing import Optional
+from typing import Optional, cast
 
 from sdpj.infrastructure.database.user_db.interface import UserDBInterface
 
@@ -242,7 +242,7 @@ class UserCenter:
         return await self._user_db.check_access_control_exists(resource_id, user_id)
 
     async def get_accessible_resource_ids(self, user_id: int, resource_ids: list[int]) -> set[int]:
-        return await self._user_db.get_accessible_resource_ids(user_id, resource_ids)
+        return cast(set[int], await self._user_db.get_accessible_resource_ids(user_id, resource_ids))
 
     async def get_acl_by_id(self, acl_id: int):
         return await self._user_db.get_access_control_by_id(acl_id)
@@ -285,7 +285,7 @@ class UserCenter:
         Returns:
             {config_id: config_content_dict} 映射
         """
-        return await self._user_db.read_private_configs_batch(config_ids)
+        return cast(dict[int, dict], await self._user_db.read_private_configs_batch(config_ids))
 
     async def update_private_config(self, config_id: int, config_content: dict) -> bool:
         """更新用户私有检测配置内容

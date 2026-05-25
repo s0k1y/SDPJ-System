@@ -1,7 +1,7 @@
 """DataProcessor 检测数据处理模块实现
 
 负责检测样本与数据集的查询维护、检测结果持久化、报告数据汇总、
-多模态与多编码样本构造及响应处理、文件导入及结构化数据序列化。
+文件导入及结构化数据序列化。
 
 依赖模块：SampleDB, ResultDB, UtilsLib
 被依赖模块：SDPJDetector, PrivateConfigManager, ReportManager
@@ -507,7 +507,7 @@ class DataProcessor:
         return await self._result_db.count_compliance_results()
 
     async def export_report_file(
-        self, report_data: dict, target_format: Literal["json", "yaml", "jsonl"]
+        self, report_data: dict, target_format: str
     ) -> tuple[str, str]:
         if target_format == "jsonl":
             lines = []
@@ -524,40 +524,6 @@ class DataProcessor:
         task_group_id = report_data.get("task_group_id", "unknown")
         filename = f"{task_group_id}.{target_format}"
         return filename, content
-
-    # ==================== 多模态与多编码的样本构造及响应处理 ====================
-
-    def construct_multimodal_sample(
-        self, poc: str, target_modality: Literal["image", "audio", "video"]
-    ) -> bytes:
-        if target_modality == "image":
-            return self._utils.text_to_image(poc)
-        if target_modality == "audio":
-            return self._utils.text_to_audio(poc)
-        if target_modality == "video":
-            return self._utils.text_to_video(poc)
-        raise NotImplementedError(f"模态 '{target_modality}' 暂未支持")
-
-    def parse_multimodal_response(
-        self, response_data: bytes, source_modality: Literal["image", "audio", "video"]
-    ) -> str:
-        if source_modality == "image":
-            return self._utils.image_to_text(response_data)
-        if source_modality == "audio":
-            return self._utils.audio_to_text(response_data)
-        if source_modality == "video":
-            return self._utils.video_to_text(response_data)
-        raise NotImplementedError(f"模态 '{source_modality}' 暂未支持")
-
-    def construct_encoded_sample(
-        self, poc: str, encoding_type: Literal["base64", "url", "unicode_escape", "hex"]
-    ) -> str:
-        return self._utils.encode_text(poc, encoding_type)
-
-    def decode_response_content(
-        self, encoded_content: str, encoding_type: Literal["base64", "url", "unicode_escape", "hex"]
-    ) -> str:
-        return self._utils.decode_text(encoded_content, encoding_type)
 
     # ==================== 文件导入及结构化数据序列化 ====================
 
@@ -583,6 +549,14 @@ class DataProcessor:
         if format == "json":
             return self._utils.deserialize_json(serialized_data)
         return self._utils.deserialize_yaml(serialized_data)
+
+    # ==================== 多编码样本构造与响应还原 ====================
+
+    def construct_encoded_sample(self, poc: str, encoding_type: str) -> str:
+        return self._utils.encode_text(poc, encoding_type)
+
+    def decode_response_content(self, encoded_content: str, encoding_type: str) -> str:
+        return self._utils.decode_text(encoded_content, encoding_type)
 
     # ==================== PoC 池缓存 ====================
 

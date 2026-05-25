@@ -93,8 +93,7 @@ class SampleDB:
     async def get_sample_count_by_dataset(self, dataset_id: int) -> int:
         async with self.session_manager.get_session() as session:
             repo = SampleRepository(session)
-            samples = await repo.get_by_dataset(dataset_id)
-            return len(samples)
+            return await repo.count_by_dataset(dataset_id)
 
     async def get_dataset_by_id(self, dataset_id: int) -> Optional[dict]:
         """按 ID 查询单个数据集

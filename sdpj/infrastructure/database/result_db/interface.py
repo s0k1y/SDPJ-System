@@ -61,6 +61,19 @@ class ResultDBInterface(Protocol):
         """
         ...
 
+    async def create_task_group_with_id(self, task_group_id: str, user_id: int, model_id: str) -> str:
+        """使用指定ID创建检测任务组
+
+        Args:
+            task_group_id: 预生成的任务组ID
+            user_id: 用户ID
+            model_id: 模型ID
+
+        Returns:
+            任务组ID
+        """
+        ...
+
     async def delete_task_group(self, task_group_id: str) -> bool:
         """删除检测任务组
 
@@ -383,7 +396,6 @@ class ResultDBInterface(Protocol):
         Returns:
             删除的条目数
         """
-        ...
         ...
 
     async def append_result_data_batch(

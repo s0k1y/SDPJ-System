@@ -8,6 +8,7 @@ from typing import Callable
 
 from sdpj.drivers.data_processor_interface import DataProcessorInterface
 from sdpj.drivers.llm_service_interface import LLMError, LLMServiceInterface
+from sdpj.infrastructure.utils.rate_limiter import RateLimiter
 
 from . import prompt_builder, result_parser
 from ..sdpj_detector_interface import SDPJDetectorInterface
@@ -51,7 +52,7 @@ class SDPJDetector(SDPJDetectorInterface):
             jailbreak_dataset_ids=jailbreak_dataset_ids,
             max_rps=max_rps,
             max_concurrency=max_concurrency,
-            poc_progress_callback=poc_progress_callback,
+            poc_progress_callback=poc_progress_callback,  # type: ignore[arg-type]
             task_progress_callback=task_progress_callback,
             force_refresh=force_refresh,
             llm_callback=llm_callback,
@@ -85,7 +86,7 @@ class SDPJDetector(SDPJDetectorInterface):
         instance = await self._llm.get_service_instance(model_id)
         judge_input = prompt_builder.build_judge_input(judge_template, model_output)
         try:
-            resp = await _call_llm(self._llm, instance, "", judge_input)
+            resp = await _call_llm(self._llm, instance, "", judge_input, RateLimiter())
             return result_parser.parse_compliance_judgment(resp)
         except LLMError:
             return "违规"

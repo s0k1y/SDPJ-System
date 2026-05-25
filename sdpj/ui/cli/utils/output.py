@@ -1,7 +1,6 @@
 """CLI 输出格式化工具 — Rich 渲染"""
 
 from rich.console import Console
-from rich.panel import Panel
 from rich.table import Table as RichTable
 from rich.text import Text
 

@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo '{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"E:\\\\\\\\Sky毕业设计\\\\\\\\4.系统源代码\\\\\\\\.claude\\\\\\\\CLAUDE.md\"}}')",
+      "Bash(powershell -Command '$j = [Console]::In.ReadToEnd\\(\\); Write-Host $j')",
+      "Bash(echo '{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"E:/Sky毕业设计/4.系统源代码/.claude/CLAUDE.md\"}}')",
+      "Bash(powershell -File \"E:/Sky毕业设计/4.系统源代码/.claude/hooks/protect-config.ps1\")",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(powershell -Command 'if \\($input\\) { Write-Host \"input IS truthy, type:\" $input.GetType\\(\\).Name } else { Write-Host \"input IS falsy\" }')",
+      "Bash(powershell -Command '$input | Out-String; Write-Host \"---LENGTH:\" \\($input | Out-String\\).Length')",
+      "Bash(powershell -Command 'Write-Host \"input type:\" $input.GetType\\(\\).Name; Write-Host \"[Console]::IsInputRedirected:\" \\([Console]::IsInputRedirected\\)')"
+    ]
+  }
+}

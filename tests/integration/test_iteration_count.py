@@ -1,11 +1,5 @@
 """独立测试脚本 - 验证 iteration_count 功能"""
 
-import sys
-import io
-
-# 修复 Windows 控制台编码问题
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
-
 
 def test_calculate_statistics_with_iteration_count():
     """测试 ReportManager.calculate_statistics 包含 subtype_compliance"""
@@ -123,6 +117,11 @@ def test_result_data_structure():
 
 
 if __name__ == "__main__":
+    import sys
+    import io
+
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+
     print("=" * 60)
     print("测试 iteration_count 功能")
     print("=" * 60)
@@ -137,5 +136,5 @@ if __name__ == "__main__":
 
     print()
     print("=" * 60)
-    print("✓ 所有测试通过")
+    print("所有测试通过")
     print("=" * 60)

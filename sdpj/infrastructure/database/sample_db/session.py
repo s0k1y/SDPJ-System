@@ -78,7 +78,7 @@ class SampleDBSessionManager:
         """
         if self._engine is None:
             await self.initialize()
-
+        assert self._engine is not None
         async with self._engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
@@ -89,7 +89,7 @@ class SampleDBSessionManager:
         """
         if self._engine is None:
             await self.initialize()
-
+        assert self._engine is not None
         async with self._engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
 
@@ -108,7 +108,7 @@ class SampleDBSessionManager:
         """
         if self._session_factory is None:
             await self.initialize()
-
+        assert self._session_factory is not None
         session: AsyncSession = self._session_factory()
         try:
             yield session

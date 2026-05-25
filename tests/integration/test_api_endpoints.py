@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from sdpj.ui.webui.backend.app import app
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def client():
     return TestClient(app, raise_server_exceptions=False)
 

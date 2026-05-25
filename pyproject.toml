@@ -65,6 +65,9 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    "ignore::pytest.PytestUnhandledThreadExceptionWarning",
+]
 
 [tool.ruff]
 line-length = 100

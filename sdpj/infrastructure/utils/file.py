@@ -25,9 +25,11 @@ def write_file(file_path: str, content: str | bytes, mode: str = "text") -> bool
         path = Path(file_path)
         path.parent.mkdir(parents=True, exist_ok=True)
         if mode == "text":
+            if isinstance(content, bytes):
+                content = content.decode("utf-8")
             path.write_text(content, encoding="utf-8")
         else:
-            path.write_bytes(content)
+            path.write_bytes(content if isinstance(content, bytes) else content.encode("utf-8"))
         return True
     except OSError as e:
         raise FileError(str(e)) from e

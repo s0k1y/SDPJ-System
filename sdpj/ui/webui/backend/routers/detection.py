@@ -27,7 +27,7 @@ async def start_detection(
     scheduler: StateSchedulerInterface = Depends(get_scheduler),
 ):
     user_id: int = request.state.user_id
-    config_data = req.model_dump()
+    config_data = req.model_dump()  # type: ignore[attr-defined]
     return wrap_scheduler_result(await scheduler.start_detection(user_id, config_data))
 
 
@@ -148,7 +148,7 @@ async def import_dataset(
         content = await file.read()
 
         result = await scheduler.import_dataset_file(
-            user_id=user_id, filename=file.filename, content=content
+            user_id=user_id, filename=file.filename or "", content=content
         )
 
         if result.get("success"):

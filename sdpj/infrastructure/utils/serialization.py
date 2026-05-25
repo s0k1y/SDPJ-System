@@ -2,29 +2,29 @@
 
 import json
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, cast
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 
 def serialize_json(obj: dict) -> str:
     """JSON 序列化"""
-    return json.dumps(obj, ensure_ascii=False, indent=2)
+    return cast(str, json.dumps(obj, ensure_ascii=False, indent=2))
 
 
 def deserialize_json(text: str) -> dict:
     """JSON 反序列化"""
-    return json.loads(text)
+    return cast(dict, json.loads(text))
 
 
 def serialize_yaml(obj: dict) -> str:
     """YAML 序列化"""
-    return yaml.dump(obj, allow_unicode=True)
+    return cast(str, yaml.dump(obj, allow_unicode=True))
 
 
 def deserialize_yaml(text: str) -> dict:
     """YAML 反序列化"""
-    return yaml.safe_load(text)
+    return cast(dict, yaml.safe_load(text))
 
 
 def to_utc_iso(dt: datetime | None) -> str | None:

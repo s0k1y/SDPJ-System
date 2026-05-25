@@ -3,7 +3,9 @@
 负责访问控制表的 CRUD 操作。
 """
 
-from typing import Optional
+from typing import Optional, cast
+
+from sqlalchemy.engine import CursorResult
 
 from sqlalchemy import and_, delete, select
 from sqlalchemy.exc import IntegrityError
@@ -70,7 +72,7 @@ class ACLRepository:
         stmt = delete(AccessControl).where(AccessControl.acl_id == acl_id)
         result = await self._session.execute(stmt)
         await self._session.flush()
-        return result.rowcount > 0
+        return cast(CursorResult, result).rowcount > 0
 
     async def get_by_resource(self, resource_id: int) -> list[AccessControl]:
         """按资源 ID 查询访问控制项列表

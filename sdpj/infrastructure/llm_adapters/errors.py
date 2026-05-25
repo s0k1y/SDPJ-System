@@ -1,7 +1,7 @@
 """LLM 适配器错误定义与服务实例"""
 
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 
 class LLMError(Exception):
@@ -46,13 +46,13 @@ class StandardizedLLMError(LLMError):
         self.detail = detail
         super().__init__(message)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         result = {
             "error": self.category.value,
             "message": self.message,
         }
         if self.status_code is not None:
-            result["status_code"] = self.status_code
+            result["status_code"] = self.status_code  # type: ignore[assignment]
         if self.detail is not None:
             result["detail"] = self.detail
         return result
@@ -86,11 +86,11 @@ class LLMServiceInstance:
         if not self._active:
             raise RuntimeError(f"Service instance for '{self.model_id}' has been destroyed")
         adapter_kwargs = {k: v for k, v in kwargs.items() if k != "model_id"}
-        return await self.adapter.call(
+        return cast(dict, await self.adapter.call(
             prompt=user_message,
             system_prompt=system_prompt,
             **adapter_kwargs,
-        )
+        ))
 
     async def destroy(self) -> None:
         self._active = False

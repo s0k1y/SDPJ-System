@@ -11,7 +11,7 @@ import uuid
 from collections import deque
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable
+from typing import Callable, cast
 
 import structlog
 
@@ -306,11 +306,11 @@ class EventLogger(EventLoggerInterface):
             return results, total
         else:
             seen_ids: set[str] = set()
-            results: list[LogEntry] = []
+            db_results: list[LogEntry] = []
 
             for entry in memory_matches:
                 seen_ids.add(entry.log_id)
-                results.append(entry)
+                db_results.append(entry)
 
             if self._result_db is not None and "database" in self._output_targets:
                 try:
@@ -320,12 +320,12 @@ class EventLogger(EventLoggerInterface):
                     for entry in db_entries:
                         if entry.log_id not in seen_ids:
                             seen_ids.add(entry.log_id)
-                            results.append(entry)
+                            db_results.append(entry)
                 except Exception as e:
                     sys.stderr.write(f"[EventLogger] 从数据库查询日志失败: {e}\n")
                     sys.stderr.flush()
 
-            results.sort(
+            db_results.sort(
                 key=lambda e: (
                     e.timestamp.replace(tzinfo=timezone.utc)
                     if e.timestamp.tzinfo is None
@@ -333,7 +333,7 @@ class EventLogger(EventLoggerInterface):
                 ),
                 reverse=True,
             )
-            return results, len(results)
+            return db_results, len(db_results)
 
     async def _query_from_db(
         self,
@@ -386,7 +386,7 @@ class EventLogger(EventLoggerInterface):
         user_ids: list[str] | None = None,
     ) -> int:
         """从数据库统计日志数量（异步）"""
-        return await self._result_db.count_logs(
+        return cast(int, await self._result_db.count_logs(
             category=category.value if category else None,
             level=level.value if level else None,
             time_start=time_start,
@@ -394,7 +394,7 @@ class EventLogger(EventLoggerInterface):
             source_module=source_module,
             user_id=user_id,
             user_ids=user_ids,
-        )
+        ))
 
     def set_log_level(self, level: LogLevel) -> bool:
         """
@@ -472,13 +472,14 @@ class EventLogger(EventLoggerInterface):
             marker.write_text(now.isoformat())
             if deleted > 0:
                 self._logger.info(f"已清理 {deleted} 条超过 {max_age_days} 天的日志")
-            return deleted
+            return cast(int, deleted)
         except Exception as e:
             self._logger.error(f"清理日志失败: {e}")
             return 0
 
     async def _db_writer_loop(self) -> None:
         while True:
+            assert self._log_queue is not None
             entry = await self._log_queue.get()
             try:
                 await self._save_to_db(entry)

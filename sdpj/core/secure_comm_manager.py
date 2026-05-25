@@ -113,7 +113,7 @@ class SecureCommManager(SecureCommManagerInterface):
         )
         self._cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
 
-        print(f"[SecureCommManager] Self-signed certificate generated:")
+        print("[SecureCommManager] Self-signed certificate generated:")
         print(f"  Cert: {self._cert_path}")
         print(f"  Key:  {self._key_path}")
 

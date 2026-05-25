@@ -8,7 +8,7 @@ import asyncio
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Dict
+from typing import Dict, cast
 
 from .task_queue_manager_interface import (
     Task,
@@ -148,7 +148,7 @@ class TaskQueueManager(TaskQueueManagerInterface):
                 task.status = TaskStatus.RUNNING
 
             await self._persist_status(task.task_id, TaskStatus.RUNNING)
-            return task
+            return cast(Task, task)
 
     async def dequeue_tasks(self, count: int) -> list[Task]:
         tasks = []

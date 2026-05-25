@@ -312,26 +312,6 @@ class TestMultimodalAndEncoding:
     def data_processor(self, mock_sample_db, mock_result_db, mock_utils):
         return DataProcessor(mock_sample_db, mock_result_db, mock_utils)
 
-    def test_construct_multimodal_sample(self, data_processor, mock_utils):
-        """测试构造多模态样本"""
-        mock_utils.text_to_image.return_value = b"fake_image_data"
-
-        result = data_processor.construct_multimodal_sample(poc="测试PoC", target_modality="image")
-
-        assert result == b"fake_image_data"
-        mock_utils.text_to_image.assert_called_once_with("测试PoC")
-
-    def test_parse_multimodal_response(self, data_processor, mock_utils):
-        """测试解析多模态响应"""
-        mock_utils.image_to_text.return_value = "提取的文本内容"
-
-        result = data_processor.parse_multimodal_response(
-            response_data=b"fake_image_data", source_modality="image"
-        )
-
-        assert result == "提取的文本内容"
-        mock_utils.image_to_text.assert_called_once_with(b"fake_image_data")
-
     def test_construct_encoded_sample(self, data_processor, mock_utils):
         """测试构造编码样本"""
         mock_utils.encode_text.return_value = "dGVzdCBQb0M="

@@ -8,7 +8,7 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Any, Literal, Optional, cast
 
 from sdpj.drivers.data_processor_interface import DataProcessorInterface
 from sdpj.drivers.llm_registry_interface import LLMRegistryInterface
@@ -63,7 +63,7 @@ class PrivateConfigManager(PrivateConfigManagerInterface):
 
     async def read_configs_batch(self, config_ids: list[int]) -> dict[int, dict]:
         """批量读取配置内容"""
-        return await self._user_center.read_private_configs_batch(config_ids)
+        return cast(dict[int, dict], await self._user_center.read_private_configs_batch(config_ids))
 
     async def update_config(self, config_id: int, config_content: dict) -> tuple[bool, str]:
         model_id = config_content.get("model_id") or config_content.get("model")
@@ -121,7 +121,7 @@ class PrivateConfigManager(PrivateConfigManagerInterface):
         if not config_ids:
             return []
 
-        configs_map = await self._user_center.read_private_configs_batch(config_ids)
+        configs_map = cast(dict[int, dict], await self._user_center.read_private_configs_batch(config_ids))
 
         configs = []
         for r in owned:
@@ -340,7 +340,7 @@ class PrivateConfigManager(PrivateConfigManagerInterface):
     async def shutdown_registry(self) -> bool:
         return await self._llm_registry.shutdown()
 
-    async def is_model_available(self, model_id: str) -> tuple[bool, any]:
+    async def is_model_available(self, model_id: str) -> tuple[bool, Any]:
         return await self._llm_registry.is_model_available(model_id)
 
     def get_adapter_info(self, model_id: str) -> dict:

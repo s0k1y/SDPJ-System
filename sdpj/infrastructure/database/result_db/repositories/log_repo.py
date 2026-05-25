@@ -169,7 +169,7 @@ class LogRepository:
             stmt = stmt.where(and_(*conditions))
 
         result = await self.session.execute(stmt)
-        return result.scalar()
+        return result.scalar() or 0
 
     async def delete_old_logs(self, before: datetime) -> int:
         """删除指定时间之前的日志

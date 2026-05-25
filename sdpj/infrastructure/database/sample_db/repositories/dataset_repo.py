@@ -95,7 +95,7 @@ class DatasetRepository:
             .scalar_subquery()
             .label("sample_count")
         )
-        builtin_first = case((Dataset.resource_id == None, 0), else_=1)
+        builtin_first = case((Dataset.resource_id.is_(None), 0), else_=1)
         stmt = (
             select(Dataset, count_subq)
             .options(noload(Dataset.samples))

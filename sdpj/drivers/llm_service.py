@@ -14,7 +14,7 @@
 
 import asyncio
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 from tenacity import (
     RetryError,
@@ -139,7 +139,7 @@ class LLMService:
                     original_error=e,
                 ) from e
 
-        return await _do_call()
+        return cast(Dict[str, Any], await _do_call())
 
     async def verify_connectivity(self, service_instance, timeout: float = 30.0) -> dict:
         """验证模型连接性，发送健康检查消息并返回结构化结果"""

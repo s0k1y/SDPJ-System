@@ -115,6 +115,8 @@ class AnthropicAdapter(LLMAdapter):
         except Exception as e:
             raise StandardizedLLMError(ErrorCategory.UNKNOWN, str(e), original_error=e)
 
+        return {}
+
     def get_metadata(self) -> dict:
         return {
             **super().get_metadata(),

@@ -28,12 +28,12 @@ class UserDBSessionManager:
     - 提供会话上下文管理器
     """
 
-    def __init__(self, database_url: str, echo: bool = False, engine: AsyncEngine = None):
+    def __init__(self, database_url: str, echo: bool = False, engine: AsyncEngine | None = None):
         if engine is not None:
             self._engine = engine
         else:
             is_memory = ":memory:" in database_url
-            self._engine: AsyncEngine = create_async_engine(
+            self._engine = create_async_engine(
                 database_url,
                 echo=echo,
                 poolclass=StaticPool if is_memory else NullPool,
@@ -83,10 +83,10 @@ class UserDBSessionManager:
                         nullable = "" if col.nullable else " NOT NULL"
                         default = ""
                         if col.server_default is not None:
-                            default = f" DEFAULT {col.server_default.arg}"
+                            default = f" DEFAULT {getattr(col.server_default, 'arg', None)}"
                         elif col.default is not None:
                             if col.default.is_scalar:
-                                val = col.default.arg
+                                val = getattr(col.default, 'arg', None)
                                 if isinstance(val, str):
                                     default = f" DEFAULT '{val}'"
                                 else:

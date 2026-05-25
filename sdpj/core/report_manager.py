@@ -5,7 +5,7 @@
 """
 
 import json
-from typing import Literal, Optional
+from typing import Optional
 
 from sdpj.drivers.data_processor_interface import DataProcessorInterface
 from sdpj.drivers.user_center_interface import UserCenterInterface
@@ -192,7 +192,7 @@ class ReportManager(ReportManagerInterface):
     async def export_report(
         self,
         task_group_id: str,
-        target_format: Literal["json", "yaml", "jsonl"] = "json",
+        target_format: str = "json",
         *,
         user_id: int | None = None,
         task_id: str | None = None,
@@ -230,7 +230,7 @@ class ReportManager(ReportManagerInterface):
         aggregated = await self._data_processor.aggregate_task_group_results(task_group_id)
 
         tasks = aggregated.get("tasks", [])
-        all_results = []
+        all_results: list[dict] = []
         dataset_results: dict[str, list] = {}
         for task in tasks:
             report = task.get("report")

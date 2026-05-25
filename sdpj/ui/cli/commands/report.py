@@ -46,7 +46,7 @@ def _render_visualization(data: dict, *, group_id: str = "") -> None:
     if stats:
         summary.append(f"\n检测 {stats.get('total', 0)} 条  |  ")
         summary.append(f"通过 {stats.get('compliant', 0)} 条", style="green")
-        summary.append(f"  |  ")
+        summary.append("  |  ")
         summary.append(f"未通过 {stats.get('non_compliant', 0)} 条", style="red")
     _console.print(Panel(summary, title="[bold]检测报告摘要[/bold]", border_style="cyan", width=60))
 

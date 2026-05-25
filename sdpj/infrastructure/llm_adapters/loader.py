@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Union
+from typing import Union, cast
 
 from sdpj.infrastructure.llm_adapters.base import LLMAdapter
 from sdpj.infrastructure.llm_adapters.errors import AdapterValidationError
@@ -30,7 +30,7 @@ def load_adapter_from_config(model_id: str, config: Union[dict, str, Path]) -> L
         path = Path(config)
         if path.is_file():
             config = json.loads(path.read_text(encoding="utf-8"))
-        else:
+        elif isinstance(config, str):
             config = json.loads(config)
 
     if not isinstance(config, dict):
@@ -60,12 +60,12 @@ def load_adapter_from_config(model_id: str, config: Union[dict, str, Path]) -> L
 
             _meta_keys = {"request_format", "adapter_class", "max_rps", "max_concurrency"}
             filtered_config = {k: v for k, v in config.items() if k not in _meta_keys}
-            return adapter_class(
+            return cast(LLMAdapter, adapter_class(
                 model_id=model_id,
                 max_rps=max_rps,
                 max_concurrency=max_concurrency,
                 **filtered_config,
-            )
+            ))
         except (ImportError, AttributeError, TypeError) as e:
             raise AdapterValidationError(f"Failed to load custom adapter: {e}")
 

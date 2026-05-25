@@ -10,7 +10,7 @@ import asyncio
 import json
 import time
 import uuid
-from typing import Callable, Optional
+from typing import Any, Callable, Optional, cast
 
 from sdpj.control.state_scheduler_interface import StateSchedulerInterface
 from sdpj.control.system_states import SystemStateMachine
@@ -55,24 +55,32 @@ class StateScheduler(StateSchedulerInterface):
         self._consumer_task: asyncio.Task | None = None
         self._enqueue_in_progress: bool = False
         self._running_tasks: set[asyncio.Task] = set()
+        self._initialized: bool = False
 
     # ── 内部日志辅助 ──
 
-    async def startup(self) -> None:
+    async def startup(
+        self,
+        skip_builtin_datasets: bool = False,
+        skip_adapter_restore: bool = False,
+    ) -> None:
         if self._db_initializer is not None:
-            await self._db_initializer()
-        await self.session_init()
+            await self._db_initializer(skip_builtin_datasets=skip_builtin_datasets)
+        await self.session_init(skip_adapter_restore=skip_adapter_restore)
         await self._cleanup_stale_cancelled_groups()
         self.start_task_consumer()
         await self._logger.start_db_writer()
         self._logger.subscribe_logs(self._on_new_log)
         await self._logger.cleanup_old_logs()
 
-    async def session_init(self) -> None:
+    async def session_init(self, skip_adapter_restore: bool = False) -> None:
+        if self._initialized:
+            return
         await self._config.initialize_registry()
-        await self._task_queue.initialize()
-        await self._restore_adapters_from_db()
+        if not skip_adapter_restore:
+            await self._restore_adapters_from_db()
         await self._logger.start_db_writer()
+        self._initialized = True
         if self.get_system_state() == "idle":
             queue_view = await self._task_queue.get_queue_view()
             has_pending = any(t.status == TaskStatus.PENDING for t in queue_view)
@@ -102,7 +110,7 @@ class StateScheduler(StateSchedulerInterface):
                     seen_model_ids.add(model_id)
                     available, _ = await self._config.is_model_available(model_id)
                     if available:
-                        await self._config.unregister_private_model(model_id)
+                        continue
                     adapter_content = json.dumps(content, ensure_ascii=False)
                     success, _, error = await self._config.register_private_model(
                         adapter_content, model_id
@@ -161,7 +169,7 @@ class StateScheduler(StateSchedulerInterface):
                 content = cfg.get("content", {})
                 cfg_model = content.get("model") or content.get("model_id")
                 if cfg_model == model_id:
-                    return content
+                    return cast(Optional[dict], content)
         except Exception:
             pass
         return None
@@ -366,7 +374,7 @@ class StateScheduler(StateSchedulerInterface):
         jailbreak_dataset_ids = task_params.get("jailbreak_dataset_ids")
         force_refresh = task_params.get("force_refresh", False)
 
-        print(f"\n[DEBUG StateScheduler.execute_detection_task] === 开始执行 ===", flush=True)
+        print("\n[DEBUG StateScheduler.execute_detection_task] === 开始执行 ===", flush=True)
         print(
             f"[DEBUG StateScheduler.execute_detection_task] task_id={task_id}, detection_type={detection_type}",
             flush=True,
@@ -399,13 +407,16 @@ class StateScheduler(StateSchedulerInterface):
         except Exception:
             pass
 
+        _poc_started = False
+
         def _poc_progress_cb(
             processed: int,
             total: int,
             found: int,
-            score_counts: dict = None,
-            subtype_stats: dict = None,
+            score_counts: dict | None = None,
+            subtype_stats: dict | None = None,
         ) -> None:
+            nonlocal _poc_started
             self._log_rt(
                 "poc_progress",
                 f"PoC进度回调: processed={processed}, total={total}, found={found}, group_id={task_group_id}",
@@ -423,10 +434,10 @@ class StateScheduler(StateSchedulerInterface):
                     st for st, info in subtype_stats.items() if not info.get("event_set", False)
                 ]
                 progress["remaining_subtypes"] = remaining
-            if not hasattr(_poc_progress_cb, "_started"):
-                _poc_progress_cb._started = True
+            if not _poc_started:
+                _poc_started = True
                 progress["start_time"] = time.monotonic()
-            asyncio.ensure_future(self._task_queue.update_poc_progress(task_group_id, progress))
+            asyncio.ensure_future(self._task_queue.update_poc_progress(task_group_id, progress))  # type: ignore[arg-type]
 
         def _task_progress_cb(task_id: str, processed: int, total: int) -> None:
             asyncio.ensure_future(self._task_queue.update_task_progress(task_id, processed, total))
@@ -437,7 +448,7 @@ class StateScheduler(StateSchedulerInterface):
         def _dynamic_progress_cb(processed: int, total: int, avg_iterations: float) -> None:
             asyncio.ensure_future(
                 self._task_queue.update_dynamic_progress(
-                    task_group_id,
+                    task_group_id,  # type: ignore[arg-type]
                     {"processed": processed, "total": total, "avg_iterations": avg_iterations},
                 )
             )
@@ -465,7 +476,7 @@ class StateScheduler(StateSchedulerInterface):
                 f"force_refresh={force_refresh}, group_id={task_group_id}",
             )
             await self._task_queue.update_poc_progress(
-                task_group_id,
+                task_group_id,  # type: ignore[arg-type]
                 {
                     "processed": 0,
                     "total": 0,
@@ -484,7 +495,7 @@ class StateScheduler(StateSchedulerInterface):
                     jailbreak_dataset_ids=jailbreak_dataset_ids,
                     max_rps=suggested_max_rps,
                     max_concurrency=suggested_max_concurrency,
-                    poc_progress_callback=_poc_progress_cb,
+                    poc_progress_callback=_poc_progress_cb,  # type: ignore[arg-type]
                     task_progress_callback=_task_progress_cb,
                     force_refresh=force_refresh,
                     llm_callback=_llm_call_cb,
@@ -498,7 +509,7 @@ class StateScheduler(StateSchedulerInterface):
                     jailbreak_dataset_ids=jailbreak_dataset_ids,
                     max_rps=suggested_max_rps,
                     max_concurrency=suggested_max_concurrency,
-                    poc_progress_callback=_poc_progress_cb,
+                    poc_progress_callback=_poc_progress_cb,  # type: ignore[arg-type]
                     task_progress_callback=_task_progress_cb,
                     force_refresh=force_refresh,
                     llm_callback=_llm_call_cb,
@@ -530,7 +541,7 @@ class StateScheduler(StateSchedulerInterface):
                     jailbreak_dataset_ids=jailbreak_dataset_ids,
                     max_rps=suggested_max_rps,
                     max_concurrency=suggested_max_concurrency,
-                    poc_progress_callback=_poc_progress_cb,
+                    poc_progress_callback=_poc_progress_cb,  # type: ignore[arg-type]
                     task_progress_callback=_task_progress_cb,
                     force_refresh=force_refresh,
                     llm_callback=_llm_call_cb,
@@ -768,19 +779,19 @@ class StateScheduler(StateSchedulerInterface):
                     "error_message": t.error_message if t.status.value == "failed" else "",
                 }
                 if task_prog:
-                    child["progress"] = task_prog
+                    child["progress"] = task_prog  # type: ignore[assignment]
                 children.append(child)
 
             poc_progress = await self._task_queue.get_poc_progress(group_id)
             poc_eta = -1.0
-            stage_info = {"stage": "unknown"}
+            stage_info: dict[str, Any] = {"stage": "unknown"}
             if poc_progress:
                 is_initializing = poc_progress.get("total", 0) == 0
                 remaining_subtypes = poc_progress.get("remaining_subtypes", [])
                 poc_complete = not is_initializing and not remaining_subtypes
                 if not poc_complete:
                     if is_initializing:
-                        poc_child = {
+                        poc_child: dict[str, Any] = {
                             "task_id": f"poc_{group_id}",
                             "status": "running",
                             "dataset_id": "poc_selecting",
@@ -800,7 +811,7 @@ class StateScheduler(StateSchedulerInterface):
                             if score_parts
                             else f"有效 {poc_progress['found']} 条"
                         )
-                        poc_child = {
+                        poc_child: dict[str, Any] = {  # type: ignore[no-redef]
                             "task_id": f"poc_{group_id}",
                             "status": "running",
                             "dataset_id": "poc_selecting",
@@ -815,14 +826,14 @@ class StateScheduler(StateSchedulerInterface):
                                 "remaining_subtypes": remaining_subtypes,
                             },
                         }
-                    children.insert(0, poc_child)
+                    children.insert(0, poc_child)  # type: ignore[arg-type]
                     status_counts["running"] += 1
                 subtype_stats = poc_progress.get("subtype_stats", {})
                 start_time = poc_progress.get("start_time")
                 last_update_time = poc_progress.get("last_update_time")
                 if not remaining_subtypes:
                     poc_eta = 0.0
-                    stage_info = {
+                    stage_info: dict[str, Any] = {  # type: ignore[no-redef]
                         "stage": "poc_selecting",
                         "remaining_subtypes": [],
                         "estimated_needed": poc_progress["processed"],
@@ -855,7 +866,7 @@ class StateScheduler(StateSchedulerInterface):
                         estimated_needed = poc_progress["processed"] + (
                             poc_eta * overall_speed if overall_speed > 0 and poc_eta > 0 else 0
                         )
-                        stage_info = {
+                        stage_info: dict[str, Any] = {  # type: ignore[no-redef]
                             "stage": "poc_selecting",
                             "remaining_subtypes": remaining_subtypes,
                             "estimated_needed": int(estimated_needed),
@@ -863,7 +874,7 @@ class StateScheduler(StateSchedulerInterface):
                         if poc_eta < 0:
                             slow_subtypes = [st for st, v in subtype_etas if v == float("inf")]
                             if slow_subtypes:
-                                stage_info["slow_subtypes"] = slow_subtypes
+                                stage_info["slow_subtypes"] = slow_subtypes  # type: ignore[assignment]
                     else:
                         stage_info = {
                             "stage": "poc_selecting",
@@ -894,24 +905,24 @@ class StateScheduler(StateSchedulerInterface):
                 task_etas = []
                 for child in children:
                     if child.get("status") == "running" and "progress" in child:
-                        prog = child["progress"]
-                        recent_speeds = prog.get("recent_speeds", [])
-                        processed = prog.get("processed", 0)
-                        task_total = prog.get("total", 0)
+                        prog = child["progress"]  # type: ignore[assignment]
+                        recent_speeds = prog.get("recent_speeds", [])  # type: ignore[attr-defined]
+                        processed = prog.get("processed", 0)  # type: ignore[attr-defined]
+                        task_total = prog.get("total", 0)  # type: ignore[attr-defined]
                         if recent_speeds and processed < task_total:
                             avg_speed = sum(recent_speeds) / len(recent_speeds)
                             if avg_speed > 0:
                                 task_etas.append((task_total - processed) / avg_speed)
                 if task_etas:
                     eta_seconds = max(task_etas)
-                    stage_info = {
+                    stage_info: dict[str, Any] = {  # type: ignore[no-redef]
                         "stage": "static_detecting",
                         "tasks_remaining": sum(
                             1 for c in children if c.get("status") in ("pending", "running")
                         ),
                     }
                 elif eta_seconds < 0:
-                    stage_info = {
+                    stage_info: dict[str, Any] = {  # type: ignore[no-redef]
                         "stage": "static_detecting",
                         "tasks_remaining": sum(
                             1 for c in children if c.get("status") in ("pending", "running")
@@ -943,7 +954,7 @@ class StateScheduler(StateSchedulerInterface):
                         }
                 elif dyn_processed >= dyn_total:
                     eta_seconds = 0.0
-                    stage_info = {
+                    stage_info: dict[str, Any] = {  # type: ignore[no-redef]
                         "stage": "dynamic_detecting",
                         "avg_iterations": round(dyn_avg_iter, 2),
                         "samples_remaining": 0,
@@ -972,7 +983,7 @@ class StateScheduler(StateSchedulerInterface):
                     if dyn_total > 0
                     else None,
                 }
-                children.append(dyn_child)
+                children.append(dyn_child)  # type: ignore[arg-type]
                 status_counts["running"] += 1
 
             if group_status == "completed":
@@ -1188,7 +1199,7 @@ class StateScheduler(StateSchedulerInterface):
     # ── 系统状态与日志 (职责 9-12) ──
 
     def get_system_state(self) -> str:
-        return next(iter(self._fsm.configuration)).id
+        return cast(str, next(iter(self._fsm.configuration)).id)
 
     def subscribe_state_changes(self, callback: Callable[[str], None]) -> None:
         if callback not in self._state_callbacks:
@@ -1437,7 +1448,7 @@ class StateScheduler(StateSchedulerInterface):
         try:
             resources = await self._account.list_resources_for_user(user_id)
             all_datasets = await self._config.query_datasets()
-            ds_map: dict[int, tuple[int, str]] = {}  # resource_id → (dataset_id, name)
+            ds_map: dict[int, tuple] = {}  # resource_id → (dataset_id, name)
             for ds in all_datasets:
                 rid = ds.get("resource_id")
                 if rid is not None:
@@ -1445,7 +1456,10 @@ class StateScheduler(StateSchedulerInterface):
             for r in resources:
                 if r.get("resource_type") == "private_dataset":
                     rid = r.get("resource_id")
-                    info = ds_map.get(rid)
+                    if rid is not None:
+                        rid = int(rid)
+                    if rid is not None:
+                        info = ds_map.get(rid)
                     if info:
                         ds_id, ds_name = info
                         await self._config.remove_dataset(ds_id, rid)
@@ -1514,7 +1528,7 @@ class StateScheduler(StateSchedulerInterface):
                     return {"success": False, "error": "无访问权限"}
 
             if operation == "verify":
-                config_id: int = params["config_id"]
+                config_id = params["config_id"]
                 config = await self._config.read_config(config_id)
                 if config is None:
                     return {"success": False, "error": "配置不存在"}
@@ -1692,7 +1706,7 @@ class StateScheduler(StateSchedulerInterface):
                 "import_dataset",
                 {"filename": filename, "dataset_id": result.get("dataset_id")},
             )
-        return result
+        return cast(dict, result)
 
     async def schedule_private_resource_operation(self, operation: str, params: dict) -> dict:
         try:

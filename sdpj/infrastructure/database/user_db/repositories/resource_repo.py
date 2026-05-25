@@ -3,7 +3,9 @@
 负责资源表的 CRUD 操作。
 """
 
-from typing import Optional
+from typing import Optional, cast
+
+from sqlalchemy.engine import CursorResult
 
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
@@ -64,7 +66,7 @@ class ResourceRepository:
         stmt = delete(Resource).where(Resource.resource_id == resource_id)
         result = await self._session.execute(stmt)
         await self._session.flush()
-        return result.rowcount > 0
+        return cast(CursorResult, result).rowcount > 0
 
     async def get_by_owner(self, user_id: int) -> list[Resource]:
         """按拥有者查询资源列表

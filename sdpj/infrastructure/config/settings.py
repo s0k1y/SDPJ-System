@@ -30,6 +30,14 @@ def _load_or_generate_secret_key() -> str:
     return key
 
 
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+
+
+def _default_db_url() -> str:
+    db_path = _PROJECT_ROOT / "sdpj" / "infrastructure" / "database" / "sdpj.db"
+    return f"sqlite+aiosqlite:///{db_path}"
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -39,12 +47,12 @@ class Settings(BaseSettings):
 
     env: Literal["development", "test", "production"] = "development"
     debug: bool = True
-    db_url: str = "sqlite+aiosqlite:///./sdpj/infrastructure/database/sdpj.db"
+    db_url: str = _default_db_url()
     secret_key: str = ""
     adapters_dir: str = "~/.sdpj/adapters/"
     log_level: str = "INFO"
-    log_dir: str = f"./{DEFAULT_LOG_DIR}"
-    export_dir: str = f"./{DEFAULT_EXPORT_DIR}"
+    log_dir: str = str(_PROJECT_ROOT / DEFAULT_LOG_DIR)
+    export_dir: str = str(_PROJECT_ROOT / DEFAULT_EXPORT_DIR)
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     frontend_url: str = "http://localhost:5173"

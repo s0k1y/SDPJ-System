@@ -4,9 +4,10 @@
 """
 
 import json
-from typing import Optional
+from typing import Any, Optional, cast
 
 from sqlalchemy import delete, select
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -76,7 +77,7 @@ class PrivateConfigRepository:
         if not private_config:
             return None
 
-        return json.loads(private_config.config_content)
+        return cast(dict[Any, Any], json.loads(private_config.config_content))
 
     async def update(self, config_id: int, config_content: dict) -> bool:
         """更新私有检测配置内容
@@ -115,7 +116,7 @@ class PrivateConfigRepository:
         stmt = delete(PrivateConfig).where(PrivateConfig.config_id == config_id)
         result = await self._session.execute(stmt)
         await self._session.flush()
-        return result.rowcount > 0
+        return cast(CursorResult, result).rowcount > 0
 
     async def get_by_ids(self, config_ids: list[int]) -> dict[int, dict]:
         """批量按 ID 读取私有检测配置内容

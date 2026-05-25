@@ -39,6 +39,7 @@ class SessionManager:
         """初始化数据库引擎和会话工厂"""
         if self.engine is None:
             is_memory = ":memory:" in self.database_url
+            pool_kwargs: dict[str, object]
             if is_memory:
                 pool_kwargs = {"poolclass": StaticPool}
             else:
@@ -73,6 +74,7 @@ class SessionManager:
 
         if self.engine is None:
             await self.initialize()
+        assert self.engine is not None
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
             await self._migrate_detection_task(conn)
@@ -202,6 +204,7 @@ class SessionManager:
         """删除所有表"""
         if self.engine is None:
             await self.initialize()
+        assert self.engine is not None
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
 
@@ -210,6 +213,7 @@ class SessionManager:
         """获取数据库会话的上下文管理器"""
         if self.async_session_maker is None:
             await self.initialize()
+        assert self.async_session_maker is not None
         session: AsyncSession = self.async_session_maker()
         try:
             yield session

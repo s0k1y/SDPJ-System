@@ -5,6 +5,7 @@ import pytest
 from click.testing import CliRunner
 
 from sdpj.ui.cli.main import cli
+from sdpj.ui.cli.session import clear_session
 from tests.fixtures.sample_data import REAL_CONFIGS
 
 
@@ -75,6 +76,10 @@ class TestUserAuth:
 class TestLoginRequired:
     """\u672a\u767b\u5f55\u2192exit_code=1\uff08ClickException\uff09"""
 
+    @pytest.fixture(autouse=True)
+    def _clear_session(self):
+        clear_session()
+
     def test_detect_start(self):
         r = CliRunner().invoke(cli, [
             "Detect", "task", "start",
@@ -96,7 +101,7 @@ class TestLoginRequired:
 
     def test_report_list(self):
         r = CliRunner().invoke(cli, ["Report", "list"])
-        assert r.exit_code == 0
+        assert r.exit_code == 1
 
     def test_report_delete(self):
         r = CliRunner().invoke(
@@ -118,7 +123,7 @@ class TestLoginRequired:
 
     def test_user_profile(self):
         r = CliRunner().invoke(cli, ["User", "profile"])
-        assert r.exit_code == 0
+        assert r.exit_code == 1
 
     def test_user_password(self):
         r = CliRunner().invoke(cli, ["User", "password", "--old", "x", "--new", "y"])
@@ -130,7 +135,7 @@ class TestLoginRequired:
 
     def test_user_unregister(self):
         r = CliRunner().invoke(cli, ["User", "unregister", "--yes"])
-        assert r.exit_code == 0
+        assert r.exit_code == 1
 
     def test_user_resources(self):
         r = CliRunner().invoke(cli, ["User", "resources"])
@@ -199,6 +204,11 @@ class TestLoginRequired:
 
 
 class TestLoginRequiredWithFiles:
+
+    @pytest.fixture(autouse=True)
+    def _clear_session(self):
+        clear_session()
+
     def test_config_create(self):
         r = CliRunner().invoke(cli, [
             "Config", "create",

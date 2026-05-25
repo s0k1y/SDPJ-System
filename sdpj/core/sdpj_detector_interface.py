@@ -23,6 +23,7 @@ class SDPJDetectorInterface(Protocol):
         max_rps: float = 5.0,
         max_concurrency: int = 10,
         poc_progress_callback: Callable[[int, int, int, dict, dict | None], None] | None = None,
+        task_progress_callback: Callable[[str, int, int], None] | None = None,
         force_refresh: bool = False,
         llm_callback: LLMCallCallback | None = None,
     ) -> dict:
@@ -59,7 +60,7 @@ class SDPJDetectorInterface(Protocol):
         ...
 
     async def write_result(
-        self, report_id: str, risk_subclass: str, model_output: str, compliance_result: str
+        self, report_id: str, risk_subclass: str, poc: str, model_output: str, compliance_result: str
     ) -> str:
         """将单条检测结果写入检测结果数据库"""
         ...

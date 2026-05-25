@@ -73,7 +73,7 @@ class StateSchedulerInterface(Protocol):
         ...
 
     async def export_report(
-        self, task_group_id: str, target_format: str, *, user_id: int | None = None
+        self, task_group_id: str, target_format: str, *, user_id: int | None = None, task_id: str | None = None
     ) -> dict:
         """导出检测报告文件
 
@@ -81,6 +81,7 @@ class StateSchedulerInterface(Protocol):
             task_group_id: 任务组 ID
             target_format: 目标文件格式
             user_id: 请求者用户 ID，用于权限校验
+            task_id: 可选，指定导出的任务 ID
         """
         ...
 
@@ -112,11 +113,15 @@ class StateSchedulerInterface(Protocol):
 
     # ── 系统状态与日志 (职责 9-12) ──
 
-    async def startup(self) -> None:
+    async def startup(
+        self,
+        skip_builtin_datasets: bool = False,
+        skip_adapter_restore: bool = False,
+    ) -> None:
         """应用启动时初始化（注册已入库大模型等）"""
         ...
 
-    async def session_init(self) -> None:
+    async def session_init(self, skip_adapter_restore: bool = False) -> None:
         """每次会话初始化（恢复适配器、启动后台消费者等，不含首次建表）"""
         ...
 
@@ -235,3 +240,5 @@ class StateSchedulerInterface(Protocol):
     async def schedule_private_resource_operation(self, operation: str, params: dict) -> dict:
         """调度用户私有大模型适配器与私有数据集的上传与移除"""
         ...
+
+    async def list_all_users(self) -> list[dict]: ...

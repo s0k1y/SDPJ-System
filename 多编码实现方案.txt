@@ -1,10 +1,14 @@
 ================================================================================
               大语言模型安全风险检测系统 — 多编码间接注入实现方案
 ================================================================================
-版本: v1.2
+版本: v1.3
 日期: 2026-05-25
 状态: 设计阶段（尚未实施）
-更新: v1.2 修正第五节编码变换层级（_process 闭包内而非 _prepare_poc_async 中）、
+更新: v1.3 修正第十三节 P0 优先级描述（与第五节保持一致）、
+          补充第十一节文件清单（DataProcessorInterface / ResultDBInterface / ResultDB /
+          compute_reports_summary）、修正第十二节不需要修改的文件描述、
+          补充第十四节实施级风险（compute_reports_summary SQL 查询变更）
+      v1.2 修正第五节编码变换层级（_process 闭包内而非 _prepare_poc_async 中）、
           补充第十节 metadata_json 双写路径说明、新增 DataProcessor 改动项、
           补充第十四节实施级风险
 
@@ -197,17 +201,27 @@ _prepare_poc_async 被两处调用：
 六、前端 UI 设计
 ================================================================================
 
-6.1 位置
-─────────
-在 DetectionForm.vue 的 Step 0 中，"检测类型"表单项下方，新增"攻击路径选择"表单项
+6.1 步骤流程重构
+─────────────────
+在 DetectionForm.vue 中，将原有 3 步向导扩展为 4 步：
 
-6.2 交互形态
-─────────────
+  Step 0: 新建检测任务（配置被测大模型）
+  Step 1: 选择攻击意图[配置被测数据集]  //这里仅仅改名,不变
+  Step 2: 选择攻击路径（新增独立步骤）
+  Step 3: 确认启动
+
+原方案将"攻击路径选择"作为 Step 0 内的表单项（el-tree-select），
+现改为独立步骤页，用户在选择攻击意图和配置数据集后，
+进入专门的攻击路径选择页面，交互更清晰、层次更分明。
+
+6.2 Step 2 攻击路径选择页的交互形态
+────────────────────────────────────
 使用 el-tree-select 组件，树形结构如下：
 
   攻击路径
   ├── 直接注入（默认选中）
   └── 间接注入
+      ├── 多模态注入（本期未实现，disabled）
       └── 多编码注入
           ├── Base16
           ├── Base32
@@ -228,9 +242,11 @@ _prepare_poc_async 被两处调用：
 - 一次仅可选择一项
 - 选择"直接注入"时为直接注入（默认行为）
 - 选择某个具体编码时为间接注入
-- "间接注入"和"多编码注入"为中间节点，不可选（通过 disabled 属性禁用）
+- "间接注入"、"多编码注入"和"多模态注入"为中间节点，不可选（通过 disabled 属性禁用）
+- "多模态注入"本期未实现，整棵子树均 disabled，不可展开不可选
 - 必须展开到叶子节点选择具体编码
 - 默认选中"直接注入"
+- Step 2 必须选择一项后方可进入 Step 3（校验规则）
 
 6.4 前端 form 数据
 ───────────────────
@@ -245,8 +261,8 @@ _prepare_poc_async 被两处调用：
 在 handleSubmit 中，payload 新增字段:
   encoding_type: form.attack_path === 'direct' ? null : form.attack_path
 
-6.6 Step 2 摘要新增行
-──────────────────────
+6.6 Step 3 确认摘要新增行
+──────────────────────────
   攻击路径    直接注入 / 间接注入-Base64 / 间接注入-凯撒密码 等
 
 6.7 编码列表的数据来源
@@ -256,6 +272,17 @@ _prepare_poc_async 被两处调用：
 - 新增 API: GET /api/detection/encoding-types
 - 返回有效编码类型列表，前端用此构建树形结构
 - 未来扩展编码类型时，只需修改 encoding.py，前端自动同步
+
+6.8 步骤导航逻辑调整
+─────────────────────
+因新增 Step 2，需调整以下逻辑：
+
+- currentStep 取值范围从 0/1/2 扩展为 0/1/2/3
+- "下一步"按钮显示条件: currentStep < 3
+- "启动检测"按钮显示条件: currentStep === 3
+- validateStep 新增 step === 2 分支:
+    校验 form.attack_path 已选择（非空）
+- Step 3（确认页）摘要中新增"攻击路径"行
 
 ================================================================================
 七、全链路数据流
@@ -437,31 +464,46 @@ ReportManager.prepare_visualization_data() 和 prepare_task_visualization_data()
                                                               时将 encoding_type / attack
                                                               _path 写入 metadata
 
-  6   sdpj/drivers/data_processor.py                         create_detection_task() 新增    最小改动
+  6   sdpj/drivers/data_processor_interface.py                create_detection_task() 签名    接口同步
+                                                              新增可选 metadata_json 参数
+
+  7   sdpj/drivers/data_processor.py                         create_detection_task() 新增    最小改动
                                                               可选的 metadata_json 参数，
                                                               用于存储 encoding_type 和
                                                               attack_path
 
-  7   sdpj/ui/webui/backend/schemas/detection.py              DetectionStartRequest          Schema 扩展
+  8   sdpj/infrastructure/database/result_db/                 create_detection_task() 签名    接口同步
+      interface.py                                            新增可选 metadata_json 参数
+
+  9   sdpj/infrastructure/database/result_db/                 create_detection_task() 实现    最小改动
+      result_db.py                                            新增 metadata_json 参数并写入
+                                                              数据库；
+                                                              compute_reports_summary()
+                                                              SQL 查询新增 SELECT
+                                                              DetectionTask.metadata_json，
+                                                              children 中返回 attack_path
+
+  10  sdpj/ui/webui/backend/schemas/detection.py              DetectionStartRequest          Schema 扩展
                                                               新增 encoding_type 字段
 
-  8   sdpj/ui/webui/backend/routers/detection.py              新增 GET /encoding-types        新增端点
+  11  sdpj/ui/webui/backend/routers/detection.py              新增 GET /encoding-types        新增端点
                                                               端点
 
-  9   sdpj/ui/webui/frontend/src/components/detection/        Step 0 新增"攻击路径选择"       前端扩展
-      DetectionForm.vue                                       el-tree-select；
+  12  sdpj/ui/webui/frontend/src/components/detection/        新增 Step 2 攻击路径选择       前端扩展
+      DetectionForm.vue                                       独立步骤页（el-tree-select）；
+                                                              3步→4步流程重构；
                                                               form 新增 attack_path 字段；
                                                               payload 新增 encoding_type
                                                               字段；
-                                                              Step 2 摘要新增攻击路径行
+                                                              Step 3 确认摘要新增攻击路径行
 
-  10  sdpj/ui/webui/frontend/src/components/report/           报告列表表格新增"攻击路径"列     前端扩展
+  13  sdpj/ui/webui/frontend/src/components/report/           报告列表表格新增"攻击路径"列     前端扩展
       ReportTable.vue                                         （仅子任务行显示）
 
-  11  sdpj/ui/webui/frontend/src/components/report/           统计概览行新增"攻击路径"统计项   前端扩展
+  14  sdpj/ui/webui/frontend/src/components/report/           统计概览行新增"攻击路径"统计项   前端扩展
       ReportChart.vue
 
-  12  sdpj/core/report_manager.py                             prepare_visualization_data()   后端扩展
+  15  sdpj/core/report_manager.py                             prepare_visualization_data()   后端扩展
                                                               和 prepare_task_visualization
                                                               _data() 返回数据新增
                                                               attack_path 字段
@@ -473,13 +515,14 @@ ReportManager.prepare_visualization_data() 和 prepare_task_visualization_data()
   - crypto_toolkit.py       — 不做任何修改，只被 encoding.py 导入
   - utils_lib.py            — encode_text/decode_text 签名不变
   - utils_interface.py      — 同上
-  - DataProcessorInterface  — 接口需同步更新 create_detection_task 签名，但属于被动适配
   - SampleDB / models.py    — 不改数据库
   - LLM Adapter 层          — 编码后仍是 str
   - llm_service.py          — 纯透传
   - prompt_builder.py       — 处理的是 LLM 输出，与输入编码无关
   - result_parser.py        — 同上
   - dynamic_detector.py     — 动态检测暂不涉及间接注入
+  - task_queue_manager_interface.py — create_detection_task 签名由 DataProcessorInterface
+    统一管理，TaskQueueManager 不直接调用 create_detection_task，无需修改
   - 所有数据集 JSONL 文件   — 不改
 
 ================================================================================
@@ -488,7 +531,8 @@ ReportManager.prepare_visualization_data() 和 prepare_task_visualization_data()
 
   P0（必须先做）:
     1. encoding.py 扩展注册表 + build_encoded_injection_sample + 诱导模板
-    2. static_detector._prepare_poc_async 增加 encoding_type 参数
+    2. static_detector.run_static_detection 增加 encoding_type 可选参数；
+       _process 闭包内部在 LLM 调用前按需执行编码变换（调用 build_encoded_injection_sample）
 
   P1（高优先级）:
     3. 后端数据流打通（schemas → router → state_scheduler → detector 接口签名）
@@ -528,8 +572,16 @@ ReportManager.prepare_visualization_data() 和 prepare_task_visualization_data()
    - static_detector.run_static_detection() 中 create_detection_task 的当前签名
      为 (task_group_id, dataset_id, task_status, start_time)，不支持 metadata 参数
    - 报告查询链路依赖每数据集级 DetectionTask.metadata_json 中的 attack_path
-   - 需扩展 create_detection_task() / DataProcessorInterface / DataProcessor，
-     新增 metadata_json 可选参数，否则报告页面无法展示攻击路径
+   - 需扩展 create_detection_task() / DataProcessorInterface / DataProcessor /
+     ResultDBInterface / ResultDB，新增 metadata_json 可选参数，否则报告页面无法展示攻击路径
+
+6. compute_reports_summary() SQL 查询变更（实施级风险）
+   - 当前 compute_reports_summary() 通过 SQL 聚合查询构建 ReportTable 列表数据，
+     children 中不包含 attack_path 字段
+   - 需在 SQL 查询中新增 SELECT DetectionTask.metadata_json，并在 children 字典中
+     返回 attack_path = metadata_json.get("attack_path", "直接注入")
+   - 这涉及 result_db.py 中约 50 行 SQL 构建代码的修改，需仔细验证 SQLAlchemy
+     对 JSON 字段的访问语法
 
 ================================================================================
 十五、多模态注入的架构断层备忘（本期不实现，仅记录）

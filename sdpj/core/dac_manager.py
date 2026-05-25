@@ -4,6 +4,8 @@
 被依赖模块: StateScheduler
 """
 
+from typing import cast
+
 from sdpj.drivers.user_center_interface import UserCenterInterface
 
 from .dac_manager_interface import DACManagerInterface
@@ -48,6 +50,8 @@ class DACManager(DACManagerInterface):
             return False, "访问控制项不存在"
 
         resource_id = target_acl.get("resource_id")
+        if resource_id is None:
+            return False, "资源ID缺失"
         owner_id = await self._get_resource_owner(resource_id)
         if owner_id != caller_user_id:
             return False, "仅资源拥有者可移除访问权"
@@ -69,7 +73,7 @@ class DACManager(DACManagerInterface):
         """批量查询用户在指定资源中有访问权限的资源 ID 集合"""
         if not resource_ids:
             return set()
-        return await self._user_center.get_accessible_resource_ids(user_id, resource_ids)
+        return cast(set[int], await self._user_center.get_accessible_resource_ids(user_id, resource_ids))
 
     async def get_access_list(
         self, resource_id: int, caller_user_id: int

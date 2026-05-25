@@ -25,7 +25,7 @@ class ModelInfo:
         adapter_name: str,
         version: str,
         description: str = "",
-        supported_features: List[str] = None,
+        supported_features: List[str] | None = None,
     ):
         """
         初始化大模型信息

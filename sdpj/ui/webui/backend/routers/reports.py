@@ -42,8 +42,8 @@ async def list_reports(
     model_id: Optional[str] = None,
     scheduler: StateSchedulerInterface = Depends(get_scheduler),
 ):
-    user_id: int = request.state.user_id
-    filters = {"user_id": user_id}
+    user_id: int = int(request.state.user_id)
+    filters: dict[str, int | str] = {"user_id": user_id}
     if model_id:
         filters["model_id"] = model_id
     result = await scheduler.list_reports(filters)

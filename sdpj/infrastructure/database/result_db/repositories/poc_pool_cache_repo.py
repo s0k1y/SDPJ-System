@@ -3,7 +3,10 @@
 提供 PoC 池缓存的数据访问操作。
 """
 
+from typing import cast
+
 from sqlalchemy import delete, select
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import PocPoolCache
@@ -32,4 +35,4 @@ class PocPoolCacheRepository:
         stmt = delete(PocPoolCache).where(PocPoolCache.model_id == model_id)
         result = await self.session.execute(stmt)
         await self.session.flush()
-        return result.rowcount
+        return cast(CursorResult, result).rowcount

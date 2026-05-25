@@ -85,9 +85,9 @@ def create_app() -> FastAPI:
     @app.get("/api/logs")
     async def logs(
         request: Request,
-        level: str = None,
-        source_module: str = None,
-        user_id: str = None,
+        level: str | None = None,
+        source_module: str | None = None,
+        user_id: str | None = None,
         page: int = 1,
         page_size: int = 20,
     ):
@@ -95,7 +95,7 @@ def create_app() -> FastAPI:
 
         scheduler = get_scheduler()
 
-        filters = {}
+        filters: dict[str, object] = {}
         if level:
             filters["level"] = level
         if source_module:

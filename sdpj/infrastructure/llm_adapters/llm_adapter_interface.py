@@ -44,5 +44,7 @@ class LLMAdapterLibInterface(Protocol):
         """将底层异常标准化为统一错误语义"""
         ...
 
+    async def close_sessions(self) -> None: ...
+
 
 LLMAdapterInterface = LLMAdapterLibInterface

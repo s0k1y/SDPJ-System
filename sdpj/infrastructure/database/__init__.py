@@ -6,4 +6,4 @@
 - UserDB: 用户信息数据库
 """
 
-__all__ = []
+__all__: list[str] = []
