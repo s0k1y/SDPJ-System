@@ -5,6 +5,8 @@ EventLogger 实现
 """
 
 import asyncio
+import os
+import sys
 import uuid
 from collections import deque
 from datetime import datetime, timedelta, timezone
@@ -62,7 +64,7 @@ class EventLogger(EventLoggerInterface):
                 structlog.processors.JSONRenderer(),
             ],
             context_class=dict,
-            logger_factory=structlog.PrintLoggerFactory(),
+            logger_factory=structlog.WriteLoggerFactory(file=open(os.devnull, 'w')),
             cache_logger_on_first_use=False,
         )
         self._logger = structlog.get_logger()
@@ -266,6 +268,7 @@ class EventLogger(EventLoggerInterface):
 
             if self._result_db is not None and "database" in self._output_targets:
                 try:
+                    fetch_limit = offset + page_size
                     db_entries = await self._query_from_db(
                         category,
                         level,
@@ -274,18 +277,21 @@ class EventLogger(EventLoggerInterface):
                         source_module,
                         user_id,
                         user_ids,
-                        limit=page_size,
-                        offset=offset,
+                        limit=fetch_limit,
+                        offset=0,
                     )
                     db_total = await self._count_from_db(
                         category, level, time_start, time_end, source_module, user_id, user_ids
                     )
                 except Exception as e:
-                    self._logger.error(f"从数据库查询日志失败: {e}")
+                    sys.stderr.write(f"[EventLogger] 从数据库查询日志失败: {e}\n")
+                    sys.stderr.flush()
 
             db_ids = {e.log_id for e in db_entries}
             memory_only = [e for e in memory_matches if e.log_id not in db_ids]
-            memory_only.sort(
+
+            combined = memory_only + db_entries
+            combined.sort(
                 key=lambda e: (
                     e.timestamp.replace(tzinfo=timezone.utc)
                     if e.timestamp.tzinfo is None
@@ -295,12 +301,7 @@ class EventLogger(EventLoggerInterface):
             )
 
             total = db_total + len(memory_only)
-
-            if page == 1:
-                results = memory_only + db_entries
-                results = results[:page_size]
-            else:
-                results = db_entries
+            results = combined[offset : offset + page_size]
 
             return results, total
         else:
@@ -321,7 +322,8 @@ class EventLogger(EventLoggerInterface):
                             seen_ids.add(entry.log_id)
                             results.append(entry)
                 except Exception as e:
-                    self._logger.error(f"从数据库查询日志失败: {e}")
+                    sys.stderr.write(f"[EventLogger] 从数据库查询日志失败: {e}\n")
+                    sys.stderr.flush()
 
             results.sort(
                 key=lambda e: (
@@ -551,8 +553,10 @@ class EventLogger(EventLoggerInterface):
     async def _save_to_db(self, entry: LogEntry) -> None:
         try:
             ts = entry.timestamp
-            if ts.tzinfo is not None:
-                ts = ts.astimezone(timezone.utc).replace(tzinfo=None)
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            else:
+                ts = ts.astimezone(timezone.utc)
             await self._result_db.save_log(
                 log_id=entry.log_id,
                 category=entry.category.value,

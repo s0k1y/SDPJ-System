@@ -701,7 +701,11 @@ class ResultDB:
                     "log_id": log.log_id,
                     "category": log.category,
                     "level": log.level,
-                    "timestamp": log.timestamp.replace(tzinfo=timezone.utc),
+                    "timestamp": (
+                        log.timestamp
+                        if log.timestamp.tzinfo is not None
+                        else log.timestamp.replace(tzinfo=timezone.utc)
+                    ),
                     "source_module": log.source_module,
                     "user_id": log.user_id,
                     "event_type": log.event_type,

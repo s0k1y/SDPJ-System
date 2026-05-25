@@ -377,8 +377,8 @@ class TestTimestampSorting:
         assert logs[1].source_module == "Mod2"
         assert logs[2].source_module == "Mod1"
 
-    def test_save_to_db_normalizes_to_utc_naive(self):
-        """_save_to_db应将UTC-aware时间戳归一化为UTC-naive"""
+    def test_save_to_db_preserves_utc_aware(self):
+        """_save_to_db应保留UTC-aware时间戳（不剥离时区信息）"""
         from unittest.mock import AsyncMock, MagicMock
         from sdpj.core.event_logger_interface import LogEntry
 
@@ -404,15 +404,15 @@ class TestTimestampSorting:
         call_args = mock_db.save_log.call_args
         saved_ts = call_args.kwargs.get("timestamp") or call_args[1].get("timestamp")
 
-        assert saved_ts.tzinfo is None
+        assert saved_ts.tzinfo == timezone.utc
         assert saved_ts.year == 2026
         assert saved_ts.month == 5
         assert saved_ts.day == 5
         assert saved_ts.hour == 21
         assert saved_ts.minute == 6
 
-    def test_save_to_db_preserves_naive_utc(self):
-        """_save_to_db对已经是naive的时间戳不做转换"""
+    def test_save_to_db_annotates_naive_as_utc(self):
+        """_save_to_db应将naive时间戳标注为UTC时区"""
         from unittest.mock import AsyncMock
         from sdpj.core.event_logger_interface import LogEntry
 
@@ -438,8 +438,8 @@ class TestTimestampSorting:
         call_args = mock_db.save_log.call_args
         saved_ts = call_args.kwargs.get("timestamp") or call_args[1].get("timestamp")
 
-        assert saved_ts.tzinfo is None
-        assert saved_ts == naive_ts
+        assert saved_ts.tzinfo == timezone.utc
+        assert saved_ts.replace(tzinfo=None) == naive_ts
 
 
 class TestTimestampMigration:
