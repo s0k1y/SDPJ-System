@@ -49,7 +49,7 @@
       "id": "KI-001",
       "severity": "major",
       "description": "DAG基础设施放错了目录层级——上一轮Trae SOLO Agent在父目录(4.系统源代码/)创建了.dag/和openspec/，但Git仓库和ClaudeCode工作目录在SDPJ-System/。需迁移。",
-      "workaround": "在SDPJ-System/下重新创建.dag/目录结构；将父目录的openspec/changes/multi-encoding-indirect-injection/ 4个工件复制到SDPJ-System/openspec/changes/",
+      "workaround": "根据"E:\Sky毕业设计\4.系统源代码\.agents\skills\multi-agent-dev\Specific\ClaudeCode\SKILL.md"判断以下操作是否有执行的必要:在SDPJ-System/下重新创建.dag/目录结构；将父目录的openspec/changes/multi-encoding-indirect-injection/ 4个工件复制到SDPJ-System/openspec/changes/",
       "files": [
         "SDPJ-System/.dag/plan.json",
         "SDPJ-System/openspec/changes/multi-encoding-indirect-injection/proposal.md",
