@@ -190,7 +190,7 @@ class SystemLog(Base):
     )
     level: Mapped[str] = mapped_column(String(20), nullable=False, index=True, comment="日志级别")
     timestamp: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True, comment="时间戳"
+        DateTime, nullable=False, index=True, comment="时间戳"
     )
     source_module: Mapped[str] = mapped_column(
         String(255), nullable=False, index=True, comment="来源模块"
