@@ -1,0 +1,128 @@
+{
+  "handoff_version": "1.0",
+  "created_at": "2026-05-25T15:30:00+08:00",
+  "session_id": "mypy-type-fix-session",
+
+  "wakeup": {
+    "step_1": "pwd",
+    "step_2": "git log --oneline -20",
+    "step_3": "read context-handoff.json (本文件)"
+  },
+
+  "project_state": {
+    "phase": "bugfixing",
+    "total_features": 150,
+    "completed": 118,
+    "in_progress": "mypy 静态类型检查错误修复 — 从150条错误降至32条",
+    "broken": []
+  },
+
+  "next_task": {
+    "id": "FIX-REMAINING-32",
+    "description": "修复剩余32条 mypy 类型错误，最终目标: conda run -n SDPJ-System mypy sdpj --ignore-missing-imports 零错误",
+    "priority": "high",
+    "blocked_by": []
+  },
+
+  "environment": {
+    "branch": "master",
+    "last_commit": "26e3c1b",
+    "dev_server": "cd SDPJ-System; conda activate SDPJ-System",
+    "python_env": "conda activate SDPJ-System (Python 3.11)",
+    "test_command": "$env:CONDA_NO_PLUGINS='true'; conda run -n SDPJ-System mypy sdpj --ignore-missing-imports 2>$null",
+    "project_root": "e:\\Sky毕业设计\\4.系统源代码\\SDPJ-System"
+  },
+
+  "known_issues": [
+    {
+      "id": "KI-001",
+      "severity": "major",
+      "description": "errors.py:55 — to_dict() 中 status_code(int) 赋值给 dict[str,str]，需改返回类型为 dict[str, Any]",
+      "workaround": "修改 to_dict 返回类型注解为 -> dict[str, Any]",
+      "files": ["sdpj/infrastructure/llm_adapters/errors.py"]
+    },
+    {
+      "id": "KI-002",
+      "severity": "minor",
+      "description": "serialization.py:7 — types-PyYAML 已安装但 mypy 仍报 import-untyped，需确认 stub 路径",
+      "workaround": "可忽略或添加 # type: ignore[import-untyped]",
+      "files": ["sdpj/infrastructure/utils/serialization.py"]
+    },
+    {
+      "id": "KI-003",
+      "severity": "major",
+      "description": "report_manager.py:192 — export_report 实现签名中 target_format 仍为 Literal，接口已改为 str",
+      "workaround": "修改 report_manager.py 中 export_report 的 target_format 参数类型为 str",
+      "files": ["sdpj/core/report_manager.py"]
+    },
+    {
+      "id": "KI-004",
+      "severity": "major",
+      "description": "builtin_datasets/__init__.py:115 — 列表推导式类型不兼容 & None 不可迭代",
+      "workaround": "对 records 做 None 检查后再列表推导，或调整 _read_and_parse_jsonl 返回值",
+      "files": ["sdpj/infrastructure/database/sample_db/builtin_datasets/__init__.py"]
+    },
+    {
+      "id": "KI-005",
+      "severity": "minor",
+      "description": "task_queue_manager.py:151 — 返回 Any 而非 Task|None，需 cast",
+      "workaround": "return cast(Task | None, ...)",
+      "files": ["sdpj/core/task_queue_manager.py"]
+    },
+    {
+      "id": "KI-006",
+      "severity": "major",
+      "description": "sdpj_detector/__init__.py:55 — poc_progress_callback 类型不兼容，接口期望 Callable[[int,int,int,dict],None] 但实现传的是带 dict|None 的",
+      "workaround": "添加 # type: ignore[arg-type] 或对齐接口与实际签名的可选参数",
+      "files": ["sdpj/core/sdpj_detector/__init__.py"]
+    },
+    {
+      "id": "KI-007",
+      "severity": "major",
+      "description": "state_scheduler.py 多处: task_group_id 为 Any|None 需 str；800-980行大量 dict 类型不匹配(insert/append/dict-item/attr-defined)",
+      "workaround": "在 431/442/470 行之前添加 assert task_group_id is not None；800-980行需逐个添加 type: ignore 或重构为 TypedDict",
+      "files": ["sdpj/control/state_scheduler.py"]
+    },
+    {
+      "id": "KI-008",
+      "severity": "major",
+      "description": "private_config_repo.py:79 — 返回 Any 而非 dict|None，需 cast",
+      "workaround": "return cast(dict[Any, Any] | None, ...)",
+      "files": ["sdpj/infrastructure/database/user_db/repositories/private_config_repo.py"]
+    },
+    {
+      "id": "KI-009",
+      "severity": "blocker",
+      "description": "bootstrap.py:76-85 — 多接口不兼容: UtilsLib vs UtilsInterface、DataProcessor vs DataProcessorInterface(缺 add_dataset_record 的 risk_type 参数)、LLMServiceInterface 未定义",
+      "workaround": "1) 更新 UtilsLib 使其符合 UtilsInterface 签名 2) 修改 DataProcessor.add_dataset_record 使其与接口一致 3) 导入 LLMServiceInterface",
+      "files": ["sdpj/bootstrap.py", "sdpj/infrastructure/utils/utils_lib.py", "sdpj/drivers/data_processor.py"]
+    },
+    {
+      "id": "KI-010",
+      "severity": "major",
+      "description": "reports.py:48 — request.state.user_id 为 str 但赋值给 int；reports.py:81 — export_report 调用的 task_id 参数未在 StateSchedulerInterface 中声明",
+      "workaround": "48行: int() 转换已做但可能被重新覆盖；81行: StateSchedulerInterface 需添加 task_id 参数",
+      "files": ["sdpj/ui/webui/backend/routers/reports.py", "sdpj/control/state_scheduler_interface.py"]
+    }
+  ],
+
+  "recent_decisions": [
+    "采用 cast() 模式处理返回 Any 问题 (而非重构函数签名)，以最小化改动",
+    "type: ignore[assignment] 用于 state_scheduler.py 中复杂字典构建，因该段代码使用动态聚合模式难以静态类型化",
+    "所有 Interface(Protocol) 类已同步添加缺失方法签名 (Agent1执行)",
+    "Agent2 已将 _poc_progress_cb 从动态属性改为 nonlocal 闭包变量模式"
+  ],
+
+  "progress_summary": {
+    "original_errors": 150,
+    "current_errors": 32,
+    "files_checked": 150,
+    "error_files_remaining": 10,
+    "main_remaining_categories": [
+      "bootstrap.py 接口不兼容 (blocker, KI-009)",
+      "state_scheduler.py dict类型不匹配 (major, KI-007)",
+      "report_manager.py 签名不一致 (major, KI-003)",
+      "其他杂项 cast/type注解 (minor)"
+    ]
+  }
+}
