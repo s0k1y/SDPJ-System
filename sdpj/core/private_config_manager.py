@@ -354,6 +354,9 @@ class PrivateConfigManager(PrivateConfigManagerInterface):
     async def unregister_private_model(self, model_id: str) -> tuple[bool, str]:
         return await self._llm_registry.unregister_private_model(model_id)
 
+    async def close_adapter_sessions(self) -> None:
+        await self._llm_registry.close_adapter_sessions()
+
     async def export_dataset_file(
         self, dataset_id: int, username: str | None = None
     ) -> dict | None:

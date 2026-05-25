@@ -172,3 +172,15 @@ class LLMRegistryInterface(Protocol):
             系统关闭期
         """
         ...
+
+    async def close_adapter_sessions(self) -> None:
+        """
+        关闭所有已注册适配器的HTTP会话（不销毁实例）
+
+        后置条件:
+            所有 aiohttp ClientSession 已关闭，适配器实例可下次惰性重建
+
+        触发场景:
+            CLI 模式下单次检测完成后释放网络资源
+        """
+        ...

@@ -6,12 +6,12 @@ import click
 
 BANNER = (
     "   _____    ____     ____        __          _____                    __                   \n"
-    "  / ___/   / __ \   / __ \      / /         / ___/   __  __   _____  / /_  ___    ____ ___ \n"
-    "  \__ \   / / / /  / /_/ / __  / /  ______  \__ \   / / / /  / ___/ / __/ / _ \  / __ `__ \ \n"
+    "  / ___/   / __ \\   / __ \\      / /         / ___/   __  __   _____  / /_  ___    ____ ___ \n"
+    "  \\__ \\   / / / /  / /_/ / __  / /  ______  \\__ \\   / / / /  / ___/ / __/ / _ \\  / __ `__ \\ \n"
     " ___/ /  / /_/ /  / ____/ / /_/ /  /_____/ ___/ /  / /_/ /  (__  ) / /_  /  __/ / / / / / / \n"
-    "/____/  /_____/  /_/      \____/          /____/   \__, /  /____/  \__/  \___/ /_/ /_/ /_/ \n"
+    "/____/  /_____/  /_/      \\____/          /____/   \\__, /  /____/  \\__/  \\___/ /_/ /_/ /_/ \n"
     "                                                  /____/                                   \n"
-    "                   Self–Detection based on Post–Jialbreak-System V1.0.0                    \n"
+    "                   Self-Detection based on Post-Jialbreak-System V1.0.0                    \n"
 )
 
 
@@ -58,8 +58,9 @@ class OrderedGroup(click.Group):
                 cmd = self.commands.get(name)
                 if cmd is None or cmd.hidden:
                     continue
+                is_group = isinstance(cmd, click.Group)
                 rows.append((name, cmd.get_short_help_str()))
-                if isinstance(cmd, click.Group):
+                if is_group:
                     rows.append(("", ""))
                     for sub_name, sub_cmd in cmd.commands.items():
                         if sub_cmd.hidden:
@@ -88,7 +89,7 @@ class OrderedGroup(click.Group):
 
     def format_help(self, ctx, formatter):
         if self._banner and ctx.parent is None:
-            formatter.write(self._banner + "\n")
+            formatter.write(click.style(self._banner, fg="green") + "\n")
         super().format_help(ctx, formatter)
 
     def get_help(self, ctx):

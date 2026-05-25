@@ -36,6 +36,7 @@ class StateScheduler(StateSchedulerInterface):
         event_logger: EventLoggerInterface,
         task_queue_manager: TaskQueueManagerInterface,
         db_initializer=None,
+        engine=None,
     ):
         self._account = account_manager
         self._dac = dac_manager
@@ -46,6 +47,7 @@ class StateScheduler(StateSchedulerInterface):
         self._fsm = SystemStateMachine()
         self._task_queue = task_queue_manager
         self._db_initializer = db_initializer
+        self._engine = engine
         self._state_callbacks: list = []
         self._error_callbacks: list = []
         self._log_callbacks: list = []
@@ -59,9 +61,18 @@ class StateScheduler(StateSchedulerInterface):
     async def startup(self) -> None:
         if self._db_initializer is not None:
             await self._db_initializer()
+        await self.session_init()
+        await self._cleanup_stale_cancelled_groups()
+        self.start_task_consumer()
+        await self._logger.start_db_writer()
+        self._logger.subscribe_logs(self._on_new_log)
+        await self._logger.cleanup_old_logs()
+
+    async def session_init(self) -> None:
         await self._config.initialize_registry()
         await self._task_queue.initialize()
         await self._restore_adapters_from_db()
+        await self._logger.start_db_writer()
         if self.get_system_state() == "idle":
             queue_view = await self._task_queue.get_queue_view()
             has_pending = any(t.status == TaskStatus.PENDING for t in queue_view)
@@ -72,37 +83,88 @@ class StateScheduler(StateSchedulerInterface):
                     self._notify_state()
                 except Exception as e:
                     self._log_err("FSMError", f"启动时状态恢复失败: {e}")
-        self.start_task_consumer()
-        await self._logger.start_db_writer()
-        self._logger.subscribe_logs(self._on_new_log)
-        await self._logger.cleanup_old_logs()
 
     async def _restore_adapters_from_db(self) -> None:
         try:
-            configs = await self._config.list_configs(1)
+            all_users = await self._account.list_all_users()
+            seen_model_ids: set[str] = set()
             restored = 0
-            for cfg in configs:
-                content = cfg.get("content", {})
-                model_id = content.get("model") or content.get("model_id")
-                if not model_id:
+            for user in all_users:
+                uid = user.get("user_id")
+                if uid is None:
                     continue
-                # 始终先注销旧实例，再用最新配置重新注册（确保配置变更生效）
-                available, _ = await self._config.is_model_available(model_id)
-                if available:
-                    await self._config.unregister_private_model(model_id)
-                adapter_content = json.dumps(content, ensure_ascii=False)
-                success, _, error = await self._config.register_private_model(
-                    adapter_content, model_id
-                )
-                if success:
-                    restored += 1
-                    self._log_rt("adapter_restored", f"启动时恢复适配器: {model_id}")
-                else:
-                    self._log_err("AdapterRestore", f"恢复适配器失败: {model_id}, error={error}")
+                configs = await self._config.list_configs(uid)
+                for cfg in configs:
+                    content = cfg.get("content", {})
+                    model_id = content.get("model") or content.get("model_id")
+                    if not model_id or model_id in seen_model_ids:
+                        continue
+                    seen_model_ids.add(model_id)
+                    available, _ = await self._config.is_model_available(model_id)
+                    if available:
+                        await self._config.unregister_private_model(model_id)
+                    adapter_content = json.dumps(content, ensure_ascii=False)
+                    success, _, error = await self._config.register_private_model(
+                        adapter_content, model_id
+                    )
+                    if success:
+                        restored += 1
+                        self._log_rt("adapter_restored", f"启动时恢复适配器: {model_id}")
+                    else:
+                        self._log_err("AdapterRestore", f"恢复适配器失败: {model_id}, error={error}")
             if restored > 0:
                 self._log_rt("adapters_restored", f"启动时共恢复 {restored} 个适配器")
         except Exception as e:
             self._log_err("AdapterRestore", f"恢复适配器异常: {e}")
+
+    async def _cleanup_stale_cancelled_groups(self) -> None:
+        """启动时清理数据库中全部子任务均已取消且无关联报告的任务组"""
+        if self._engine is None:
+            return
+        try:
+            from sqlalchemy import text
+
+            stale_groups: list[str] = []
+            async with self._engine.connect() as conn:
+                result = await conn.execute(
+                    text("""
+                        SELECT tg.task_group_id
+                        FROM TaskGroup tg
+                        WHERE tg.task_group_id IN (
+                            SELECT dt.task_group_id
+                            FROM DetectionTask dt
+                            GROUP BY dt.task_group_id
+                            HAVING COUNT(*) = SUM(CASE WHEN dt.task_status = 'cancelled' THEN 1 ELSE 0 END)
+                        )
+                        AND tg.task_group_id NOT IN (
+                            SELECT DISTINCT dt2.task_group_id
+                            FROM DetectionReport dr
+                            JOIN DetectionTask dt2 ON dr.task_id = dt2.task_id
+                        )
+                    """)
+                )
+                stale_groups = [row[0] for row in result]
+
+            for tg_id in stale_groups:
+                try:
+                    await self._report.delete_report(task_group_id=tg_id)
+                    self._log_rt("startup_cleanup", f"启动时清理已取消任务组: {tg_id}")
+                except Exception as e:
+                    self._log_err("StartupCleanup", f"清理已取消任务组 {tg_id} 失败: {e}")
+        except Exception as e:
+            self._log_err("StartupCleanup", f"启动清理异常: {e}")
+
+    async def _find_config_by_model_id(self, user_id: int, model_id: str) -> Optional[dict]:
+        try:
+            configs = await self._config.list_configs(user_id)
+            for cfg in configs:
+                content = cfg.get("content", {})
+                cfg_model = content.get("model") or content.get("model_id")
+                if cfg_model == model_id:
+                    return content
+        except Exception:
+            pass
+        return None
 
     async def shutdown(self) -> None:
         await self._logger.flush()
@@ -208,10 +270,22 @@ class StateScheduler(StateSchedulerInterface):
                     return {"success": False, "error": f"模型适配器注册失败: {err}"}
                 self._log_rt("adapter_auto_registered", f"适配器 '{model_id}' 已自动注册")
             else:
-                return {
-                    "success": False,
-                    "error": f"模型适配器 '{model_id}' 未注册且无配置信息可用",
-                }
+                found = await self._find_config_by_model_id(user_id, model_id)
+                if found is not None:
+                    adapter_content = json.dumps(found, ensure_ascii=False)
+                    ok, _, err = await self._config.register_private_model(
+                        adapter_content, model_id
+                    )
+                    if not ok:
+                        return {"success": False, "error": f"模型适配器注册失败: {err}"}
+                    self._log_rt(
+                        "adapter_auto_registered", f"适配器 '{model_id}' 已自动注册(回退查找)"
+                    )
+                else:
+                    return {
+                        "success": False,
+                        "error": f"模型适配器 '{model_id}' 未注册且无配置信息可用",
+                    }
 
         if not dataset_ids:
             return {"success": False, "error": "必须指定至少一个检测数据集 (dataset_ids)"}
@@ -516,6 +590,7 @@ class StateScheduler(StateSchedulerInterface):
                 self._transition_detection_done("detection_done")
             return {"success": True, "tasks": [], "message": "队列为空"}
 
+        spawned = []
         for task in batch:
             params = {
                 "model_id": task.model_id,
@@ -530,10 +605,27 @@ class StateScheduler(StateSchedulerInterface):
             bg_task = asyncio.create_task(self._run_task_bg(task.task_id, params))
             self._running_tasks.add(bg_task)
             bg_task.add_done_callback(self._running_tasks.discard)
+            spawned.append(bg_task)
+
+        await asyncio.gather(*spawned, return_exceptions=True)
+
+        task_results = []
+        for task in batch:
+            final_status = await self._task_queue.get_task_status(task.task_id)
+            task_results.append({
+                "task_id": task.task_id,
+                "status": "completed",
+                "success": final_status == TaskStatus.COMPLETED,
+            })
+
+        try:
+            await self._config.close_adapter_sessions()
+        except Exception:
+            pass
 
         return {
             "success": True,
-            "tasks": [{"task_id": t.task_id, "status": "launched"} for t in batch],
+            "tasks": task_results,
         }
 
     def _cleanup_running_tasks(self) -> None:
@@ -609,6 +701,7 @@ class StateScheduler(StateSchedulerInterface):
 
         for orphan_id in orphan_group_ids:
             orphan_tasks = task_group_map.pop(orphan_id, [])
+            all_cancelled = all(t.status == TaskStatus.CANCELLED for t in orphan_tasks)
             for t in orphan_tasks:
                 try:
                     await self._task_queue.remove_task(t.task_id)
@@ -618,6 +711,14 @@ class StateScheduler(StateSchedulerInterface):
                 self._log_rt(
                     "orphan_cleanup", f"清理孤儿任务组 {orphan_id}, 移除 {len(orphan_tasks)} 个任务"
                 )
+                if all_cancelled:
+                    try:
+                        await self._report.delete_report(task_group_id=orphan_id)
+                        self._log_rt(
+                            "orphan_cleanup", f"孤儿任务组 {orphan_id} (全部已取消) 数据库记录已删除"
+                        )
+                    except Exception:
+                        pass
 
         groups = []
         config_ids_to_read = []
@@ -946,7 +1047,7 @@ class StateScheduler(StateSchedulerInterface):
     # ── 报告管理调度 (职责 5-8) ──
 
     async def generate_report(
-        self, task_group_id: str, detection_type: str, *, user_id: int | None = None
+        self, task_group_id: str, *, user_id: int | None = None
     ) -> dict:
         try:
             old_state = self.get_system_state()
@@ -958,6 +1059,7 @@ class StateScheduler(StateSchedulerInterface):
             return {"success": False, "error": "系统状态不允许生成报告"}
 
         try:
+            detection_type = await self._resolve_group_type(task_group_id)
             if detection_type == "static":
                 report = await self._report.generate_static_report(task_group_id)
             else:
@@ -972,6 +1074,13 @@ class StateScheduler(StateSchedulerInterface):
         except Exception as e:
             self._handle_error(e, "ReportError")
             return {"success": False, "error": str(e)}
+
+    async def _resolve_group_type(self, task_group_id: str) -> str:
+        queue_view = await self._task_queue.get_queue_view()
+        for t in queue_view:
+            if t.metadata.get("task_group_id") == task_group_id:
+                return t.algorithm_type
+        return "static"
 
     async def view_report(self, task_group_id: str, *, user_id: int | None = None) -> dict:
         report = await self._report.view_report(task_group_id, user_id=user_id)

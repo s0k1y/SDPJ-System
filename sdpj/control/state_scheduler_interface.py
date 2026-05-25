@@ -43,13 +43,12 @@ class StateSchedulerInterface(Protocol):
     # ── 报告管理调度 (职责 5-8) ──
 
     async def generate_report(
-        self, task_group_id: str, detection_type: str, *, user_id: int | None = None
+        self, task_group_id: str, *, user_id: int | None = None
     ) -> dict:
         """生成检测报告
 
         Args:
             task_group_id: 任务组 ID
-            detection_type: 检测类型
             user_id: 请求者用户 ID，用于权限校验
         """
         ...
@@ -115,6 +114,10 @@ class StateSchedulerInterface(Protocol):
 
     async def startup(self) -> None:
         """应用启动时初始化（注册已入库大模型等）"""
+        ...
+
+    async def session_init(self) -> None:
+        """每次会话初始化（恢复适配器、启动后台消费者等，不含首次建表）"""
         ...
 
     async def shutdown(self) -> None:

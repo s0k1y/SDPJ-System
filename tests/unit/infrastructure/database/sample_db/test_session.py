@@ -45,14 +45,17 @@ async def test_session_manager_drop_tables():
     await manager.create_tables()
     await manager.drop_tables()
 
-    # 验证表已删除（尝试插入数据应失败）
     from sqlalchemy.exc import OperationalError
 
-    async with manager.get_session() as session:
+    session = manager._session_factory()
+    try:
         dataset = Dataset(name="测试数据集", risk_type="越狱攻击")
         session.add(dataset)
         with pytest.raises(OperationalError):
             await session.commit()
+    finally:
+        await session.rollback()
+        await session.close()
 
     await manager.close()
 

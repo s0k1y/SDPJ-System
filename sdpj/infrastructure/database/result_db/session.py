@@ -210,15 +210,18 @@ class SessionManager:
         """获取数据库会话的上下文管理器"""
         if self.async_session_maker is None:
             await self.initialize()
-        async with self.async_session_maker() as session:
+        session: AsyncSession = self.async_session_maker()
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
             try:
-                yield session
-                await session.commit()
-            except Exception:
-                await session.rollback()
-                raise
-            finally:
                 await session.close()
+            except Exception:
+                pass
 
     async def close(self) -> None:
         """关闭数据库引擎"""

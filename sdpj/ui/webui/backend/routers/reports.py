@@ -32,7 +32,7 @@ async def generate(
 ):
     user_id: int = request.state.user_id
     return wrap_scheduler_result(
-        await scheduler.generate_report(req.task_group_id, req.detection_type, user_id=user_id)
+        await scheduler.generate_report(req.task_group_id, user_id=user_id)
     )
 
 

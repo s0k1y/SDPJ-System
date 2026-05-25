@@ -136,3 +136,6 @@ class LLMRegistry:
                 pass
         self._registry.clear()
         return True
+
+    async def close_adapter_sessions(self) -> None:
+        await self._adapter_lib.close_sessions()

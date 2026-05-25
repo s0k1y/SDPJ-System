@@ -1,11 +1,15 @@
 """SDPJ-System CLI 入口点 — python -m sdpj  /  sdpj"""
 
+import logging
 import sys
 import threading
 
 import click
 
 from sdpj.ui.cli.main import cli
+
+
+logging.getLogger('sqlalchemy.pool').setLevel(logging.CRITICAL)
 
 
 _original_thread_excepthook = threading.excepthook

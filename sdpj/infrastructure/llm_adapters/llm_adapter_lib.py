@@ -78,6 +78,14 @@ class LLMAdapterLib:
         self._instances.pop(instance.model_id, None)
         return True
 
+    # ===== 职责 7: 关闭所有服务实例的HTTP会话 =====
+    async def close_sessions(self) -> None:
+        for instance in list(self._instances.values()):
+            try:
+                await instance.destroy()
+            except Exception:
+                pass
+
     # ===== 职责 7: 错误标准化 =====
     @staticmethod
     def standardize_error(exc: Exception) -> StandardizedLLMError:

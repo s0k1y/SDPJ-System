@@ -7,7 +7,6 @@ from pydantic import BaseModel
 
 class ReportGenerateRequest(BaseModel):
     task_group_id: str
-    detection_type: str = "static"
 
 
 class ReportDeleteRequest(BaseModel):

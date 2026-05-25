@@ -95,16 +95,6 @@ def system_group():
     """系统监控与管理"""
 
 
-@system_group.command("status")
-@click.pass_context
-def system_status(ctx):
-    """查询系统状态"""
-    from sdpj.ui.cli.utils import output
-
-    state = ctx.obj.scheduler.get_system_state()
-    output.info(f"系统状态: {state}")
-
-
 @system_group.command("logs")
 @click.option("--category", default=None, type=click.Choice(["operation", "runtime", "error"]))
 @click.option("--module", "source_module", default=None, help="来源模块")
@@ -159,59 +149,6 @@ def system_logs(ctx, category, source_module, user_id, page, page_size):
     _page_output("\n".join(lines))
 
 
-@system_group.command("watch")
-@click.option("--interval", default=2, help="轮询间隔秒数")
-@click.pass_context
-def system_watch(ctx, interval):
-    """实时监听系统状态变更推送"""
-    import time
-
-    last_state = [None]
-
-    def on_state_change(new_state: str) -> None:
-        if new_state != last_state[0]:
-            last_state[0] = new_state
-            click.echo(f"[状态变更] {new_state}")
-
-    ctx.obj.scheduler.subscribe_state_changes(on_state_change)
-    click.echo("开始监听系统状态，按 Ctrl+C 退出...")
-    try:
-        while True:
-            current = ctx.obj.scheduler.get_system_state()
-            on_state_change(current)
-            time.sleep(interval)
-    except KeyboardInterrupt:
-        click.echo("\n正在停止... (再次按 Ctrl+C 强制退出)")
-        try:
-            ctx.obj.scheduler.unsubscribe_state_changes(on_state_change)
-            click.echo("已停止监听")
-        except KeyboardInterrupt:
-            click.echo("强制退出")
-
-
-@system_group.command("watch-errors")
-@click.pass_context
-def system_watch_errors(ctx):
-    """实时监听系统异常推送"""
-    import time
-
-    def on_error(err_type: str, desc: str) -> None:
-        click.echo(click.style(f"[异常] {err_type}: {desc}", fg="red"))
-
-    ctx.obj.scheduler.subscribe_errors(on_error)
-    click.echo("开始监听系统异常，按 Ctrl+C 退出...")
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        click.echo("\n正在停止... (再次按 Ctrl+C 强制退出)")
-        try:
-            ctx.obj.scheduler.unsubscribe_errors(on_error)
-            click.echo("已停止监听")
-        except KeyboardInterrupt:
-            click.echo("强制退出")
-
-
 # ── 主 Group ──
 
 
@@ -232,7 +169,7 @@ def cli(ctx):
     except Exception as e:
         scheduler = None
         click.echo(click.style(f"[ERR] 系统初始化失败: {e}", fg="red"), err=True)
-        click.echo("请检查数据库连接配置，或运行 sdpj System status 查看系统状态。", err=True)
+        click.echo("请检查数据库连接配置。", err=True)
 
     if scheduler is not None:
         try:

@@ -120,7 +120,10 @@ class UserDBSessionManager:
             await session.rollback()
             raise
         finally:
-            await session.close()
+            try:
+                await session.close()
+            except Exception:
+                pass
 
     async def close(self) -> None:
         """关闭数据库引擎"""

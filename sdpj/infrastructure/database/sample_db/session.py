@@ -109,14 +109,18 @@ class SampleDBSessionManager:
         if self._session_factory is None:
             await self.initialize()
 
-        async with self._session_factory() as session:
+        session: AsyncSession = self._session_factory()
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
             try:
-                yield session
-            except Exception:
-                await session.rollback()
-                raise
-            finally:
                 await session.close()
+            except Exception:
+                pass
 
     async def close(self) -> None:
         """关闭数据库引擎

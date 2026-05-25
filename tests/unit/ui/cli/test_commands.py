@@ -110,6 +110,8 @@ class TestUnwrap:
 
 def _make_mock_scheduler():
     s = MagicMock()
+    s.session_init = AsyncMock()
+    s.startup = AsyncMock()
     s.start_detection = AsyncMock()
     s.query_detection_progress = AsyncMock()
     s.execute_concurrent_tasks = AsyncMock()
@@ -139,14 +141,7 @@ def _make_mock_scheduler():
     s.schedule_config_operation = AsyncMock()
     s.schedule_private_resource_operation = AsyncMock()
     s.check_resource_access = AsyncMock()
-    s.get_system_state = MagicMock(return_value="idle")
 
-    s.subscribe_state_changes = MagicMock()
-    s.unsubscribe_state_changes = MagicMock()
-    s.subscribe_errors = MagicMock()
-    s.unsubscribe_errors = MagicMock()
-    s.subscribe_logs = MagicMock()
-    s.unsubscribe_logs = MagicMock()
     s.subscribe_llm_calls = MagicMock()
     s.unsubscribe_llm_calls = MagicMock()
     return s
@@ -197,6 +192,8 @@ class TestDetectStart:
                 "1",
                 "--dataset",
                 "2",
+                "--type", "static",
+                "--config-id", "1",
             ],
             s,
         )
@@ -211,7 +208,7 @@ class TestDetectStart:
             "task_group_id": "tg-002",
             "task_ids": ["t1"],
         }
-        result = _invoke(["Detect", "task", "start", "--model-id", "42", "--dataset", "1"], s)
+        result = _invoke(["Detect", "task", "start", "--model-id", "42", "--dataset", "1", "--type", "static", "--config-id", "1"], s)
         assert result.exit_code == 0
         assert s.start_detection.call_args[0][1]["model_id"] == 42
 
@@ -231,6 +228,8 @@ class TestDetectStart:
                 "ds",
                 "--dataset",
                 "1",
+                "--type", "static",
+                "--config-id", "1",
                 "--force-refresh",
                 "--jailbreak-dataset",
                 "5",
@@ -245,13 +244,13 @@ class TestDetectStart:
     def test_start_failure_shows_error(self):
         s = _make_mock_scheduler()
         s.start_detection.return_value = {"success": False, "error": "模型未注册"}
-        result = _invoke(["Detect", "task", "start", "--model-id", "bad", "--dataset", "1"], s)
+        result = _invoke(["Detect", "task", "start", "--model-id", "bad", "--dataset", "1", "--type", "static", "--config-id", "1"], s)
         assert result.exit_code == 1
         assert "模型未注册" in result.output
 
     def test_requires_login(self):
         s = _make_mock_scheduler()
-        result = _invoke_logout(["Detect", "task", "start", "--model-id", "x", "--dataset", "1"], s)
+        result = _invoke_logout(["Detect", "task", "start", "--model-id", "x", "--dataset", "1", "--type", "static", "--config-id", "1"], s)
         assert result.exit_code == 1
         assert "登录" in result.output
 
@@ -314,26 +313,6 @@ class TestDetectCancel:
         result = _invoke(["Detect", "task", "cancel"], s)
         assert result.exit_code == 0
         assert "必须提供" in result.output
-
-
-class TestDetectRun:
-    def test_run(self):
-        s = _make_mock_scheduler()
-        s.execute_concurrent_tasks.return_value = {
-            "success": True,
-            "tasks": [],
-            "message": "队列为空",
-        }
-        result = _invoke(["Detect", "task", "run"], s)
-        assert result.exit_code == 0
-        s.execute_concurrent_tasks.assert_called_once_with(3)
-
-    def test_run_with_concurrency(self):
-        s = _make_mock_scheduler()
-        s.execute_concurrent_tasks.return_value = {"success": True, "tasks": [], "message": "ok"}
-        result = _invoke(["Detect", "task", "run", "--concurrency", "5"], s)
-        assert result.exit_code == 0
-        s.execute_concurrent_tasks.assert_called_once_with(5)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -429,20 +408,12 @@ class TestReportGenerate:
         assert result.exit_code == 0
         assert "报告已生成" in result.output
 
-    def test_generate_dynamic(self):
-        s = _make_mock_scheduler()
-        s.generate_report = AsyncMock(
-            return_value={"success": True, "report": {"task_group_id": "tg-001"}}
-        )
-        result = _invoke(["Report", "generate", "--group-id", "tg-001", "--type", "dynamic"], s)
-        assert result.exit_code == 0
-
 
 class TestReportDelete:
     def test_delete_success(self):
         s = _make_mock_scheduler()
         s.delete_report.return_value = {"success": True}
-        result = _invoke(["Report", "delete", "--target-id", "tg-001", "--yes"], s)
+        result = _invoke(["Report", "delete", "--target-id", "tg-001"], s)
         assert result.exit_code == 0
         s.delete_report.assert_called_once_with("tg-001", 1, "task_group")
 
@@ -512,7 +483,7 @@ class TestReportVisualization:
         s.prepare_task_visualization_data = AsyncMock(
             return_value={"success": True, "data": {"risk_distribution": {}}}
         )
-        result = _invoke(["Report", "task-visualization", "--task-id", "task-001"], s)
+        result = _invoke(["Report", "visualization", "--task-id", "task-001"], s)
         assert result.exit_code == 0
 
 
@@ -589,7 +560,7 @@ class TestUserAccountOps:
         s.schedule_account_operation = AsyncMock(
             return_value={
                 "success": True,
-                "resources": [{"id": 1, "type": "dataset", "name": "test"}],
+                "resources": [{"resource_id": 1, "resource_type": "dataset", "dataset_name": "test"}],
                 "shared_resources": [],
             }
         )
@@ -659,12 +630,12 @@ class TestDACOps:
         s.schedule_dac_operation = AsyncMock(
             return_value={
                 "success": True,
-                "acl_list": [{"id": 1, "user_id": 2, "permission": "read"}],
+                "acl_list": [{"acl_id": 1, "grantee_user_id": 2, "grantee_username": "bob"}],
             }
         )
         result = _invoke(["User", "auth", "show", "--resource-id", "10"], s)
         assert result.exit_code == 0
-        assert "read" in result.output
+        assert "bob" in result.output
 
     def test_show_acl_empty(self):
         s = _make_mock_scheduler()
@@ -858,20 +829,6 @@ class TestPrivateResourceOps:
 # ═══════════════════════════════════════════════════════════
 # System 命令
 # ═══════════════════════════════════════════════════════════
-
-
-class TestSystemStatus:
-    def test_status(self):
-        s = _make_mock_scheduler()
-        result = _invoke(["System", "status"], s)
-        assert result.exit_code == 0
-        assert "idle" in result.output
-
-    def test_status_bootstrap_failure(self):
-        s = _make_mock_scheduler()
-        result = _invoke_logout(["System", "status"], s)
-        assert result.exit_code == 0
-        assert "idle" in result.output
 
 
 class TestSystemLogs:
