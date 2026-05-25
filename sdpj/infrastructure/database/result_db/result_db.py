@@ -701,7 +701,7 @@ class ResultDB:
                     "log_id": log.log_id,
                     "category": log.category,
                     "level": log.level,
-                    "timestamp": log.timestamp,
+                    "timestamp": log.timestamp.replace(tzinfo=timezone.utc),
                     "source_module": log.source_module,
                     "user_id": log.user_id,
                     "event_type": log.event_type,
@@ -834,6 +834,7 @@ class ResultDB:
                 tg_filters.append(TaskGroup.user_id == user_id)
             if model_id is not None:
                 tg_filters.append(TaskGroup.model_id == model_id)
+            tg_filters.append(DetectionTask.task_status != 'cancelled')
 
             task_stats_stmt = (
                 select(

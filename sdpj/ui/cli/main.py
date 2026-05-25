@@ -4,6 +4,9 @@
 仅依赖 StateSchedulerInterface，不含业务逻辑。
 """
 
+import asyncio
+import atexit
+from datetime import datetime
 from pathlib import Path
 
 import click
@@ -38,6 +41,10 @@ def _resolve_db_path() -> Path:
         path_str = url.split(":///")[-1]
         return Path(path_str).resolve()
     return Path("sdpj/infrastructure/database/sdpj.db").resolve()
+
+
+def _cleanup(scheduler: StateSchedulerInterface) -> None:
+    pass
 
 
 def _bootstrap() -> StateSchedulerInterface:
@@ -137,7 +144,11 @@ def system_logs(ctx, category, source_module, user_id, page, page_size):
     if total != len(logs_list):
         lines.append(f"共 {total} 条，当前显示 {len(logs_list)} 条")
     for e in logs_list:
-        ts = e.get("timestamp", "") if isinstance(e, dict) else getattr(e, "timestamp", "")
+        ts_val = e.get("timestamp", "") if isinstance(e, dict) else getattr(e, "timestamp", "")
+        if isinstance(ts_val, datetime):
+            ts = ts_val.astimezone().strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            ts = str(ts_val)
         cat = e.get("category", "") if isinstance(e, dict) else getattr(e, "category", "")
         desc = (
             e.get("description", str(e))
@@ -224,16 +235,19 @@ def cli(ctx):
         click.echo("请检查数据库连接配置，或运行 sdpj System status 查看系统状态。", err=True)
 
     if scheduler is not None:
-        db_path = _resolve_db_path()
-        if not db_path.exists():
-            click.echo(click.style("[Init] 数据库不存在，正在初始化...", fg="yellow"), err=True)
-            import asyncio
-
-            try:
+        try:
+            db_path = _resolve_db_path()
+            is_new_db = not db_path.exists()
+            if is_new_db:
+                click.echo(click.style("[Init] 数据库不存在，正在初始化...", fg="yellow"), err=True)
                 asyncio.run(scheduler.startup())
                 click.echo(click.style("[Init] 数据库初始化完成", fg="green"), err=True)
-            except Exception as e:
-                click.echo(click.style(f"[Init] 数据库初始化失败: {e}", fg="red"), err=True)
+            else:
+                asyncio.run(scheduler.session_init())
+        except Exception as e:
+            click.echo(click.style(f"[Init] 系统初始化失败: {e}", fg="red"), err=True)
+
+        atexit.register(_cleanup, scheduler)
     ctx.obj = CLIContext(scheduler)
 
 
