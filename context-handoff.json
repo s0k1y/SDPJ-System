@@ -1,7 +1,7 @@
 {
   "handoff_version": "1.0",
-  "created_at": "2026-05-26T15:30:00+08:00",
-  "session_id": "multi-encoding-implementation",
+  "created_at": "2026-05-26T18:30:00+08:00",
+  "session_id": "multi-encoding-implementation-final",
 
   "wakeup": {
     "step_1": "pwd",
@@ -18,131 +18,51 @@
   },
 
   "next_task": {
-    "id": "VERIFY-001",
-    "description": "运行完整测试套件并启动WebUI进行端到端功能验证",
-    "priority": "high",
+    "id": "VERIFY-01",
+    "description": "浏览器端到端手动验证：启动WebUI，创建多编码检测任务，验证攻击路径选择器、报告列表攻击路径列、报告详情攻击路径统计是否正常渲染",
+    "priority": "medium",
     "blocked_by": []
   },
 
   "environment": {
     "branch": "master",
-    "last_commit": "20e2f50",
-    "dev_server": "cd sdpj/ui/webui/frontend && npm run dev",
+    "last_commit": "e3bb7cf",
+    "dev_server": "cd sdpj/ui/webui && npm run dev (前端) + python -m sdpj (后端)",
     "python_env": "conda activate SDPJ-System",
-    "test_command": "python -m pytest tests/ -v"
+    "test_command": "D:/Anaconda/envs/SDPJ-System/python.exe -m pytest tests/ -x -q"
   },
 
   "known_issues": [
     {
       "id": "KI-001",
       "severity": "minor",
-      "description": "编码测试覆盖不全：test_encoding.py仅测试4种编码(base64/url/unicode_escape/hex)，未覆盖新增的9种(base16/base32/base85/rot13/caesar/morse/vigenere/ascii/unicode)",
-      "workaround": "核心编码逻辑已通过现有测试验证，新增编码使用相同的BaseCodec/CryptoCodec模式",
-      "files": ["tests/unit/infrastructure/utils/test_encoding.py"]
+      "description": "mypy 有 14 个既有类型错误分布在 6 个文件(cli/__init__.py, scripts/migrate_timestamps_utc.py, scripts/log_manager.py, cli/main.py)，均为本次改动未涉及的既有代码",
+      "workaround": "不影响运行，可后续统一修复",
+      "files": [
+        "sdpj/ui/cli/__init__.py",
+        "sdpj/infrastructure/utils/scripts/migrate_timestamps_utc.py",
+        "sdpj/infrastructure/utils/scripts/log_manager.py",
+        "sdpj/ui/cli/main.py"
+      ]
     },
     {
       "id": "KI-002",
       "severity": "minor",
-      "description": "attack_path字段未测试：prepare_visualization_data()和prepare_task_visualization_data()返回attack_path，但test_report_manager.py未验证此字段",
-      "workaround": "字段传递逻辑简单，从metadata_json提取后直接返回",
-      "files": ["tests/unit/core/test_report_manager.py"]
+      "description": "前端 Vue 组件(DetectionForm/ReportTable/ReportChart)已修改但未在浏览器中实际验证渲染效果",
+      "workaround": "启动 dev server 后手动验证",
+      "files": [
+        "sdpj/ui/webui/frontend/src/components/detection/DetectionForm.vue",
+        "sdpj/ui/webui/frontend/src/components/report/ReportTable.vue",
+        "sdpj/ui/webui/frontend/src/components/report/ReportChart.vue"
+      ]
     }
   ],
 
   "recent_decisions": [
-    "选择直接实现路径(Path B)而非DAG工作流：8个阻断问题均为DAG基础设施设置问题，不影响功能实现",
-    "编码转换位置选择_process闭包而非_prepare_poc_async：PoC池必须保持原始直接注入文本，编码后的文本仅用于LLM调用",
-    "使用现有metadata_json字段存储encoding_type和attack_path：避免新增数据库列，保持schema稳定",
-    "前端向导从3步扩展为4步：新增Step2用于攻击路径选择，使用el-tree-select多选模式",
-    "双循环任务拆分逻辑：has_direct控制直接注入任务，encoding_types数组控制间接注入任务"
-  ],
-
-  "task_completion_details": {
-    "T1": {
-      "file": "sdpj/infrastructure/utils/encoding.py",
-      "status": "completed",
-      "changes": "扩展至13种编码，新增build_encoded_injection_sample()、get_encoding_types()、get_attack_path_label()"
-    },
-    "T2": {
-      "file": "sdpj/core/sdpj_detector/static_detector.py",
-      "status": "completed",
-      "changes": "run_static_detection()添加encoding_type参数，_process闭包中应用编码转换"
-    },
-    "T3": {
-      "file": "sdpj/core/sdpj_detector/__init__.py",
-      "status": "completed",
-      "changes": "SDPJDetector门面类透传encoding_type参数"
-    },
-    "T4": {
-      "file": "sdpj/core/sdpj_detector_interface.py",
-      "status": "completed",
-      "changes": "Protocol接口定义添加encoding_type参数"
-    },
-    "T5": {
-      "file": "sdpj/ui/webui/backend/schemas/detection.py",
-      "status": "completed",
-      "changes": "DetectionStartRequest添加encoding_types和has_direct字段"
-    },
-    "T6": {
-      "file": "sdpj/drivers/data_processor_interface.py",
-      "status": "completed",
-      "changes": "create_detection_task添加metadata_json参数"
-    },
-    "T7": {
-      "file": "sdpj/drivers/data_processor.py",
-      "status": "completed",
-      "changes": "DataProcessor实现透传metadata_json，aggregate_task_group_results返回metadata_json"
-    },
-    "T8": {
-      "file": "sdpj/infrastructure/database/result_db/interface.py",
-      "status": "completed",
-      "changes": "ResultDB接口添加metadata_json参数"
-    },
-    "T9": {
-      "file": "sdpj/infrastructure/database/result_db/result_db.py",
-      "status": "completed",
-      "changes": "create_detection_task支持metadata_json，list_tasks_by_group和get_detection_task返回metadata_json"
-    },
-    "T10": {
-      "file": "sdpj/control/state_scheduler.py",
-      "status": "completed",
-      "changes": "start_detection()实现双循环拆分，execute_detection_task()提取encoding_type"
-    },
-    "T11": {
-      "file": "sdpj/ui/webui/backend/routers/detection.py",
-      "status": "completed",
-      "changes": "新增GET /encoding-types端点"
-    },
-    "T12": {
-      "file": "sdpj/ui/webui/frontend/src/components/detection/DetectionForm.vue",
-      "status": "completed",
-      "changes": "3→4步向导，Step2攻击路径选择(el-tree-select多选)，handleSubmit包含encoding_types和has_direct"
-    },
-    "T13": {
-      "file": "sdpj/ui/webui/frontend/src/components/report/ReportTable.vue",
-      "status": "completed",
-      "changes": "报告表格添加'攻击路径'列，buildFlattenedRows包含attack_path"
-    },
-    "T14": {
-      "file": "sdpj/ui/webui/frontend/src/components/report/ReportChart.vue",
-      "status": "completed",
-      "changes": "添加attack_path统计项和.stat-text CSS类"
-    },
-    "T15": {
-      "file": "sdpj/core/report_manager.py",
-      "status": "completed",
-      "changes": "prepare_visualization_data()和prepare_task_visualization_data()返回attack_path字段"
-    }
-  },
-
-  "verification_results": {
-    "unit_tests": {
-      "test_encoding.py": "6/6 passed",
-      "test_report_manager.py": "17/17 passed"
-    },
-    "frontend_build": "npm run build 成功",
-    "syntax_check": "所有Python文件无语法错误"
-  },
-
-  "data_flow_summary": "用户选择编码 → DetectionForm.vue → POST /detection/start → StateScheduler.start_detection() → 双循环创建任务(直接注入+间接注入) → execute_detection_task() → run_static_detection(encoding_type=...) → _process() → build_encoded_injection_sample() → create_detection_task(metadata_json=...) → result_db存储 → ReportTable/ReportChart展示attack_path"
+    "使用 DetectionTask.metadata_json 已有 JSON 字段存储 encoding_type 和 attack_path，零数据库 Schema 变更",
+    "state_scheduler 中采用 数据集x编码 双循环拆分任务，每个子任务独立编码类型",
+    "attack_path 数据流：state_scheduler 写入 metadata_json → result_db compute_reports_summary 查询 → report_manager 聚合 → 前端展示",
+    "前端攻击路径选择器使用 el-tree-select 树形多选，顶层为 直接注入/间接注入(多编码)，间接注入下挂 13 种编码子节点",
+    "不兼容中文的编码(rot13/caesar/vigenere/morse)在选择器中标注提示，由 _ENCODING_META.chinese_compatible 控制"
+  ]
 }
