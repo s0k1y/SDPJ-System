@@ -63,8 +63,20 @@ function Stop-PortProcess {
                     Write-Host "  Stopping port $Port process (PID: $procIdInt - $($proc.ProcessName))" -ForegroundColor Gray
                     Stop-Process -Id $procIdInt -Force -ErrorAction SilentlyContinue
                     $killed += $procIdInt
+                    $verifyCount = 0
+                    while ($verifyCount -lt 10) {
+                        $stillAlive = Get-Process -Id $procIdInt -ErrorAction SilentlyContinue
+                        if (-not $stillAlive) { break }
+                        Start-Sleep -Milliseconds 500
+                        $verifyCount++
+                    }
+                    if ($stillAlive) {
+                        Write-Host "  Force killing stubborn process PID $procIdInt via taskkill" -ForegroundColor DarkYellow
+                        & taskkill /F /PID $procIdInt 2>$null
+                    }
                 } else {
-                    Write-Host "  Port $Port held by zombie PID $procIdInt (process already dead, waiting for OS to release)" -ForegroundColor DarkGray
+                    Write-Host "  Port $Port held by zombie PID $procIdInt, attempting force cleanup" -ForegroundColor DarkGray
+                    & taskkill /F /PID $procIdInt 2>$null
                 }
             }
         }
@@ -74,6 +86,11 @@ function Stop-PortProcess {
 
 Stop-PortProcess -Port $backendPort
 Stop-PortProcess -Port $frontendPort
+
+# Force cleanup all Python processes on target ports
+Write-Host "  Force cleaning any remaining Python processes..." -ForegroundColor Gray
+& taskkill /F /IM python.exe 2>$null | Out-Null
+Start-Sleep -Seconds 2
 
 # Wait for OS to release ports (including zombie holds)
 $maxWait = 15
@@ -88,7 +105,7 @@ while ($waited -lt $maxWait) {
 
 if ($waited -ge $maxWait) {
     Write-Host "[1/3] WARNING: Port $backendPort still occupied after ${maxWait}s wait" -ForegroundColor Red
-    Write-Host "  The port may be in a zombie state. Trying alternative port..." -ForegroundColor Yellow
+    Write-Host "  The port may be locked by another process. Trying alternative port..." -ForegroundColor Yellow
     $backendPort = 8001
 }
 

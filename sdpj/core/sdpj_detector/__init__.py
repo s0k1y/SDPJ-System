@@ -71,6 +71,7 @@ class SDPJDetector(SDPJDetectorInterface):
         llm_callback: LLMCallCallback | None = None,
         dynamic_progress_callback: DynamicProgressCallback | None = None,
         encoding_type: str | None = None,
+        target_dataset_id: int | None = None,
     ) -> dict:
         return await run_dynamic_detection(
             self._llm,
@@ -84,6 +85,7 @@ class SDPJDetector(SDPJDetectorInterface):
             llm_callback=llm_callback,
             dynamic_progress_callback=dynamic_progress_callback,
             encoding_type=encoding_type,
+            target_dataset_id=target_dataset_id,
         )
 
     async def judge_compliance(self, model_id: str, model_output: str, judge_template: str) -> str:  # noqa: D102

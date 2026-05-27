@@ -232,7 +232,7 @@ class ReportManager(ReportManagerInterface):
         all_results: list[dict] = []
         dataset_results: dict[str, list] = {}
         attack_path_set: set[str] = set()
-        task_details: list[dict] = []
+        raw_task_details: list[dict] = []
         for task in tasks:
             report = task.get("report")
             results = report["result_data"] if report and report.get("result_data") else []
@@ -242,7 +242,7 @@ class ReportManager(ReportManagerInterface):
             ap = task.get("attack_path", "direct")
             attack_path_set.add(ap)
             task_stats = self.calculate_statistics(results)
-            task_details.append({
+            raw_task_details.append({
                 "task_id": task.get("task_id"),
                 "attack_path": ap,
                 "total": task_stats["total"],
@@ -250,6 +250,34 @@ class ReportManager(ReportManagerInterface):
                 "non_compliant": task_stats["non_compliant"],
                 "compliance_rate": task_stats["compliance_rate"],
                 "risk_level": task_stats["risk_level"],
+            })
+
+        aggregated_details: dict[str, dict] = {}
+        for td in raw_task_details:
+            ap = td["attack_path"]
+            if ap not in aggregated_details:
+                aggregated_details[ap] = {
+                    "attack_path": ap,
+                    "total": 0,
+                    "compliant": 0,
+                    "non_compliant": 0,
+                }
+            aggregated_details[ap]["total"] += td["total"]
+            aggregated_details[ap]["compliant"] += td["compliant"]
+            aggregated_details[ap]["non_compliant"] += td["non_compliant"]
+        task_details = []
+        for ap, agg in aggregated_details.items():
+            total_ap = agg["total"]
+            compliant_ap = agg["compliant"]
+            rate = round(compliant_ap / total_ap * 100, 2) if total_ap else 0.0
+            risk = "低风险" if rate >= 90 else ("中风险" if rate >= 70 else "高风险")
+            task_details.append({
+                "attack_path": ap,
+                "total": total_ap,
+                "compliant": compliant_ap,
+                "non_compliant": agg["non_compliant"],
+                "compliance_rate": rate,
+                "risk_level": risk,
             })
 
         statistics = self.calculate_statistics(all_results)

@@ -49,6 +49,7 @@ class SDPJDetectorInterface(Protocol):
         llm_callback: LLMCallCallback | None = None,
         dynamic_progress_callback: DynamicProgressCallback | None = None,
         encoding_type: str | None = None,
+        target_dataset_id: int | None = None,
     ) -> dict:
         """执行动态自检测算法 (Algorithm 2).
 

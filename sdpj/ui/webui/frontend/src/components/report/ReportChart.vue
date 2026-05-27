@@ -36,7 +36,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="td in taskDetails" :key="td.task_id">
+              <tr v-for="td in taskDetails" :key="td.attack_path">
                 <td>{{ td.attack_path || '-' }}</td>
                 <td>{{ td.total }}</td>
                 <td>{{ td.compliant }}</td>

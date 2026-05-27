@@ -9,10 +9,13 @@
 import asyncio
 import contextlib
 import json
+import logging
 import time
 import uuid
 from collections.abc import Callable
 from typing import Any, cast
+
+logger = logging.getLogger(__name__)
 
 from sdpj.control.state_scheduler_interface import StateSchedulerInterface
 from sdpj.control.system_states import SystemStateMachine
@@ -534,10 +537,7 @@ class StateScheduler(StateSchedulerInterface):
             if breakdown:
                 progress["breakdown"] = breakdown
             asyncio.ensure_future(  # noqa: RUF006
-                self._task_queue.update_dynamic_progress(
-                    task_group_id,  # type: ignore[arg-type]
-                    progress,
-                ),
+                self._task_queue.update_dynamic_progress(task_id, progress),
             )
 
         cancel_event = asyncio.Event()
@@ -616,6 +616,7 @@ class StateScheduler(StateSchedulerInterface):
                         llm_callback=_llm_call_cb,
                         dynamic_progress_callback=_dynamic_progress_cb,
                         encoding_type=encoding_type,
+                        target_dataset_id=dataset_ids[0] if dataset_ids else None,
                     )
                     result = {
                         "status": "completed",
@@ -650,6 +651,7 @@ class StateScheduler(StateSchedulerInterface):
                         llm_callback=_llm_call_cb,
                         dynamic_progress_callback=_dynamic_progress_cb,
                         encoding_type=encoding_type,
+                        target_dataset_id=dataset_ids[0] if dataset_ids else None,
                     )
                     result = {
                         "status": "completed",
@@ -680,7 +682,7 @@ class StateScheduler(StateSchedulerInterface):
                 await checker
             if task_group_id:
                 await self._task_queue.clear_poc_progress(task_group_id)
-                await self._task_queue.clear_dynamic_progress(task_group_id)
+                await self._task_queue.clear_dynamic_progress(task_id)
 
     async def execute_concurrent_tasks(self, max_concurrency: int = 3) -> dict:  # noqa: D102
         self._cleanup_running_tasks()
@@ -1017,53 +1019,62 @@ class StateScheduler(StateSchedulerInterface):
                         ),
                     }
 
-            dynamic_prog = await self._task_queue.get_dynamic_progress(group_id)
-            if dynamic_prog and group_status == "running":
-                dyn_processed = dynamic_prog.get("processed", 0)
-                dyn_total = dynamic_prog.get("total", 0)
-                dyn_avg_iter = dynamic_prog.get("avg_iterations", 0.0)
-                dyn_speeds = dynamic_prog.get("recent_speeds", [])
-                if dyn_speeds and dyn_processed < dyn_total:
+            agg_dyn_processed = 0
+            agg_dyn_total = 0
+            agg_dyn_avg_iter = 0.0
+            dyn_speeds: list[float] = []
+            for child in children:
+                child_dyn = await self._task_queue.get_dynamic_progress(child.get("task_id", ""))
+                if child_dyn:
+                    agg_dyn_processed += child_dyn.get("processed", 0)
+                    agg_dyn_total += child_dyn.get("total", 0)
+                    child_dyn_speeds = child_dyn.get("recent_speeds", [])
+                    if child_dyn_speeds:
+                        dyn_speeds.extend(child_dyn_speeds)
+            if agg_dyn_total > 0 and agg_dyn_processed > 0:
+                agg_dyn_avg_iter = round(agg_dyn_processed / agg_dyn_total, 2)
+            if agg_dyn_total > 0 and group_status == "running":
+                if dyn_speeds and agg_dyn_processed < agg_dyn_total:
                     avg_speed = sum(dyn_speeds) / len(dyn_speeds)
                     if avg_speed > 0:
-                        dyn_eta = (dyn_total - dyn_processed) / avg_speed
+                        dyn_eta = (agg_dyn_total - agg_dyn_processed) / avg_speed
                         if dyn_eta > eta_seconds or eta_seconds < 0:
                             eta_seconds = dyn_eta
                         stage_info = {
                             "stage": "dynamic_detecting",
-                            "avg_iterations": round(dyn_avg_iter, 2),
-                            "samples_remaining": dyn_total - dyn_processed,
+                            "avg_iterations": round(agg_dyn_avg_iter, 2),
+                            "samples_remaining": agg_dyn_total - agg_dyn_processed,
                         }
                     else:
                         stage_info = {
                             "stage": "dynamic_detecting",
-                            "avg_iterations": round(dyn_avg_iter, 2),
-                            "samples_remaining": dyn_total - dyn_processed,
+                            "avg_iterations": round(agg_dyn_avg_iter, 2),
+                            "samples_remaining": agg_dyn_total - agg_dyn_processed,
                         }
-                elif dyn_processed >= dyn_total:
+                elif agg_dyn_processed >= agg_dyn_total:
                     eta_seconds = 0.0
                     stage_info: dict[str, Any] = {  # type: ignore[no-redef]
                         "stage": "dynamic_detecting",
-                        "avg_iterations": round(dyn_avg_iter, 2),
+                        "avg_iterations": round(agg_dyn_avg_iter, 2),
                         "samples_remaining": 0,
                     }
 
-            if dynamic_prog and group_status == "running":
-                dyn_processed = dynamic_prog.get("processed", 0)
-                dyn_total = dynamic_prog.get("total", 0)
-                dyn_avg_iter = dynamic_prog.get("avg_iterations", 0.0)
-                dyn_breakdown = dynamic_prog.get("breakdown")
+            if group_status in ("running",) and any(
+                c.get("status") in ("running", "completed") for c in children
+            ):
                 for child in children:
-                    if child.get("status") in ("completed", "running"):
-                        child["status"] = "running"
+                    child_task_id = child.get("task_id", "")
+                    child_dyn = await self._task_queue.get_dynamic_progress(child_task_id)
+                    if child_dyn and child.get("status") == "running":
+                        child_dyn_total = child_dyn.get("total", 0)
                         child["progress"] = (
                             {
-                                "processed": dyn_processed,
-                                "total": dyn_total,
-                                "avg_iterations": dyn_avg_iter,
-                                "breakdown": dyn_breakdown,
+                                "processed": child_dyn.get("processed", 0),
+                                "total": child_dyn_total,
+                                "avg_iterations": child_dyn.get("avg_iterations", 0.0),
+                                "breakdown": child_dyn.get("breakdown"),
                             }
-                            if dyn_total > 0
+                            if child_dyn_total > 0
                             else None
                         )
 
@@ -1653,6 +1664,11 @@ class StateScheduler(StateSchedulerInterface):
                 return {"success": ok, "config_id": cid, "message": msg}
 
             return {"success": False, "error": f"未知配置操作: {operation}"}
+        except KeyError as e:
+            return {"success": False, "error": f"缺少必要参数: {e}"}
+        except Exception as e:  # noqa: BLE001
+            logger.exception(f"配置操作 {operation} 执行失败")
+            return {"success": False, "error": f"操作执行失败: {e}"}
         finally:
             if is_write:
                 try:

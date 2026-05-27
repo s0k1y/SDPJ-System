@@ -27,6 +27,7 @@ async def run_dynamic_detection(  # noqa: C901, D417, PLR0913, PLR0915
     llm_callback: LLMCallCallback | None = None,
     dynamic_progress_callback: DynamicProgressCallback | None = None,
     encoding_type: str | None = None,
+    target_dataset_id: int | None = None,
 ) -> dict:
     """执行动态检测算法 (Algorithm 2).
 
@@ -68,12 +69,13 @@ async def run_dynamic_detection(  # noqa: C901, D417, PLR0913, PLR0915
     }
     total_iterations = 0
 
-    for task in static_agg.get("tasks", []):
+    for task_idx, task in enumerate(static_agg.get("tasks", [])):
         report = task.get("report")
         if not report:
             continue
-
         ds_id = task.get("dataset_id", "0")
+        if target_dataset_id is not None and int(ds_id) != target_dataset_id:
+            continue
         dyn_task_id = await data_processor.create_detection_task(
             task_group_id, int(ds_id), "running", datetime.now(UTC),
             algorithm_type="dynamic",
@@ -97,6 +99,7 @@ async def run_dynamic_detection(  # noqa: C901, D417, PLR0913, PLR0915
                 compliant_rds.append(rd)
 
         async def _process_compliant(rd, _sem=sem, _limiter=limiter):  # noqa: ANN001, ANN202
+            nonlocal total_iterations
             subtype = rd.get("risk_subclass", "")
             current_poc = rd.get("poc", "")
             final_output = rd.get("model_output", "")
@@ -109,6 +112,14 @@ async def run_dynamic_detection(  # noqa: C901, D417, PLR0913, PLR0915
                     iter_output = final_output
                     for _ in range(max_iterations):
                         sample_iterations += 1
+                        total_iterations += 1
+                        if dynamic_progress_callback is not None:
+                            avg_iter = (
+                                round(total_iterations / max(iteration_total, 1), 2)
+                                if total_iterations
+                                else 0.0
+                            )
+                            dynamic_progress_callback(total_iterations, iteration_total, avg_iter, iteration_breakdown)
                         try:
                             mut_input = prompt_builder.build_mutation_input(
                                 attack_template, iter_poc, iter_output,
@@ -162,17 +173,7 @@ async def run_dynamic_detection(  # noqa: C901, D417, PLR0913, PLR0915
         compliant_results = []
 
         async def _process_compliant_tracked(rd):  # noqa: ANN001, ANN202
-            nonlocal total_iterations
-            result = await _process_compliant(rd)
-            total_iterations += result["iteration_count"]
-            if dynamic_progress_callback is not None:
-                avg_iter = (
-                    round(total_iterations / max(iteration_total, 1), 2)
-                    if total_iterations
-                    else 0.0
-                )
-                dynamic_progress_callback(total_iterations, iteration_total, avg_iter, iteration_breakdown)
-            return result
+            return await _process_compliant(rd)
 
         for batch_start in range(0, len(compliant_rds), _BATCH_SIZE):
             batch = compliant_rds[batch_start : batch_start + _BATCH_SIZE]
