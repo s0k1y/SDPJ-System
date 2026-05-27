@@ -441,7 +441,7 @@ class PrivateConfigManager(PrivateConfigManagerInterface):
         return {"content": file_content, "filename": Path(dataset_name).name + ".jsonl"}
 
     async def multimodal_capability_test(self, config_id: int, user_id: int) -> dict:
-        """测试模型的多模态能力(image_url / input_audio / file)."""
+        """测试模型的多模态能力(image_url / input_audio)."""
         content = await self._user_center.read_private_config(config_id)
         if content is None:
             return {"supported_types": [], "error": "配置不存在"}
@@ -455,7 +455,7 @@ class PrivateConfigManager(PrivateConfigManagerInterface):
             return {"supported_types": [], "error": "未指定 model_id"}
 
         supported: list[str] = []
-        for content_type in ("image_url", "input_audio", "file"):
+        for content_type in ("image_url", "input_audio"):
             test_content = await self._make_test_content(content_type)
             pass_count = 0
             for attempt in range(3):
@@ -485,13 +485,7 @@ class PrivateConfigManager(PrivateConfigManagerInterface):
     @staticmethod
     def _check_test_response(content_type: str, text: str) -> bool:
         normalized = "".join(c for c in text if c.isalnum()).lower()
-        if content_type == "image_url":
-            return "10101" in normalized
-        if content_type == "input_audio":
-            return "10101" in normalized
-        if content_type == "file":
-            return "sdpjfiletest2026" in normalized
-        return False
+        return "10101" in normalized
 
     @staticmethod
     async def _make_test_content(content_type: str) -> list[dict]:
@@ -504,35 +498,10 @@ class PrivateConfigManager(PrivateConfigManagerInterface):
             )
 
         if content_type == "input_audio":
-            import base64  # noqa: PLC0415
-            import struct  # noqa: PLC0415
+            from sdpj.infrastructure.utils.multimodal import build_multimodal_content  # noqa: PLC0415
 
-            sample_rate = 16000
-            num_samples = 160
-            data = struct.pack(f"<{num_samples}h", *([0] * num_samples))
-            header = struct.pack(
-                "<4sI4s4s4sIHHIIHH4sI",
-                b"RIFF", 36 + len(data), b"WAVE",
-                b"fmt ", 16, 1, 1, sample_rate, sample_rate * 2, 2, 16,
-                b"data", len(data),
+            return await build_multimodal_content(
+                '你好，你可以回复我"10101"吗，不要包含其它任何内容', "wav",
             )
-            b64 = base64.b64encode(header + data).decode()
-            return [{"type": "input_audio", "input_audio": {"data": b64, "format": "wav"}}]
-
-        if content_type == "file":
-            import base64  # noqa: PLC0415
-
-            test_text = "SDPJ_FILE_TEST_2026"
-            b64 = base64.b64encode(test_text.encode("utf-8")).decode()
-            return [
-                {
-                    "type": "file",
-                    "file": {
-                        "filename": "test.txt",
-                        "file_data": f"data:text/plain;base64,{b64}",
-                    },
-                },
-                {"type": "text", "text": "请仔细阅读附件文件中的内容并逐字复述"},
-            ]
 
         return []

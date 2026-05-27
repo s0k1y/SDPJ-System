@@ -5,7 +5,7 @@ import pathlib
 
 import click
 
-from sdpj.ui.cli import OrderedGroup
+from sdpj.ui.cli import OrderedGroup, require_scheduler
 from sdpj.ui.cli.utils import output
 from sdpj.ui.cli.utils.result import unwrap
 
@@ -27,6 +27,7 @@ def config_group() -> None:
 @click.option("--max-rps", required=True, type=float, help="每秒最大请求数")
 @click.option("--max-concurrency", required=True, type=int, help="最大并发数")
 @click.pass_context
+@require_scheduler
 def create_config(ctx, model, request_format, api_key, base_url, timeout, max_rps, max_concurrency) -> None:  # noqa: ANN001, E501, PLR0913
     """创建私有检测配置并自动注册适配器."""
     content = {
@@ -53,6 +54,7 @@ def create_config(ctx, model, request_format, api_key, base_url, timeout, max_rp
 
 @config_group.command("list")
 @click.pass_context
+@require_scheduler
 def list_configs(ctx) -> None:  # noqa: ANN001
     """列出私有检测配置清单."""
     user_id = ctx.obj.require_login()
@@ -75,6 +77,7 @@ def list_configs(ctx) -> None:  # noqa: ANN001
 @config_group.command("view")
 @click.option("--config-id", required=True, type=int, help="配置ID")
 @click.pass_context
+@require_scheduler
 def view_config(ctx, config_id) -> None:  # noqa: ANN001
     """读取私有检测配置."""
     user_id = ctx.obj.require_login()
@@ -97,6 +100,7 @@ def view_config(ctx, config_id) -> None:  # noqa: ANN001
 @click.option("--max-rps", required=True, type=float, help="每秒最大请求数")
 @click.option("--max-concurrency", required=True, type=int, help="最大并发数")
 @click.pass_context
+@require_scheduler
 def update_config(  # noqa: PLR0913
     ctx, config_id, model, request_format, api_key, base_url, timeout, max_rps, max_concurrency,  # noqa: ANN001
 ) -> None:
@@ -125,6 +129,7 @@ def update_config(  # noqa: PLR0913
 @click.option("--config-id", required=True, type=int, help="配置ID")
 @click.confirmation_option(prompt="确认删除该配置?")
 @click.pass_context
+@require_scheduler
 def delete_config(ctx, config_id) -> None:  # noqa: ANN001
     """删除私有检测配置."""
     user_id = ctx.obj.require_login()
@@ -143,6 +148,7 @@ def delete_config(ctx, config_id) -> None:  # noqa: ANN001
 @config_group.command("import")
 @click.argument("file_path", type=click.Path(exists=True))
 @click.pass_context
+@require_scheduler
 def import_config(ctx, file_path) -> None:  # noqa: ANN001
     """导入私有检测配置并自动注册适配器."""
     import os  # noqa: PLC0415
@@ -167,6 +173,7 @@ def import_config(ctx, file_path) -> None:  # noqa: ANN001
 @click.option("--format", "fmt", default="json", type=click.Choice(["json", "yaml"]))
 @click.option("--output", "output_path", default=None, help="输出文件路径")
 @click.pass_context
+@require_scheduler
 def export_config(ctx, config_id, fmt, output_path) -> None:  # noqa: ANN001
     """导出私有检测配置."""
     user_id = ctx.obj.require_login()
@@ -191,6 +198,7 @@ def export_config(ctx, config_id, fmt, output_path) -> None:  # noqa: ANN001
 @config_group.command("verify")
 @click.option("--config-id", required=True, type=int, help="配置ID")
 @click.pass_context
+@require_scheduler
 def verify_config(ctx, config_id) -> None:  # noqa: ANN001
     """测试私有检测配置的可用性."""
     user_id = ctx.obj.require_login()
@@ -230,6 +238,7 @@ def verify_config(ctx, config_id) -> None:  # noqa: ANN001
 @config_group.command("upload-dataset")
 @click.argument("dataset_file", type=click.Path(exists=True))
 @click.pass_context
+@require_scheduler
 def upload_dataset(ctx, dataset_file) -> None:  # noqa: ANN001
     """上传私有数据集."""
     import json  # noqa: PLC0415
@@ -267,6 +276,7 @@ def upload_dataset(ctx, dataset_file) -> None:  # noqa: ANN001
 @click.option("--resource-id", type=int, default=None, help="资源ID")
 @click.confirmation_option(prompt="确认移除该数据集?")
 @click.pass_context
+@require_scheduler
 def remove_dataset(ctx, dataset_id, resource_id) -> None:  # noqa: ANN001
     """移除私有数据集."""
     user_id = ctx.obj.require_login()
@@ -287,6 +297,7 @@ def remove_dataset(ctx, dataset_id, resource_id) -> None:  # noqa: ANN001
 @click.option("--id", "dataset_id", required=True, type=int, help="数据集ID")
 @click.option("--output", "output_path", default=None, help="输出文件路径")
 @click.pass_context
+@require_scheduler
 def export_dataset(ctx, dataset_id, output_path) -> None:  # noqa: ANN001
     """导出数据集文件."""
     user_id = ctx.obj.require_login()
@@ -318,6 +329,7 @@ def dataset_group() -> None:
 
 @dataset_group.command("list")
 @click.pass_context
+@require_scheduler
 def dataset_list(ctx) -> None:  # noqa: ANN001
     """列出可用数据集."""
     user_id = ctx.obj.require_login()
@@ -335,6 +347,7 @@ def dataset_list(ctx) -> None:  # noqa: ANN001
 @dataset_group.command("detail")
 @click.option("--id", required=True, type=int, help="数据集ID")
 @click.pass_context
+@require_scheduler
 def dataset_detail(ctx, id) -> None:  # noqa: A002, ANN001
     """查看数据集详情."""
     user_id = ctx.obj.require_login()

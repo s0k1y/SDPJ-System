@@ -12,7 +12,7 @@ from pathlib import Path
 import click
 
 from sdpj.control.state_scheduler_interface import StateSchedulerInterface
-from sdpj.ui.cli import BANNER, OrderedGroup
+from sdpj.ui.cli import BANNER, OrderedGroup, require_scheduler
 from sdpj.ui.cli.commands.adapter import config_group
 from sdpj.ui.cli.commands.detect import detect_group
 from sdpj.ui.cli.commands.report import report_group
@@ -23,9 +23,39 @@ from sdpj.ui.cli.session import load_session
 class CLIContext:
     """本地终端用户会话上下文 (职责 17)."""
 
-    def __init__(self, scheduler: StateSchedulerInterface | None) -> None:  # noqa: D107
-        self.scheduler = scheduler
+    def __init__(self) -> None:  # noqa: D107
+        self._scheduler: StateSchedulerInterface | None = None
         self.current_user_id: int | None = load_session()
+
+    @property
+    def scheduler(self) -> StateSchedulerInterface | None:
+        return self._scheduler
+
+    def _init_scheduler(self) -> None:
+        if self._scheduler is not None:
+            return
+        try:
+            scheduler = _bootstrap()
+        except Exception as e:  # noqa: BLE001
+            msg = f"系统初始化失败: {e}\n请检查数据库连接配置."
+            raise click.ClickException(msg) from e
+
+        if scheduler is not None:
+            try:
+                db_path = _resolve_db_path()
+                is_new_db = not db_path.exists()
+                if is_new_db:
+                    click.echo(click.style("[Init] 数据库不存在,正在初始化...", fg="yellow"), err=True)
+                    asyncio.run(scheduler.startup())
+                    click.echo(click.style("[Init] 数据库初始化完成", fg="green"), err=True)
+                else:
+                    asyncio.run(scheduler.session_init())
+            except Exception as e:  # noqa: BLE001
+                msg = f"数据库初始化失败: {e}"
+                raise click.ClickException(msg) from e
+
+            atexit.register(_cleanup, scheduler)
+        self._scheduler = scheduler
 
     def require_login(self) -> int:  # noqa: D102
         if self.current_user_id is None:
@@ -103,6 +133,7 @@ def system_group() -> None:
 @click.option("--page", default=None, type=int, help="页码")
 @click.option("--page-size", default=None, type=int, help="每页条数")
 @click.pass_context
+@require_scheduler
 def system_logs(ctx, category, source_module, user_id, page, page_size) -> None:  # noqa: ANN001, C901, PLR0913
     """查询系统日志."""
     import asyncio  # noqa: PLC0415
@@ -164,29 +195,7 @@ def cli(ctx) -> None:  # noqa: ANN001, D103
     ctx.ensure_object(dict)
     if isinstance(ctx.obj, CLIContext):
         return
-
-    try:
-        scheduler = _bootstrap()
-    except Exception as e:  # noqa: BLE001
-        scheduler = None
-        click.echo(click.style(f"[ERR] 系统初始化失败: {e}", fg="red"), err=True)
-        click.echo("请检查数据库连接配置.", err=True)
-
-    if scheduler is not None:
-        try:
-            db_path = _resolve_db_path()
-            is_new_db = not db_path.exists()
-            if is_new_db:
-                click.echo(click.style("[Init] 数据库不存在,正在初始化...", fg="yellow"), err=True)
-                asyncio.run(scheduler.startup())
-                click.echo(click.style("[Init] 数据库初始化完成", fg="green"), err=True)
-            else:
-                asyncio.run(scheduler.session_init())
-        except Exception as e:  # noqa: BLE001
-            click.echo(click.style(f"[Init] 系统初始化失败: {e}", fg="red"), err=True)
-
-        atexit.register(_cleanup, scheduler)
-    ctx.obj = CLIContext(scheduler)
+    ctx.obj = CLIContext()
 
 
 # 按逻辑顺序注册

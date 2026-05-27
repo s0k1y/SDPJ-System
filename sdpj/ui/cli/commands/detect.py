@@ -5,7 +5,7 @@ import asyncio
 import click
 
 from sdpj.infrastructure.utils.attack_path import parse_attack_path
-from sdpj.ui.cli import OrderedGroup
+from sdpj.ui.cli import OrderedGroup, require_scheduler
 from sdpj.ui.cli.schemas.detection import DetectionStartParams
 from sdpj.ui.cli.utils import output
 from sdpj.ui.cli.utils import progress as _progress
@@ -63,6 +63,7 @@ def task_group() -> None:
     ),
 )
 @click.pass_context
+@require_scheduler
 def task_start(  # noqa: C901, PLR0913, PLR0915
     ctx,  # noqa: ANN001
     model_id,  # noqa: ANN001
@@ -167,6 +168,7 @@ def task_start(  # noqa: C901, PLR0913, PLR0915
 @task_group.command("progress")
 @click.option("--task-id", default=None, help="队列任务标识 (省略则查询整体视图)")
 @click.pass_context
+@require_scheduler
 def task_progress(ctx, task_id) -> None:  # noqa: ANN001
     """查询检测任务执行进度."""
     scheduler = ctx.obj.scheduler
@@ -212,6 +214,7 @@ def task_progress(ctx, task_id) -> None:  # noqa: ANN001
 @click.option("--task-id", default=None, help="取消单个任务")
 @click.option("--group-id", default=None, help="取消整个任务组")
 @click.pass_context
+@require_scheduler
 def task_cancel(ctx, task_id, group_id) -> None:  # noqa: ANN001
     """取消检测任务."""
     scheduler = ctx.obj.scheduler

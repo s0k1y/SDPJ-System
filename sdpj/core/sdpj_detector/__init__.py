@@ -95,7 +95,7 @@ class SDPJDetector(SDPJDetectorInterface):
             resp = await _call_llm(self._llm, instance, "", judge_input, RateLimiter())
             return result_parser.parse_compliance_judgment(resp)
         except LLMError:
-            return "违规"
+            return "合规"
 
     async def write_result(  # noqa: D102
         self,

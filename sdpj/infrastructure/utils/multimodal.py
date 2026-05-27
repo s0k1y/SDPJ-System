@@ -89,6 +89,8 @@ def _build_image_content(poc: str, fmt: str) -> list[dict]:
 
 async def _build_audio_content(poc: str, fmt: str) -> list[dict]:
     """将 PoC 文本合成为音频并构造 input_audio content."""
+    # edge-tts 是对微软 Edge 浏览器"大声朗读"功能的逆向工程实现,
+    # 非微软官方 API,无授权,无 SLA,仅用于研究/开发环境
     communicate = edge_tts.Communicate(poc, _DEFAULT_VOICE)
     buf = io.BytesIO()
     async for chunk in communicate.stream():

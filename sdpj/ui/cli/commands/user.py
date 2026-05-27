@@ -4,7 +4,7 @@ import asyncio
 
 import click
 
-from sdpj.ui.cli import OrderedGroup
+from sdpj.ui.cli import OrderedGroup, require_scheduler
 from sdpj.ui.cli.schemas.user import AuthParams
 from sdpj.ui.cli.session import clear_session, save_session
 from sdpj.ui.cli.utils import output
@@ -23,6 +23,7 @@ def user_group() -> None:
 @click.option("--username", prompt="用户名", help="用户名")
 @click.option("--password", prompt="密码", hide_input=True, help="密码")
 @click.pass_context
+@require_scheduler
 def register(ctx, username, password) -> None:  # noqa: ANN001
     """注册新用户."""
     params = AuthParams(username=username, password=password)
@@ -37,6 +38,7 @@ def register(ctx, username, password) -> None:  # noqa: ANN001
 @click.option("--username", prompt="用户名", help="用户名")
 @click.option("--password", prompt="密码", hide_input=True, help="密码")
 @click.pass_context
+@require_scheduler
 def login(ctx, username, password) -> None:  # noqa: ANN001
     """用户登录."""
     params = AuthParams(username=username, password=password)
@@ -51,6 +53,7 @@ def login(ctx, username, password) -> None:  # noqa: ANN001
 
 @user_group.command("logout")
 @click.pass_context
+@require_scheduler
 def logout(ctx) -> None:  # noqa: ANN001
     """用户登出."""
     user_id = ctx.obj.current_user_id
@@ -65,6 +68,7 @@ def logout(ctx) -> None:  # noqa: ANN001
 @click.option("--username", prompt="用户名", help="目标用户名")
 @click.option("--password", prompt="密码", hide_input=True, help="密码")
 @click.pass_context
+@require_scheduler
 def switch(ctx, username, password) -> None:  # noqa: ANN001
     """切换账号."""
     result = asyncio.run(
@@ -83,6 +87,7 @@ def switch(ctx, username, password) -> None:  # noqa: ANN001
 
 @user_group.command("profile")
 @click.pass_context
+@require_scheduler
 def profile(ctx) -> None:  # noqa: ANN001
     """查询当前用户资料."""
     user_id = ctx.obj.require_login()
@@ -97,6 +102,7 @@ def profile(ctx) -> None:  # noqa: ANN001
 @click.option("--old", "old_password", prompt="旧密码", hide_input=True)
 @click.option("--new", "new_password", prompt="新密码", hide_input=True)
 @click.pass_context
+@require_scheduler
 def change_password(ctx, old_password, new_password) -> None:  # noqa: ANN001
     """修改当前用户密码."""
     user_id = ctx.obj.require_login()
@@ -116,6 +122,7 @@ def change_password(ctx, old_password, new_password) -> None:  # noqa: ANN001
 @user_group.command("unregister")
 @click.confirmation_option(prompt="确认注销当前账号?")
 @click.pass_context
+@require_scheduler
 def unregister(ctx) -> None:  # noqa: ANN001
     """注销当前账号."""
     user_id = ctx.obj.require_login()
@@ -130,6 +137,7 @@ def unregister(ctx) -> None:  # noqa: ANN001
 
 @user_group.command("resources")
 @click.pass_context
+@require_scheduler
 def resources(ctx) -> None:  # noqa: ANN001
     """列出当前用户拥有的受控资源."""
     user_id = ctx.obj.require_login()
@@ -177,6 +185,7 @@ def auth_group() -> None:
 @click.option("--resource-id", required=True, type=int, help="资源ID")
 @click.option("--target-username", required=True, help="被授权用户名")
 @click.pass_context
+@require_scheduler
 def grant(ctx, resource_id, target_username) -> None:  # noqa: ANN001
     """授予其他用户对私有资源的读权限."""
     caller = ctx.obj.require_login()
@@ -197,6 +206,7 @@ def grant(ctx, resource_id, target_username) -> None:  # noqa: ANN001
 @auth_group.command("revoke")
 @click.option("--acl-id", required=True, type=int, help="访问控制项ID")
 @click.pass_context
+@require_scheduler
 def revoke(ctx, acl_id) -> None:  # noqa: ANN001
     """移除已授予的读权限."""
     caller = ctx.obj.require_login()
@@ -216,6 +226,7 @@ def revoke(ctx, acl_id) -> None:  # noqa: ANN001
 @auth_group.command("show")
 @click.option("--resource-id", required=True, type=int, help="资源ID")
 @click.pass_context
+@require_scheduler
 def show_acl(ctx, resource_id) -> None:  # noqa: ANN001
     """查询指定资源的授权清单."""
     caller = ctx.obj.require_login()
@@ -243,6 +254,7 @@ def show_acl(ctx, resource_id) -> None:  # noqa: ANN001
 @auth_group.command("check")
 @click.option("--resource-id", required=True, type=int, help="资源ID")
 @click.pass_context
+@require_scheduler
 def check_access(ctx, resource_id) -> None:  # noqa: ANN001
     """检查当前用户对指定资源的访问权限."""
     user_id = ctx.obj.require_login()
@@ -258,6 +270,7 @@ def check_access(ctx, resource_id) -> None:  # noqa: ANN001
 
 @user_group.command("list")
 @click.pass_context
+@require_scheduler
 def list_users(ctx) -> None:  # noqa: ANN001
     """列出所有用户."""
     users = asyncio.run(ctx.obj.scheduler.list_all_users())
@@ -274,6 +287,7 @@ def list_users(ctx) -> None:  # noqa: ANN001
 @click.option("--user-id", required=True, type=int, help="目标用户ID")
 @click.confirmation_option(prompt="确认删除该用户?")
 @click.pass_context
+@require_scheduler
 def delete_user(ctx, user_id) -> None:  # noqa: ANN001
     """管理员删除用户."""
     result = asyncio.run(

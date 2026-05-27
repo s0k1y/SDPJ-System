@@ -149,7 +149,8 @@ class StateScheduler(StateSchedulerInterface):
                             SELECT dt.task_group_id
                             FROM DetectionTask dt
                             GROUP BY dt.task_group_id
-                            HAVING COUNT(*) = SUM(CASE WHEN dt.task_status = 'cancelled' THEN 1 ELSE 0 END)  # noqa: E501, E501                        )
+                            HAVING COUNT(*) = SUM(CASE WHEN dt.task_status = 'cancelled' THEN 1 ELSE 0 END)
+                        )
                         AND tg.task_group_id NOT IN (
                             SELECT DISTINCT dt2.task_group_id
                             FROM DetectionReport dr
@@ -1666,7 +1667,7 @@ class StateScheduler(StateSchedulerInterface):
                 has_access = await self._dac.check_access(config_id, user_id)
                 if not has_access:
                     return {"success": False, "error": "无访问权限"}
-                cached = (config.get("content") or {}).get("multimodal_test_result", {})
+                cached = config.get("multimodal_test_result", {})
                 return {"success": True, "result": {"supported_types": cached.get("supported_types", [])}}
 
             if operation == "read":

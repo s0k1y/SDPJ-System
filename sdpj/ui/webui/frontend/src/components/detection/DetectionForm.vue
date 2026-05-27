@@ -294,6 +294,13 @@ const rules = {
   attack_paths: [{ required: true, type: 'array', min: 1, message: '请至少选择一种攻击路径', trigger: 'change' }]
 }
 
+const MULTIMODAL_CHILDREN = [
+  { id: 'multi-modal:jpg', label: 'JPG', contentType: 'image_url' },
+  { id: 'multi-modal:png', label: 'PNG', contentType: 'image_url' },
+  { id: 'multi-modal:mp3', label: 'MP3', contentType: 'input_audio' },
+  { id: 'multi-modal:wav', label: 'WAV', contentType: 'input_audio' },
+]
+
 const _MULTIMODAL_IDS = new Set(MULTIMODAL_CHILDREN.map(c => c.id))
 const _CONTENT_TYPE_MAP = Object.fromEntries(MULTIMODAL_CHILDREN.map(c => [c.id, c.contentType]))
 
@@ -548,15 +555,6 @@ const fetchModelAdapters = async () => {
 
 const _ENCODING_LEAF_IDS = computed(() => new Set(encodingTypes.value.map(t => t.name)))
 
-const MULTIMODAL_CHILDREN = [
-  { id: 'multi-modal:txt', label: 'TXT 文本', contentType: 'file' },
-  { id: 'multi-modal:mhtml', label: 'MHTML 文本', contentType: 'file' },
-  { id: 'multi-modal:jpg', label: 'JPG 图像', contentType: 'image_url' },
-  { id: 'multi-modal:png', label: 'PNG 图像', contentType: 'image_url' },
-  { id: 'multi-modal:mp3', label: 'MP3 音频', contentType: 'input_audio' },
-  { id: 'multi-modal:wav', label: 'WAV 音频', contentType: 'input_audio' },
-]
-
 const buildAttackPathTree = (types, disableMultimodal = false) => {
   return [
     { id: 'direct', label: '直接注入' },
@@ -568,10 +566,26 @@ const buildAttackPathTree = (types, disableMultimodal = false) => {
           id: 'multimodal',
           label: '多模态注入',
           disabled: disableMultimodal,
-          children: MULTIMODAL_CHILDREN.map(c => ({
-            ...c,
-            disabled: disableMultimodal,
-          })),
+          children: [
+            {
+              id: 'multimodal-image',
+              label: '图片',
+              disabled: disableMultimodal,
+              children: MULTIMODAL_CHILDREN.filter(c => c.contentType === 'image_url').map(c => ({
+                ...c,
+                disabled: disableMultimodal,
+              })),
+            },
+            {
+              id: 'multimodal-audio',
+              label: '音频',
+              disabled: disableMultimodal,
+              children: MULTIMODAL_CHILDREN.filter(c => c.contentType === 'input_audio').map(c => ({
+                ...c,
+                disabled: disableMultimodal,
+              })),
+            },
+          ],
         },
         {
           id: 'multi_encoding',

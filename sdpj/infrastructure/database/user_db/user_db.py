@@ -225,10 +225,14 @@ class UserDB:
     # ==================== 私有检测配置内容级能力 ====================
 
     async def write_private_config(self, config_id: int, config_content: dict) -> bool:
-        """写入私有检测配置内容."""
+        """写入私有检测配置内容(存在则更新,不存在则创建)."""
         async with self._session_manager.session() as session:
             config_repo = PrivateConfigRepository(session)
-            await config_repo.create(config_id, config_content)
+            existing = await config_repo.get_by_id(config_id)
+            if existing is not None:
+                await config_repo.update(config_id, config_content)
+            else:
+                await config_repo.create(config_id, config_content)
             return True
 
     async def read_private_config(self, config_id: int) -> dict | None:

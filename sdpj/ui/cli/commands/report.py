@@ -9,7 +9,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from sdpj.ui.cli import OrderedGroup
+from sdpj.ui.cli import OrderedGroup, require_scheduler
 from sdpj.ui.cli.schemas.report import ReportExportParams
 from sdpj.ui.cli.utils import output
 from sdpj.ui.cli.utils.result import unwrap
@@ -133,6 +133,7 @@ def report_group() -> None:
 @report_group.command("generate", hidden=True)
 @click.option("--group-id", required=True, help="任务组ID")
 @click.pass_context
+@require_scheduler
 def generate(ctx, group_id) -> None:  # noqa: ANN001
     """生成检测报告."""
     user_id = ctx.obj.require_login()
@@ -147,6 +148,7 @@ def generate(ctx, group_id) -> None:  # noqa: ANN001
 @report_group.command("view")
 @click.option("--group-id", required=True, help="任务组ID")
 @click.pass_context
+@require_scheduler
 def view(ctx, group_id) -> None:  # noqa: ANN001
     """查看单份检测报告."""
     user_id = ctx.obj.require_login()
@@ -158,6 +160,7 @@ def view(ctx, group_id) -> None:  # noqa: ANN001
 @report_group.command("list")
 @click.option("--model-id", default=None, help="按模型ID过滤")
 @click.pass_context
+@require_scheduler
 def list_reports(ctx, model_id) -> None:  # noqa: ANN001
     """查询检测报告列表."""
     user_id = ctx.obj.require_login()
@@ -190,6 +193,7 @@ def list_reports(ctx, model_id) -> None:  # noqa: ANN001
 @click.option("--task-id", default=None, help="子任务ID(导出单任务级别报告)")
 @click.option("--output", "output_path", default=None, help="输出文件路径")
 @click.pass_context
+@require_scheduler
 def export(ctx, group_id, target_format, task_id, output_path) -> None:  # noqa: ANN001
     """导出检测报告文件."""
     user_id = ctx.obj.require_login()
@@ -224,6 +228,7 @@ def export(ctx, group_id, target_format, task_id, output_path) -> None:  # noqa:
     help="删除粒度: task_group=任务组, task=子任务",
 )
 @click.pass_context
+@require_scheduler
 def delete(ctx, target_id, granularity) -> None:  # noqa: ANN001
     """删除检测报告."""
     user_id = ctx.obj.require_login()
@@ -237,6 +242,7 @@ def delete(ctx, target_id, granularity) -> None:  # noqa: ANN001
 
 @report_group.command("statistics")
 @click.pass_context
+@require_scheduler
 def statistics(ctx) -> None:  # noqa: ANN001
     """查询合规统计数据."""
     result = asyncio.run(ctx.obj.scheduler.query_compliance_statistics())
@@ -251,6 +257,7 @@ def statistics(ctx) -> None:  # noqa: ANN001
 @click.option("--group-id", default=None, help="任务组ID")
 @click.option("--task-id", default=None, help="任务ID")
 @click.pass_context
+@require_scheduler
 def visualization(ctx, group_id, task_id) -> None:  # noqa: ANN001
     """获取可视化数据."""
     if not group_id and not task_id:

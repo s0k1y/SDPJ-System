@@ -37,7 +37,9 @@ def _patch_cli_bootstrap(monkeypatch, _cli_scheduler) -> None:  # noqa: ANN001
     _original_make_context = cli_mod.cli.make_context
 
     def _patched_make_context(ctx_name, args, parent=None, **extra):  # noqa: ANN001, ANN003, ANN202
-        extra.setdefault("obj", CLIContext(_cli_scheduler))
-        return _original_make_context(ctx_name, args, parent=parent, **extra)
+        ctx = _original_make_context(ctx_name, args, parent=parent, **extra)
+        if isinstance(ctx.obj, cli_mod.CLIContext):
+            ctx.obj._scheduler = _cli_scheduler
+        return ctx
 
     monkeypatch.setattr(cli_mod.cli, "make_context", _patched_make_context)

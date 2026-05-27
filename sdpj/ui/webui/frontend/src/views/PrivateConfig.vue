@@ -32,7 +32,7 @@
                   <el-button class="action-btn" size="small" @click="viewConfig(cfg)">查看</el-button>
                   <el-button class="action-btn" size="small" @click="editConfig(cfg)">编辑</el-button>
                   <el-button class="action-btn" size="small" @click="verifyConfig(cfg)" :loading="verifyingId === cfg.config_id">可用性测试</el-button>
-                  <el-button class="action-btn" size="small" @click="testMultimodal(cfg)" :loading="multimodalTestingId === cfg.config_id" :disabled="!isOpenAiFormat(cfg)">多模态测试</el-button>
+                  <el-button class="action-btn" size="small" @click="testMultimodal(cfg)" :loading="multimodalTestingId === cfg.config_id">多模态测试</el-button>
                   <el-button class="action-btn action-btn-danger" size="small" @click="deleteConfig(cfg.config_id)">删除</el-button>
                 </div>
               </td>
@@ -367,6 +367,14 @@ const isOpenAiFormat = (cfg) => {
 }
 
 const testMultimodal = async (cfg) => {
+  if (!isOpenAiFormat(cfg)) {
+    ElMessageBox.alert(
+      '<div style="font-size:14px;line-height:2;"><div><b>状态：</b><span style="color:#dc2626">✗ 测试失败</span></div><div><b>详情：</b>多模态注入统一使用OpenAI接口标准,请检查该模型多模态兼容性</div></div>',
+      '多模态测试',
+      { dangerouslyUseHTMLString: true, confirmButtonText: '关闭' },
+    )
+    return
+  }
   multimodalTestingId.value = cfg.config_id
   try {
     const res = await detectionConfig('multimodal_test', { config_id: cfg.config_id })
@@ -384,7 +392,7 @@ const testMultimodal = async (cfg) => {
         }
       } else {
         const reason = r.reason || 'unknown'
-        const reasonMap = { 'non-openai-format': '非 OpenAI 兼容格式', 'unknown': '未知原因' }
+        const reasonMap = { 'non-openai-format': '非 OpenAI 兼容格式', 'unknown': '请检查该模型是否具备多模态能力且使用/兼容OpenAI标准' }
         lines.push(`<div><b>状态：</b><span style="color:#dc2626">✗ 不支持多模态</span></div>`)
         lines.push(`<div><b>原因：</b>${reasonMap[reason] || reason}</div>`)
       }

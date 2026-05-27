@@ -1,5 +1,6 @@
 """CLI 命令行界面模块."""
 
+import functools
 from collections.abc import Sequence
 from typing import Any
 
@@ -98,3 +99,21 @@ class OrderedGroup(click.Group):
         formatter = _BoldHelpFormatter(width=ctx.terminal_width)
         self.format_help(ctx, formatter)
         return formatter.getvalue() + "\n"
+
+
+# ── 装饰器 ──
+
+
+def require_scheduler(func):
+    """确保 scheduler 已初始化的装饰器.
+
+    仅在命令实际执行时触发 _bootstrap() + 数据库初始化,
+    使得 sdpj -h / sdpj -v 等无需初始化即可快速响应.
+    必须置于 @click.pass_context 之下(最靠近函数定义).
+    """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        ctx = args[0]
+        ctx.obj._init_scheduler()
+        return func(*args, **kwargs)
+    return wrapper
