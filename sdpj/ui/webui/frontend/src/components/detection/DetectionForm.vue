@@ -158,7 +158,14 @@
                 </el-tooltip>
               </template>
             </el-form-item>
-
+            <el-alert
+              v-if="multimodalWarning"
+              :title="multimodalWarning"
+              type="warning"
+              :closable="false"
+              show-icon
+              style="margin-top: -8px; margin-bottom: 16px"
+            />
           </div>
 
           <div v-show="currentStep === 3">
@@ -218,7 +225,7 @@
           v-if="currentStep < 3"
           class="btn-next"
           @click="nextStep"
-          :disabled="modelsLoading && modelAdapters.length === 0"
+          :disabled="(modelsLoading && modelAdapters.length === 0) || (currentStep === 2 && hasUnsupportedMultimodal)"
         >下一步</el-button>
 
         <el-button
@@ -235,7 +242,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { startDetection, getDatasets, detectionConfig, getEncodingTypes } from '../../api/detection'
@@ -257,7 +264,10 @@ const jailbreakDatasets = ref([])
 const jailbreakDatasetTree = ref([])
 
 const encodingTypes = ref([])
-const attackPathTree = ref([])
+const multimodalSupportedTypes = ref([])
+const multimodalWarning = ref('')
+
+const attackPathTree = computed(() => buildAttackPathTree(encodingTypes.value, !isOpenAiAdapter.value))
 
 const form = ref({
   model_id: '',
@@ -269,6 +279,14 @@ const form = ref({
   attack_paths: []
 })
 
+watch(() => form.value.model_id, () => {
+  checkMultimodalCapability()
+})
+
+watch(() => form.value.attack_paths, () => {
+  updateMultimodalWarning()
+}, { deep: true })
+
 const rules = {
   model_id: [{ required: true, message: '请选择模型适配器', trigger: 'change' }],
   detection_type: [{ required: true, message: '请选择检测算法', trigger: 'change' }],
@@ -276,8 +294,54 @@ const rules = {
   attack_paths: [{ required: true, type: 'array', min: 1, message: '请至少选择一种攻击路径', trigger: 'change' }]
 }
 
+const _MULTIMODAL_IDS = new Set(MULTIMODAL_CHILDREN.map(c => c.id))
+const _CONTENT_TYPE_MAP = Object.fromEntries(MULTIMODAL_CHILDREN.map(c => [c.id, c.contentType]))
+
+const isOpenAiAdapter = computed(() => {
+  const selected = modelAdapters.value.find(m => m.config_id === form.value.model_id)
+  return selected?.content?.request_format === 'openai'
+})
+
+const checkMultimodalCapability = async () => {
+  if (!form.value.model_id || !isOpenAiAdapter.value) {
+    multimodalSupportedTypes.value = []
+    return
+  }
+  try {
+    const res = await detectionConfig('multimodal_check', { config_id: form.value.model_id })
+    multimodalSupportedTypes.value = res.success ? (res.data?.result?.supported_types || []) : []
+  } catch {
+    multimodalSupportedTypes.value = []
+  }
+}
+
+const updateMultimodalWarning = () => {
+  const selected = form.value.attack_paths.filter(id => _MULTIMODAL_IDS.has(id))
+  if (selected.length === 0) {
+    multimodalWarning.value = ''
+    return
+  }
+  if (!isOpenAiAdapter.value) {
+    multimodalWarning.value = '多模态注入检测仅支持 OpenAI 兼容格式的被测模型'
+    return
+  }
+  const unsupported = selected.filter(id => {
+    const ct = _CONTENT_TYPE_MAP[id]
+    return ct && !multimodalSupportedTypes.value.includes(ct)
+  })
+  if (unsupported.length > 0) {
+    const types = [...new Set(unsupported.map(id => _CONTENT_TYPE_MAP[id]))]
+    const typeLabel = types.map(t => t === 'image_url' ? '图像(image_url)' : '音频(input_audio)').join('、')
+    multimodalWarning.value = `被测模型不支持该模态(${typeLabel})。请先在私有配置页面进行多模态能力测试，或取消选择该攻击路径`
+  } else {
+    multimodalWarning.value = ''
+  }
+}
+
 const effectiveAttackPaths = computed(() => {
-  return form.value.attack_paths.filter(id => id === 'direct' || _ENCODING_LEAF_IDS.value.has(id))
+  return form.value.attack_paths.filter(id =>
+    id === 'direct' || _MULTIMODAL_IDS.has(id) || _ENCODING_LEAF_IDS.value.has(id)
+  )
 })
 
 const attackPathSummary = computed(() => {
@@ -285,8 +349,10 @@ const attackPathSummary = computed(() => {
   if (!paths.length) return '-'
   const parts = []
   if (paths.includes('direct')) parts.push('直接注入')
-  const indirect = paths.filter(p => p !== 'direct')
-  if (indirect.length) parts.push(`间接注入(${indirect.join(', ')})`)
+  const multimodal = paths.filter(p => p.startsWith('multi-modal:')).map(p => p.split(':')[1])
+  if (multimodal.length) parts.push(`多模态(${multimodal.join(', ')})`)
+  const encoding = paths.filter(p => p !== 'direct' && !p.startsWith('multi-modal:'))
+  if (encoding.length) parts.push(`多编码(${encoding.join(', ')})`)
   return parts.join(' + ')
 })
 
@@ -294,6 +360,16 @@ const subtaskCount = computed(() => {
   const dsCount = form.value.dataset_ids.length || 0
   const pathCount = effectiveAttackPaths.value.length || 0
   return dsCount * pathCount
+})
+
+const hasUnsupportedMultimodal = computed(() => {
+  const selected = form.value.attack_paths.filter(id => _MULTIMODAL_IDS.has(id))
+  if (selected.length === 0) return false
+  if (!isOpenAiAdapter.value) return true
+  return selected.some(id => {
+    const ct = _CONTENT_TYPE_MAP[id]
+    return ct && !multimodalSupportedTypes.value.includes(ct)
+  })
 })
 
 const modelLabel = computed(() => {
@@ -472,7 +548,16 @@ const fetchModelAdapters = async () => {
 
 const _ENCODING_LEAF_IDS = computed(() => new Set(encodingTypes.value.map(t => t.name)))
 
-const buildAttackPathTree = (types) => {
+const MULTIMODAL_CHILDREN = [
+  { id: 'multi-modal:txt', label: 'TXT 文本', contentType: 'file' },
+  { id: 'multi-modal:mhtml', label: 'MHTML 文本', contentType: 'file' },
+  { id: 'multi-modal:jpg', label: 'JPG 图像', contentType: 'image_url' },
+  { id: 'multi-modal:png', label: 'PNG 图像', contentType: 'image_url' },
+  { id: 'multi-modal:mp3', label: 'MP3 音频', contentType: 'input_audio' },
+  { id: 'multi-modal:wav', label: 'WAV 音频', contentType: 'input_audio' },
+]
+
+const buildAttackPathTree = (types, disableMultimodal = false) => {
   return [
     { id: 'direct', label: '直接注入' },
     {
@@ -482,6 +567,11 @@ const buildAttackPathTree = (types) => {
         {
           id: 'multimodal',
           label: '多模态注入',
+          disabled: disableMultimodal,
+          children: MULTIMODAL_CHILDREN.map(c => ({
+            ...c,
+            disabled: disableMultimodal,
+          })),
         },
         {
           id: 'multi_encoding',
@@ -501,11 +591,9 @@ const fetchEncodingTypes = async () => {
     const res = await getEncodingTypes()
     if (res.success) {
       encodingTypes.value = res.data || []
-      attackPathTree.value = buildAttackPathTree(encodingTypes.value)
     }
   } catch {
     encodingTypes.value = []
-    attackPathTree.value = [{ id: 'direct', label: '直接注入' }]
   }
 }
 
@@ -517,7 +605,10 @@ const handleSubmit = async () => {
     const realModelId = selectedModel?.content?.model_id || selectedModel?.content?.model || form.value.model_id
     const paths = effectiveAttackPaths.value
     const hasDirect = paths.includes('direct')
-    const encodingTypes = paths.filter(p => p !== 'direct')
+    const modalities = paths
+      .filter(p => p.startsWith('multi-modal:'))
+      .map(p => p.split(':')[1])
+    const encodingTypes = paths.filter(p => p !== 'direct' && !p.startsWith('multi-modal:'))
     const payload = {
       model_id: realModelId,
       config_id: form.value.model_id,
@@ -527,7 +618,8 @@ const handleSubmit = async () => {
       max_iterations: form.value.max_iterations,
       force_refresh: form.value.force_refresh,
       has_direct: hasDirect,
-      encoding_types: encodingTypes.length > 0 ? encodingTypes : null
+      encoding_types: encodingTypes.length > 0 ? encodingTypes : null,
+      modalities: modalities.length > 0 ? modalities : null,
     }
     const res = await startDetection(payload)
     if (res.success) {

@@ -478,8 +478,8 @@ class TestMultiEncodingTaskSplit:
         assert result["success"] is True
         assert len(result["task_ids"]) == 9  # 3 datasets x (1 direct + 2 encodings)
 
-    async def test_task_metadata_contains_encoding_type_and_attack_path(self) -> None:
-        """每个子任务的 metadata 应包含 encoding_type 和 attack_path"""
+    async def test_task_metadata_contains_attack_path(self) -> None:
+        """每个子任务的 metadata 应包含 attack_path"""
         scheduler = _make_scheduler()
         result = await scheduler.start_detection(
             1,
@@ -496,10 +496,10 @@ class TestMultiEncodingTaskSplit:
         tasks = [t for t in queue_view if t.metadata.get("task_group_id") == result["task_group_id"]]
         assert len(tasks) == 2
 
-        direct_task = next(t for t in tasks if t.metadata.get("encoding_type") is None)
+        direct_task = next(t for t in tasks if t.metadata.get("attack_path") == "direct")
         assert direct_task.metadata["attack_path"] == "direct"
 
-        encoded_task = next(t for t in tasks if t.metadata.get("encoding_type") == "base64")
+        encoded_task = next(t for t in tasks if t.metadata.get("attack_path") == "indirect:multi-encoding:base64")
         assert encoded_task.metadata["attack_path"] == "indirect:multi-encoding:base64"
 
     async def test_single_dataset_multiple_encodings(self) -> None:
@@ -520,8 +520,12 @@ class TestMultiEncodingTaskSplit:
 
         queue_view = await scheduler._task_queue.get_queue_view()
         tasks = [t for t in queue_view if t.metadata.get("task_group_id") == result["task_group_id"]]
-        enc_types = {t.metadata.get("encoding_type") for t in tasks}
-        assert enc_types == {"base64", "hex", "rot13"}
+        attack_paths = {t.metadata.get("attack_path") for t in tasks}
+        assert attack_paths == {
+            "indirect:multi-encoding:base64",
+            "indirect:multi-encoding:hex",
+            "indirect:multi-encoding:rot13",
+        }
 
     async def test_no_encoding_types_defaults_to_direct_only(self) -> None:
         """未传 encoding_types 时默认 has_direct=True, 行为与原有一致"""
@@ -539,11 +543,10 @@ class TestMultiEncodingTaskSplit:
 
         queue_view = await scheduler._task_queue.get_queue_view()
         task = next(t for t in queue_view if t.task_id == result["task_ids"][0])
-        assert task.metadata.get("encoding_type") is None
         assert task.metadata.get("attack_path") == "direct"
 
-    async def test_concurrent_tasks_pass_encoding_type_to_detector(self) -> None:
-        """execute_concurrent_tasks 从 metadata 提取 encoding_type 并透传"""
+    async def test_concurrent_tasks_pass_attack_path_to_detector(self) -> None:
+        """execute_concurrent_tasks 从 metadata 提取 attack_path 并透传"""
         scheduler = _make_scheduler()
 
         captured_params: list[dict] = []
@@ -568,5 +571,63 @@ class TestMultiEncodingTaskSplit:
 
         await scheduler.execute_concurrent_tasks(max_concurrency=3)
 
-        enc_types_passed = {p.get("encoding_type") for p in captured_params}
-        assert enc_types_passed == {"base64", "hex"}
+        attack_paths_passed = {p.get("attack_path") for p in captured_params}
+        assert attack_paths_passed == {
+            "indirect:multi-encoding:base64",
+            "indirect:multi-encoding:hex",
+        }
+
+
+@pytest.mark.asyncio
+class TestMultiModalTaskSplit:
+    """多模态间接注入: 数据集 x 模态 双重循环拆分逻辑"""
+
+    async def test_modalities_creates_tasks_per_modality(self) -> None:
+        """modalities=['png','mp3'] 时每个数据集创建 2 个多模态任务"""
+        scheduler = _make_scheduler()
+        result = await scheduler.start_detection(
+            1,
+            {
+                "model_id": REAL_MODEL_ID,
+                "detection_type": "static",
+                "dataset_ids": [1, 2],
+                "modalities": ["png", "mp3"],
+                "has_direct": False,
+            },
+        )
+        assert result["success"] is True
+        assert len(result["task_ids"]) == 4  # 2 datasets x 2 modalities
+
+        queue_view = await scheduler._task_queue.get_queue_view()
+        tasks = [t for t in queue_view if t.metadata.get("task_group_id") == result["task_group_id"]]
+        attack_paths = {t.metadata.get("attack_path") for t in tasks}
+        assert attack_paths == {
+            "indirect:multi-modal:png",
+            "indirect:multi-modal:mp3",
+        }
+
+    async def test_direct_plus_encoding_plus_modality(self) -> None:
+        """has_direct + encoding_types + modalities 全部组合正确拆分"""
+        scheduler = _make_scheduler()
+        result = await scheduler.start_detection(
+            1,
+            {
+                "model_id": REAL_MODEL_ID,
+                "detection_type": "static",
+                "dataset_ids": [1],
+                "encoding_types": ["base64"],
+                "modalities": ["png"],
+                "has_direct": True,
+            },
+        )
+        assert result["success"] is True
+        assert len(result["task_ids"]) == 3  # 1 direct + 1 encoding + 1 modality
+
+        queue_view = await scheduler._task_queue.get_queue_view()
+        tasks = [t for t in queue_view if t.metadata.get("task_group_id") == result["task_group_id"]]
+        attack_paths = {t.metadata.get("attack_path") for t in tasks}
+        assert attack_paths == {
+            "direct",
+            "indirect:multi-encoding:base64",
+            "indirect:multi-modal:png",
+        }

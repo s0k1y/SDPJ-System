@@ -98,3 +98,85 @@ async def test_call_429_raises_rate_limit() -> None:
         with pytest.raises(StandardizedLLMError) as exc:
             await a.call("hi", "gpt-4")
     assert exc.value.category == ErrorCategory.RATE_LIMIT
+
+
+@pytest.mark.asyncio
+async def test_call_multimodal_assembles_content_array() -> None:
+    """call_multimodal 应将 content 数组组装为 messages 并 POST."""
+    a = make_adapter()
+    captured_payload: list[dict] = []
+
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.json = AsyncMock(
+        return_value={
+            "choices": [{"message": {"content": "image description"}}],
+            "model": "gpt-4",
+            "usage": {},
+        },
+    )
+    mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
+    mock_resp.__aexit__ = AsyncMock(return_value=False)
+
+    def capture_post(url, json, headers, timeout):  # noqa: ANN001
+        captured_payload.append(json)
+        return mock_resp
+
+    mock_session = MagicMock()
+    mock_session.post = MagicMock(side_effect=capture_post)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=False)
+
+    content = [
+        {"type": "image_url", "image_url": {"url": "data:image/png;base64,abc123"}},
+        {"type": "text", "text": "describe this image"},
+    ]
+
+    with patch("aiohttp.ClientSession", return_value=mock_session):
+        result = await a.call_multimodal("", content)
+
+    assert result["success"] is True
+    assert result["content"] == "image description"
+    assert len(captured_payload) == 1
+    messages = captured_payload[0]["messages"]
+    assert len(messages) == 1
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == content
+
+
+@pytest.mark.asyncio
+async def test_call_multimodal_with_system_prompt() -> None:
+    """call_multimodal 带 system_prompt 时应组装 system + user 两条消息."""
+    a = make_adapter()
+    captured_payload: list[dict] = []
+
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.json = AsyncMock(
+        return_value={
+            "choices": [{"message": {"content": "ok"}}],
+            "model": "gpt-4",
+            "usage": {},
+        },
+    )
+    mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
+    mock_resp.__aexit__ = AsyncMock(return_value=False)
+
+    def capture_post(url, json, headers, timeout):  # noqa: ANN001
+        captured_payload.append(json)
+        return mock_resp
+
+    mock_session = MagicMock()
+    mock_session.post = MagicMock(side_effect=capture_post)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=False)
+
+    content = [{"type": "input_audio", "input_audio": {"data": "base64data", "format": "mp3"}}]
+
+    with patch("aiohttp.ClientSession", return_value=mock_session):
+        await a.call_multimodal("system msg", content)
+
+    messages = captured_payload[0]["messages"]
+    assert len(messages) == 2
+    assert messages[0] == {"role": "system", "content": "system msg"}
+    assert messages[1] == {"role": "user", "content": content}

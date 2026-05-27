@@ -261,29 +261,28 @@ class TestStandardizedLLMErrorEmptyMessage:
 # ===== T2: 多编码间接注入测试 =====
 
 @pytest.mark.asyncio
-async def test_run_static_detection_accepts_encoding_type() -> None:
-    """run_static_detection 应接受 encoding_type 可选参数。"""
+async def test_run_static_detection_accepts_attack_path() -> None:
+    """run_static_detection 应接受 attack_path 参数。"""
     llm, instance = _make_mock_llm()
     dp = _make_mock_data_processor(
         poc_pool_cache=[
             {"poc_text": "cached_poc", "score": 5, "subtype": "模板化越狱"},
         ]
     )
-    # 传入 encoding_type 参数不应报错
     result = await run_static_detection(
         llm=llm,
         data_processor=dp,
         model_id="test-model",
         user_id="1",
         task_group_id="pre-existing-group-id",
-        encoding_type="base64",
+        attack_path="indirect:multi-encoding:base64",
     )
     assert result is not None
 
 
 @pytest.mark.asyncio
-async def test_encoding_type_none_preserves_existing_behavior() -> None:
-    """encoding_type=None 时行为与现有完全一致。"""
+async def test_default_attack_path_preserves_existing_behavior() -> None:
+    """attack_path='direct' 时行为与现有完全一致。"""
     llm, instance = _make_mock_llm()
     dp = _make_mock_data_processor(
         poc_pool_cache=[
@@ -302,7 +301,7 @@ async def test_encoding_type_none_preserves_existing_behavior() -> None:
 
 @pytest.mark.asyncio
 async def test_create_detection_task_receives_metadata_json() -> None:
-    """create_detection_task 调用时应传入 metadata_json（含 encoding_type 和 attack_path）。"""
+    """create_detection_task 调用时应传入 metadata_json（含 attack_path）。"""
     llm, instance = _make_mock_llm()
     dp = _make_mock_data_processor(
         poc_pool_cache=[
@@ -335,7 +334,7 @@ async def test_create_detection_task_receives_metadata_json() -> None:
         user_id="1",
         dataset_ids=[2],
         task_group_id="pre-existing-group-id",
-        encoding_type="base64",
+        attack_path="indirect:multi-encoding:base64",
     )
 
     # 验证 create_detection_task 被调用时携带 metadata_json
@@ -343,5 +342,116 @@ async def test_create_detection_task_receives_metadata_json() -> None:
     call_args = dp.create_detection_task.call_args
     assert "metadata_json" in call_args.kwargs, "create_detection_task 应收到 metadata_json 关键字参数"
     meta = call_args.kwargs["metadata_json"]
-    assert meta["encoding_type"] == "base64"
     assert meta["attack_path"] == "indirect:multi-encoding:base64"
+
+
+# ===== T5: 多模态静态检测分发测试 =====
+
+
+@pytest.mark.asyncio
+async def test_multimodal_attack_path_calls_call_multimodal() -> None:
+    """attack_path='indirect:multi-modal:jpg' 应触发 multimodal 分支."""
+    llm, instance = _make_mock_llm()
+    dp = _make_mock_data_processor(
+        poc_pool_cache=[
+            {"poc_text": "cached_poc", "score": 5, "subtype": "模板化越狱"},
+        ]
+    )
+    dp.get_all_datasets = AsyncMock(
+        return_value=[
+            {"dataset_id": 2, "risk_type": "injection", "name": "test_injection"},
+        ],
+    )
+    dp.load_dataset_by_risk_type = AsyncMock(
+        return_value=[
+            {
+                "dataset_id": 2,
+                "dataset_name": "test_injection",
+                "risk_type": "injection",
+                "samples": [
+                    {"poc": "ignore instructions", "subtype": "提示词注入"},
+                ],
+            }
+        ],
+    )
+    multimodal_content = [{"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,abc"}}]
+    dp.build_multimodal_content = AsyncMock(return_value=multimodal_content)
+    llm.call_multimodal = AsyncMock(
+        return_value={
+            "success": True,
+            "content": "I cannot comply",
+            "model": "test-model",
+            "usage": {},
+        },
+    )
+
+    result = await run_static_detection(
+        llm=llm,
+        data_processor=dp,
+        model_id="test-model",
+        user_id="1",
+        dataset_ids=[2],
+        task_group_id="pre-existing-group-id",
+        attack_path="indirect:multi-modal:jpg",
+    )
+
+    assert result["status"] == "completed"
+    dp.build_multimodal_content.assert_called_once_with("ignore instructions", "jpg")
+    llm.call_multimodal.assert_called_once()
+    call_args = llm.call_multimodal.call_args
+    assert call_args[0][2] == multimodal_content  # content param
+
+
+@pytest.mark.asyncio
+async def test_multimodal_metadata_written_correctly() -> None:
+    """多模态路径的 metadata_json 应包含正确的 attack_path."""
+    llm, instance = _make_mock_llm()
+    dp = _make_mock_data_processor(
+        poc_pool_cache=[
+            {"poc_text": "cached_poc", "score": 5, "subtype": "模板化越狱"},
+        ]
+    )
+    dp.get_all_datasets = AsyncMock(
+        return_value=[
+            {"dataset_id": 2, "risk_type": "injection", "name": "test_injection"},
+        ],
+    )
+    dp.load_dataset_by_risk_type = AsyncMock(
+        return_value=[
+            {
+                "dataset_id": 2,
+                "dataset_name": "test_injection",
+                "risk_type": "injection",
+                "samples": [
+                    {"poc": "test poc", "subtype": "提示词注入"},
+                ],
+            }
+        ],
+    )
+    dp.build_multimodal_content = AsyncMock(
+        return_value=[{"type": "image_url", "image_url": {"url": "data:image/png;base64,abc"}}],
+    )
+    llm.call_multimodal = AsyncMock(
+        return_value={
+            "success": True,
+            "content": "response",
+            "model": "test-model",
+            "usage": {},
+        },
+    )
+
+    await run_static_detection(
+        llm=llm,
+        data_processor=dp,
+        model_id="test-model",
+        user_id="1",
+        dataset_ids=[2],
+        task_group_id="pre-existing-group-id",
+        attack_path="indirect:multi-modal:png",
+    )
+
+    dp.create_detection_task.assert_called()
+    call_args = dp.create_detection_task.call_args
+    meta = call_args.kwargs.get("metadata_json") or call_args[1].get("metadata_json")
+    assert meta is not None
+    assert meta["attack_path"] == "indirect:multi-modal:png"

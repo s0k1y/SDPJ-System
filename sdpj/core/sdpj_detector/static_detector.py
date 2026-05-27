@@ -14,6 +14,7 @@ from sdpj.drivers.llm_service_interface import (
 )
 from sdpj.infrastructure.llm_adapters.errors import ErrorCategory, StandardizedLLMError
 from sdpj.infrastructure.utils import encoding as encoding_utils
+from sdpj.infrastructure.utils.attack_path import parse_attack_path
 from sdpj.infrastructure.utils.rate_limiter import RateLimiter
 
 from . import prompt_builder, result_parser
@@ -106,6 +107,82 @@ async def _call_llm(  # noqa: PLR0913
 
                 _sl.get_logger("sdpj.detector").warning(
                     "llm_rate_limited_retry",
+                    attempt=attempt + 1,
+                    delay=round(delay, 1),
+                    max_retries=max_retries,
+                )
+                await asyncio.sleep(delay)
+                continue
+            if llm_callback is not None:
+                llm_callback(request_info, {"error": str(e)})
+            raise
+        except LLMError:
+            if llm_callback is not None:
+                llm_callback(request_info, {"error": "LLMError"})
+            raise
+    return {}
+
+
+async def _call_llm_multimodal(  # noqa: PLR0913
+    llm: LLMServiceInterface,
+    instance: LLMServiceInstanceProtocol,
+    system: str,
+    content: list[dict],
+    limiter: RateLimiter,
+    llm_callback: LLMCallCallback | None = None,
+    *,
+    max_retries: int = 5,
+    base_delay: float = 2.0,
+) -> dict:
+    """多模态调用,与 _call_llm 对称但使用 call_multimodal."""
+    import time as _t  # noqa: PLC0415
+
+    model_id = getattr(instance, "model_id", "")
+    for attempt in range(max_retries + 1):
+        _t0 = _t.monotonic()
+        await limiter.acquire()
+        _t1 = _t.monotonic()
+        request_info = {
+            "system_prompt": system,
+            "content": content,
+            "model_id": model_id,
+        }
+        try:
+            resp = await llm.call_multimodal(model_id, system, content)
+            _t2 = _t.monotonic()
+            import structlog as _sl  # noqa: PLC0415
+
+            _sl.get_logger("sdpj.detector").debug(
+                "llm_multimodal_call_done",
+                wait=round(_t1 - _t0, 3),
+                call=round(_t2 - _t1, 3),
+                total=round(_t2 - _t0, 3),
+            )
+            if llm_callback is not None:
+                response_info = {
+                    "content": resp.get("content", ""),
+                    "model": resp.get("model", ""),
+                    "usage": resp.get("usage", {}),
+                }
+                llm_callback(request_info, response_info)
+            return resp  # noqa: TRY300
+        except StandardizedLLMError as e:
+            if (
+                e.category
+                in (ErrorCategory.RATE_LIMIT, ErrorCategory.TIMEOUT, ErrorCategory.NETWORK)
+                and attempt < max_retries
+            ):
+                delay = base_delay * (2**attempt)
+                retry_after = None
+                if isinstance(e.detail, dict):
+                    retry_after = e.detail.get("retry_after_seconds") or e.detail.get("retry_after")
+                if retry_after is not None:
+                    with contextlib.suppress(ValueError, TypeError):
+                        delay = max(delay, float(retry_after))
+                import structlog as _sl  # noqa: PLC0415
+
+                _sl.get_logger("sdpj.detector").warning(
+                    "llm_multimodal_rate_limited_retry",
                     attempt=attempt + 1,
                     delay=round(delay, 1),
                     max_retries=max_retries,
@@ -324,15 +401,17 @@ async def run_static_detection(  # noqa: C901, D417, PLR0912, PLR0913, PLR0915
     task_progress_callback: Callable[[str, int, int], None] | None = None,
     force_refresh: bool = False,
     llm_callback: LLMCallCallback | None = None,
-    encoding_type: str | None = None,
+    attack_path: str = "direct",
 ) -> dict:
     """执行完整的静态检测算法 (Algorithm 1).
 
     Args:
         task_group_id: 可选,复用已有的任务组ID而非创建新的
         max_rps: 每秒最大请求数,默认2.0(约120RPM),用于避免429限流
+        attack_path: 攻击路径鉴别器,格式见 sdpj.infrastructure.utils.attack_path
 
     """
+    path_type, path_detail = parse_attack_path(attack_path)
     all_datasets = await data_processor.get_all_datasets()
     target_datasets = list(all_datasets)
     if dataset_ids is not None:
@@ -388,8 +467,8 @@ async def run_static_detection(  # noqa: C901, D417, PLR0912, PLR0913, PLR0915
                     error_type=type(cache_err).__name__,
                 )
                 # 缓存写入失败不影响检测流程继续
-    attack_path = encoding_utils.get_attack_path_label(encoding_type)
-    _metadata = {"encoding_type": encoding_type, "attack_path": attack_path}
+    attack_path_label = attack_path
+    _metadata = {"attack_path": attack_path_label}
 
     if not poc_pool:
         for ds_meta in target_datasets:
@@ -427,11 +506,20 @@ async def run_static_detection(  # noqa: C901, D417, PLR0912, PLR0913, PLR0915
             poc = sample.get("poc", "")
             subtype = sample.get("subtype", "")
             prepared = await _prepare_poc_async(poc, subtype, data_processor)
-            if encoding_type is not None:
-                prepared = encoding_utils.build_encoded_injection_sample(prepared, encoding_type)
             async with sem:
                 try:
-                    resp = await _call_llm(llm, instance, "", prepared, limiter, llm_callback)
+                    if path_type == "multi-modal":
+                        content = await data_processor.build_multimodal_content(prepared, path_detail)  # type: ignore[arg-type]
+                        resp = await _call_llm_multimodal(
+                            llm, instance, "", content, limiter, llm_callback,
+                        )
+                    else:
+                        send_poc = prepared
+                        if path_type == "multi-encoding":
+                            send_poc = encoding_utils.build_encoded_injection_sample(
+                                prepared, path_detail,  # type: ignore[arg-type]
+                            )
+                        resp = await _call_llm(llm, instance, "", send_poc, limiter, llm_callback)
                     output_text = result_parser.extract_model_output(resp)
                     judge_input = prompt_builder.build_judge_input(judge_template, output_text)
                     judge_resp = await _call_llm(

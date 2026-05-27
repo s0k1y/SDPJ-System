@@ -557,7 +557,63 @@ class DataProcessorInterface(Protocol):
         """
         ...
 
-    # ==================== PoC 池缓存 ====================
+    # ==================== 多编码样本构造与响应还原 ====================
+
+    def construct_encoded_sample(self, poc: str, encoding_type: str) -> str:
+        """构造多编码检测样本.
+
+        Args:
+            poc: 明文 PoC 文本
+            encoding_type: 编码类型(如 base64, caesar)
+
+        Returns:
+            编码后的样本字符串
+
+        触发场景:
+            多编码间接注入检测时,将明文 PoC 变换为目标编码形式
+
+        """
+        ...
+
+    def decode_response_content(self, encoded_content: str, encoding_type: str) -> str:
+        """还原多编码响应内容.
+
+        Args:
+            encoded_content: 编码后的响应内容
+            encoding_type: 编码类型
+
+        Returns:
+            还原后的明文内容
+
+        触发场景:
+            多编码间接注入检测后,将编码响应还原为明文
+
+        """
+        ...
+
+    # ==================== 多模态样本构造 ====================
+
+    async def build_multimodal_content(self, poc: str, modality: str) -> list[dict]:
+        """构造多模态检测样本.
+
+        将明文 PoC 变换为 OpenAI Chat Completions content 数组格式,
+        变换结果仅在内存中构造,不落盘(约束七).
+
+        Args:
+            poc: 明文 PoC 文本
+            modality: 目标模态,支持 jpg/png/mp3/wav/txt/mhtml
+
+        Returns:
+            OpenAI content 数组(list[dict])
+
+        Raises:
+            ValueError: 不支持的 modality
+
+        触发场景:
+            多模态间接注入检测时,将明文 PoC 变换为目标模态形式
+
+        """
+        ...
 
     async def get_poc_pool_cache(self, model_id: str) -> list[dict]:
         """获取指定模型的 PoC 池缓存.

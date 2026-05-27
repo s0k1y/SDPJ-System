@@ -61,3 +61,40 @@ async def test_invoke_llm_non_recoverable_raises() -> None:
     instance.call = AsyncMock(side_effect=err)
     with pytest.raises(StandardizedLLMError):
         await svc.invoke_llm(instance, {"system_prompt": "s", "user_message": "u"})
+
+
+@pytest.mark.asyncio
+async def test_call_multimodal_delegates_to_instance() -> None:
+    """call_multimodal 应委托到 service_instance.call_multimodal."""
+    svc = _make_service()
+    instance = MagicMock(spec=LLMServiceInstance)
+    instance.call_multimodal = AsyncMock(return_value={"success": True, "content": "ok"})
+    svc._llm_adapter.get_service_instance = AsyncMock(return_value=instance)
+
+    content = [{"type": "image_url", "image_url": {"url": "data:image/png;base64,abc"}}]
+    result = await svc.call_multimodal("gpt-4", "sys", content)
+    assert result["success"] is True
+    instance.call_multimodal.assert_called_once_with("sys", content)
+
+
+@pytest.mark.asyncio
+async def test_call_multimodal_retries_on_rate_limit() -> None:
+    """call_multimodal 触发 RATE_LIMIT 时应按指数退避重试."""
+    svc = LLMService(
+        llm_adapter=MagicMock(),
+        utils=MagicMock(),
+        max_retry_attempts=4,
+        retry_wait_min=0,
+        retry_wait_max=0,
+    )
+    instance = MagicMock(spec=LLMServiceInstance)
+    rate_limit_err = StandardizedLLMError(category=ErrorCategory.RATE_LIMIT, message="rate limited")
+    instance.call_multimodal = AsyncMock(
+        side_effect=[rate_limit_err, rate_limit_err, rate_limit_err, {"success": True, "content": "ok"}],
+    )
+    svc._llm_adapter.get_service_instance = AsyncMock(return_value=instance)
+
+    content = [{"type": "input_audio", "input_audio": {"data": "base64", "format": "wav"}}]
+    result = await svc.call_multimodal("gpt-4", "", content)
+    assert result["success"] is True
+    assert instance.call_multimodal.call_count == 4

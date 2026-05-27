@@ -183,3 +183,19 @@ class LLMRegistryInterface(Protocol):
             CLI 模式下单次检测完成后释放网络资源
         """
         ...
+
+    async def call_multimodal(
+        self, model_id: str, system_prompt: str, content: list[dict],
+    ) -> dict:
+        """向指定模型发起多模态调用.
+
+        Args:
+            model_id: 大模型标识
+            system_prompt: 系统提示词
+            content: OpenAI content 数组
+
+        Returns:
+            与 call() 返回结构一致
+
+        """
+        ...

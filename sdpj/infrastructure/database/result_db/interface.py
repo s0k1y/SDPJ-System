@@ -165,6 +165,20 @@ class ResultDBInterface(Protocol):
         """
         ...
 
+    async def mark_stale_tasks_failed(self) -> int:
+        """将数据库中处于 running/pending 状态但实际已中断的任务标记为 failed.
+
+        判定规则:
+        1. task_status 为 running 且存在 report 但无 result_data → 标记 failed
+        2. task_status 为 running 且无 report 且无 result_data → 标记 failed
+        3. task_status 为 pending 且存在 report → 异常状态(不应有 report),标记 failed
+
+        Returns:
+            被标记为 failed 的任务数量
+
+        """
+        ...
+
     async def delete_detection_task(self, task_id: str) -> bool:
         """删除检测任务.
 

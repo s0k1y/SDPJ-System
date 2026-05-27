@@ -160,9 +160,9 @@ class ResultDB:
         async with self.session_manager.session() as session:
             task_repo = TaskRepository(session)
 
-            _enc = (metadata_json or {}).get("encoding_type")
+            _ap = (metadata_json or {}).get("attack_path")
             existing = await task_repo.get_by_group_and_dataset(
-                task_group_id, dataset_id, encoding_type=_enc,
+                task_group_id, dataset_id, attack_path=_ap,
             )
             if existing is not None:
                 existing.task_status = task_status

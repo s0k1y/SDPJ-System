@@ -98,3 +98,5 @@ class PrivateConfigManagerInterface(Protocol):
     async def close_adapter_sessions(self) -> None: ...  # noqa: D102
 
     async def read_configs_batch(self, config_ids: list[int]) -> dict[int, dict]: ...  # noqa: D102
+
+    async def multimodal_capability_test(self, config_id: int, user_id: int) -> dict: ...  # noqa: D102

@@ -7,10 +7,11 @@ from datetime import UTC, datetime
 from sdpj.drivers.data_processor_interface import DataProcessorInterface
 from sdpj.drivers.llm_service_interface import LLMError, LLMServiceInterface
 from sdpj.infrastructure.utils import encoding as encoding_utils
+from sdpj.infrastructure.utils.attack_path import parse_attack_path
 from sdpj.infrastructure.utils.rate_limiter import RateLimiter
 
 from . import prompt_builder, result_parser
-from .static_detector import _BATCH_SIZE, LLMCallCallback, _call_llm
+from .static_detector import _BATCH_SIZE, LLMCallCallback, _call_llm, _call_llm_multimodal
 
 DynamicProgressCallback = Callable[[int, int, float, dict | None], None]
 
@@ -26,7 +27,7 @@ async def run_dynamic_detection(  # noqa: C901, D417, PLR0913, PLR0915
     max_concurrency: int = 10,
     llm_callback: LLMCallCallback | None = None,
     dynamic_progress_callback: DynamicProgressCallback | None = None,
-    encoding_type: str | None = None,
+    attack_path: str = "direct",
     target_dataset_id: int | None = None,
 ) -> dict:
     """执行动态检测算法 (Algorithm 2).
@@ -35,8 +36,10 @@ async def run_dynamic_detection(  # noqa: C901, D417, PLR0913, PLR0915
         static_result: run_static_detection 的返回值
         max_iterations: 最大迭代变异次数
         dynamic_progress_callback: 动态检测进度回调 (processed, total, avg_iterations)
+        attack_path: 攻击路径鉴别器,格式见 sdpj.infrastructure.utils.attack_path
 
     """
+    path_type, path_detail = parse_attack_path(attack_path)
     poc_pool = static_result.get("poc_pool")
     judge_template = static_result.get("judge_template")
     static_tg_id = static_result.get("task_group_id")
@@ -129,15 +132,20 @@ async def run_dynamic_detection(  # noqa: C901, D417, PLR0913, PLR0915
                             )
                             mutated_poc = result_parser.extract_model_output(mut_resp)
 
-                            send_poc = mutated_poc
-                            if encoding_type is not None:
-                                send_poc = encoding_utils.build_encoded_injection_sample(
-                                    mutated_poc, encoding_type,
+                            if path_type == "multi-modal":
+                                content = await data_processor.build_multimodal_content(mutated_poc, path_detail)  # type: ignore[arg-type]
+                                resp = await _call_llm_multimodal(
+                                    llm, instance, "", content, _limiter, llm_callback,
                                 )
-
-                            resp = await _call_llm(
-                                llm, instance, "", send_poc, _limiter, llm_callback,
-                            )
+                            else:
+                                send_poc = mutated_poc
+                                if path_type == "multi-encoding":
+                                    send_poc = encoding_utils.build_encoded_injection_sample(
+                                        mutated_poc, path_detail,  # type: ignore[arg-type]
+                                    )
+                                resp = await _call_llm(
+                                    llm, instance, "", send_poc, _limiter, llm_callback,
+                                )
                             output_text = result_parser.extract_model_output(resp)
 
                             judge_input = prompt_builder.build_judge_input(

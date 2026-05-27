@@ -93,6 +93,16 @@ class LLMServiceInstance:
             **adapter_kwargs,
         ))
 
+    async def call_multimodal(self, system_prompt: str, content: list[dict], **kwargs) -> dict:  # noqa: ANN003, D102
+        if not self._active:
+            msg = f"Service instance for '{self.model_id}' has been destroyed"
+            raise RuntimeError(msg)
+        return cast("dict", await self.adapter.call_multimodal(
+            system_prompt=system_prompt,
+            content=content,
+            **kwargs,
+        ))
+
     async def destroy(self) -> None:  # noqa: D102
         self._active = False
         if self.adapter is not None:

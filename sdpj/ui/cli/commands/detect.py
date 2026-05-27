@@ -4,8 +4,9 @@ import asyncio
 
 import click
 
+from sdpj.infrastructure.utils.attack_path import parse_attack_path
 from sdpj.ui.cli import OrderedGroup
-from sdpj.ui.cli.schemas.detection import DetectionStartParams, parse_attack_path
+from sdpj.ui.cli.schemas.detection import DetectionStartParams
 from sdpj.ui.cli.utils import output
 from sdpj.ui.cli.utils import progress as _progress
 from sdpj.ui.cli.utils.result import unwrap

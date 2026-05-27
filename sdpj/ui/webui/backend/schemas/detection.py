@@ -13,6 +13,7 @@ class DetectionStartRequest(BaseModel):  # noqa: D101
     max_iterations: int = 3
     force_refresh: bool = False
     encoding_types: list[str] | None = None
+    modalities: list[str] | None = None
     has_direct: bool = True
 
 

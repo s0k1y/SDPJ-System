@@ -7,6 +7,15 @@ import fs from 'fs'
 import path from 'path'
 
 export default defineConfig(({ mode }) => {
+  if (mode === 'test') {
+    return {
+      plugins: [vue()],
+      test: {
+        environment: 'jsdom',
+        globals: true,
+      },
+    }
+  }
   const env = loadEnv(mode, process.cwd(), '')
   const backendPort = env.VITE_BACKEND_PORT || '8000'
 

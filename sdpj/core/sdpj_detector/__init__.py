@@ -41,7 +41,7 @@ class SDPJDetector(SDPJDetectorInterface):
         task_progress_callback: Callable[[str, int, int], None] | None = None,
         force_refresh: bool = False,
         llm_callback: LLMCallCallback | None = None,
-        encoding_type: str | None = None,
+        attack_path: str = "direct",
     ) -> dict:
         return await run_static_detection(
             self._llm,
@@ -57,7 +57,7 @@ class SDPJDetector(SDPJDetectorInterface):
             task_progress_callback=task_progress_callback,
             force_refresh=force_refresh,
             llm_callback=llm_callback,
-            encoding_type=encoding_type,
+            attack_path=attack_path,
         )
 
     async def run_dynamic_detection(  # noqa: D102, PLR0913
@@ -70,7 +70,7 @@ class SDPJDetector(SDPJDetectorInterface):
         max_concurrency: int = 10,
         llm_callback: LLMCallCallback | None = None,
         dynamic_progress_callback: DynamicProgressCallback | None = None,
-        encoding_type: str | None = None,
+        attack_path: str = "direct",
         target_dataset_id: int | None = None,
     ) -> dict:
         return await run_dynamic_detection(
@@ -84,7 +84,7 @@ class SDPJDetector(SDPJDetectorInterface):
             max_concurrency=max_concurrency,
             llm_callback=llm_callback,
             dynamic_progress_callback=dynamic_progress_callback,
-            encoding_type=encoding_type,
+            attack_path=attack_path,
             target_dataset_id=target_dataset_id,
         )
 

@@ -580,6 +580,14 @@ class DataProcessor:
     def decode_response_content(self, encoded_content: str, encoding_type: str) -> str:  # noqa: D102
         return self._utils.decode_text(encoded_content, encoding_type)
 
+    # ==================== 多模态样本构造 ====================
+
+    async def build_multimodal_content(self, poc: str, modality: str) -> list[dict]:
+        """构造多模态检测样本,委托给 infrastructure/utils/multimodal.py."""
+        from sdpj.infrastructure.utils.multimodal import build_multimodal_content as _build  # noqa: PLC0415
+
+        return await _build(poc, modality)
+
     # ==================== PoC 池缓存 ====================
 
     async def get_poc_pool_cache(self, model_id: str) -> list[dict]:  # noqa: D102

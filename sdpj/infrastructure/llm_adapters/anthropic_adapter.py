@@ -117,6 +117,17 @@ class AnthropicAdapter(LLMAdapter):
 
         return {}
 
+    async def call_multimodal(  # noqa: D102
+        self,
+        system_prompt: str,
+        content: list[dict],
+        max_tokens: int = 2048,
+        temperature: float = 0.0,
+        timeout: int = 60,  # noqa: ASYNC109
+    ) -> dict:
+        msg = "Anthropic 格式不支持多模态调用,请使用 OpenAI 兼容端点"
+        raise NotImplementedError(msg)
+
     def get_metadata(self) -> dict:  # noqa: D102
         return {
             **super().get_metadata(),

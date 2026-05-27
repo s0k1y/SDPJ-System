@@ -57,7 +57,7 @@ class TaskRepository:
 
     async def get_by_group_and_dataset(  # noqa: D102
         self, task_group_id: str, dataset_id: int,
-        encoding_type: str | None = None,
+        attack_path: str | None = None,
     ) -> DetectionTask | None:
         stmt = select(DetectionTask).where(
             DetectionTask.task_group_id == task_group_id,
@@ -69,15 +69,12 @@ class TaskRepository:
         if not tasks:
             return None
 
-        if encoding_type is not None:
+        if attack_path is not None:
             for task in tasks:
                 meta = task.metadata_json or {}
-                if meta.get("encoding_type") == encoding_type:
+                if meta.get("attack_path") == attack_path:
                     return task
             return None
-
-        if len(tasks) > 1:
-            return tasks[0]
 
         return tasks[0]
 

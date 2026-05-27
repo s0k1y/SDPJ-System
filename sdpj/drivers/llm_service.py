@@ -91,6 +91,25 @@ class LLMService:
                 original_error=e,
             ) from e
 
+    async def call_multimodal(  # noqa: D102
+        self,
+        model_id: str,
+        system_prompt: str,
+        content: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        instance = await self.get_service_instance(model_id)
+        try:
+            return await self._invoke_multimodal_with_retry(instance, system_prompt, content)
+        except RetryError as e:
+            last_exc = e.last_attempt.exception()
+            if isinstance(last_exc, StandardizedLLMError):
+                raise last_exc from e
+            raise StandardizedLLMError(
+                category=ErrorCategory.UNKNOWN,
+                message=f"重试耗尽后仍失败: {e}",
+                original_error=e,
+            ) from e
+
     def _should_retry(self, retry_state) -> bool:  # noqa: ANN001
         if retry_state.outcome is None:
             return False
@@ -124,6 +143,42 @@ class LLMService:
                     if k not in ("system_prompt", "user_message")
                 }
                 return await service_instance.call(system_prompt, user_message, **extra)
+            except StandardizedLLMError:
+                raise
+            except TimeoutError as e:
+                raise StandardizedLLMError(
+                    category=ErrorCategory.TIMEOUT,
+                    message=f"请求超时: {e}",
+                    original_error=e,
+                ) from e
+            except Exception as e:
+                raise StandardizedLLMError(
+                    category=ErrorCategory.UNKNOWN,
+                    message=f"未预期的错误: {e}",
+                    original_error=e,
+                ) from e
+
+        return cast("dict[str, Any]", await _do_call())
+
+    async def _invoke_multimodal_with_retry(
+        self,
+        service_instance: LLMServiceInstance,
+        system_prompt: str,
+        content: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        @retry(
+            stop=stop_after_attempt(self._max_retry_attempts),
+            wait=wait_exponential(
+                multiplier=1,
+                min=self._retry_wait_min,
+                max=self._retry_wait_max,
+            ),
+            retry=self._should_retry,
+            reraise=True,
+        )
+        async def _do_call():  # noqa: ANN202
+            try:
+                return await service_instance.call_multimodal(system_prompt, content)
             except StandardizedLLMError:
                 raise
             except TimeoutError as e:

@@ -19,6 +19,8 @@ class LLMServiceInstanceProtocol(Protocol):
 
     async def call(self, system_prompt: str, user_message: str, **kwargs: Any) -> dict: ...  # noqa: ANN401, D102
 
+    async def call_multimodal(self, system_prompt: str, content: list[dict], **kwargs: Any) -> dict: ...  # noqa: ANN401, D102
+
     def destroy(self) -> None: ...  # noqa: D102
 
 
@@ -38,6 +40,13 @@ class LLMServiceInterface(Protocol):
         self,
         service_instance: LLMServiceInstanceProtocol,
         request_data: dict[str, Any],
+    ) -> dict[str, Any]: ...
+
+    async def call_multimodal(  # noqa: D102
+        self,
+        model_id: str,
+        system_prompt: str,
+        content: list[dict[str, Any]],
     ) -> dict[str, Any]: ...
 
     def should_retry(self, error: LLMError, attempt: int) -> bool: ...  # noqa: D102

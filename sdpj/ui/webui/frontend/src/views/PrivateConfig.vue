@@ -31,7 +31,8 @@
                 <div class="action-btns">
                   <el-button class="action-btn" size="small" @click="viewConfig(cfg)">查看</el-button>
                   <el-button class="action-btn" size="small" @click="editConfig(cfg)">编辑</el-button>
-                  <el-button class="action-btn" size="small" @click="verifyConfig(cfg)" :loading="verifyingId === cfg.config_id">测试</el-button>
+                  <el-button class="action-btn" size="small" @click="verifyConfig(cfg)" :loading="verifyingId === cfg.config_id">可用性测试</el-button>
+                  <el-button class="action-btn" size="small" @click="testMultimodal(cfg)" :loading="multimodalTestingId === cfg.config_id" :disabled="!isOpenAiFormat(cfg)">多模态测试</el-button>
                   <el-button class="action-btn action-btn-danger" size="small" @click="deleteConfig(cfg.config_id)">删除</el-button>
                 </div>
               </td>
@@ -129,6 +130,7 @@ const importJson = ref('')
 const saving = ref(false)
 const importing = ref(false)
 const verifyingId = ref(null)
+const multimodalTestingId = ref(null)
 const selectedTemplate = ref('openai')
 const editingConfigId = ref(null) // 正在编辑的配置ID
 
@@ -356,6 +358,48 @@ const verifyConfig = async (cfg) => {
     ElMessageBox.alert(`<div style="font-size:14px;"><b>状态：</b><span style="color:#dc2626">✗ ${isTimeout ? '超时' : '网络错误'}</span><br/><b>详情：</b>${msg}</div>`, '配置可用性验证', { dangerouslyUseHTMLString: true, confirmButtonText: '关闭' })
   } finally {
     verifyingId.value = null
+  }
+}
+
+const isOpenAiFormat = (cfg) => {
+  const content = cfg.content || {}
+  return content.request_format === 'openai'
+}
+
+const testMultimodal = async (cfg) => {
+  multimodalTestingId.value = cfg.config_id
+  try {
+    const res = await detectionConfig('multimodal_test', { config_id: cfg.config_id })
+    if (res.success && res.data?.result) {
+      const r = res.data.result
+      const supported = r.supported_types || []
+      const typeMap = { image_url: '图像 (image_url)', input_audio: '音频 (input_audio)' }
+      const lines = []
+      lines.push(`<div style="font-size:14px;line-height:2;">`)
+      if (supported.length > 0) {
+        lines.push(`<div><b>状态：</b><span style="color:#16a34a">✓ 支持多模态</span></div>`)
+        lines.push(`<div><b>支持的 content type：</b></div>`)
+        for (const t of supported) {
+          lines.push(`<div style="padding-left:16px;">${typeMap[t] || t} <span style="color:#16a34a">✓</span></div>`)
+        }
+      } else {
+        const reason = r.reason || 'unknown'
+        const reasonMap = { 'non-openai-format': '非 OpenAI 兼容格式', 'unknown': '未知原因' }
+        lines.push(`<div><b>状态：</b><span style="color:#dc2626">✗ 不支持多模态</span></div>`)
+        lines.push(`<div><b>原因：</b>${reasonMap[reason] || reason}</div>`)
+      }
+      lines.push(`</div>`)
+      ElMessageBox.alert(lines.join(''), '多模态能力测试', { dangerouslyUseHTMLString: true, confirmButtonText: '关闭' })
+    } else {
+      const errMsg = res.message || res.data?.error || '未知错误'
+      ElMessageBox.alert(`<div style="font-size:14px;"><b>状态：</b><span style="color:#dc2626">✗ 测试失败</span><br/><b>详情：</b>${errMsg}</div>`, '多模态能力测试', { dangerouslyUseHTMLString: true, confirmButtonText: '关闭' })
+    }
+  } catch (e) {
+    const isTimeout = e.code === 'ECONNABORTED' || e.message?.includes('timeout')
+    const msg = isTimeout ? '测试超时，目标模型响应过慢或网络不通' : `请求失败: ${e.message || '网络错误'}`
+    ElMessageBox.alert(`<div style="font-size:14px;"><b>状态：</b><span style="color:#dc2626">✗ ${isTimeout ? '超时' : '网络错误'}</span><br/><b>详情：</b>${msg}</div>`, '多模态能力测试', { dangerouslyUseHTMLString: true, confirmButtonText: '关闭' })
+  } finally {
+    multimodalTestingId.value = null
   }
 }
 

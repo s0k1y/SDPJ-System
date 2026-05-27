@@ -15,8 +15,6 @@ import uuid
 from collections.abc import Callable
 from typing import Any, cast
 
-logger = logging.getLogger(__name__)
-
 from sdpj.control.state_scheduler_interface import StateSchedulerInterface
 from sdpj.control.system_states import SystemStateMachine
 from sdpj.core.account_manager_interface import AccountManagerInterface
@@ -26,6 +24,8 @@ from sdpj.core.private_config_manager_interface import PrivateConfigManagerInter
 from sdpj.core.report_manager_interface import ReportManagerInterface
 from sdpj.core.sdpj_detector_interface import SDPJDetectorInterface
 from sdpj.core.task_queue_manager_interface import TaskQueueManagerInterface, TaskStatus
+
+logger = logging.getLogger(__name__)
 
 
 class StateScheduler(StateSchedulerInterface):
@@ -337,6 +337,7 @@ class StateScheduler(StateSchedulerInterface):
         force_refresh: bool = config_data.get("force_refresh", False)
         config_id: int | None = config_data.get("config_id")
         encoding_types: list[str] | None = config_data.get("encoding_types")
+        modalities: list[str] | None = config_data.get("modalities")
         has_direct: bool = config_data.get("has_direct", True)
 
         loaded_config = None
@@ -393,8 +394,6 @@ class StateScheduler(StateSchedulerInterface):
         elif current_state != "detecting":
             return {"success": False, "error": f"系统当前状态为'{current_state}',不允许启动检测"}
 
-        from sdpj.infrastructure.utils.encoding import get_attack_path_label  # noqa: PLC0415
-
         task_group_id = str(uuid.uuid4())
         task_ids: list[str] = []
         try:
@@ -412,13 +411,12 @@ class StateScheduler(StateSchedulerInterface):
                                 "max_iterations": max_iterations,
                                 "jailbreak_dataset_ids": jailbreak_dataset_ids,
                                 "force_refresh": force_refresh,
-                                "encoding_type": None,
-                                "attack_path": get_attack_path_label(None),
+                                "attack_path": "direct",
                             },
                         },
                     )
                     task_ids.append(tid)
-                # 间接注入子任务(每种编码各一个)
+                # 间接注入子任务-多编码(每种编码各一个)
                 if encoding_types:
                     for enc_type in encoding_types:
                         tid = await self._task_queue.enqueue_task(
@@ -432,8 +430,26 @@ class StateScheduler(StateSchedulerInterface):
                                     "max_iterations": max_iterations,
                                     "jailbreak_dataset_ids": jailbreak_dataset_ids,
                                     "force_refresh": force_refresh,
-                                    "encoding_type": enc_type,
-                                    "attack_path": get_attack_path_label(enc_type),
+                                    "attack_path": f"indirect:multi-encoding:{enc_type}",
+                                },
+                            },
+                        )
+                        task_ids.append(tid)
+                # 间接注入子任务-多模态(每种模态各一个)
+                if modalities:
+                    for modality in modalities:
+                        tid = await self._task_queue.enqueue_task(
+                            {
+                                "user_id": str(user_id),
+                                "model_id": model_id,
+                                "algorithm_type": detection_type,
+                                "dataset_id": str(ds_id),
+                                "metadata": {
+                                    "task_group_id": task_group_id,
+                                    "max_iterations": max_iterations,
+                                    "jailbreak_dataset_ids": jailbreak_dataset_ids,
+                                    "force_refresh": force_refresh,
+                                    "attack_path": f"indirect:multi-modal:{modality}",
                                 },
                             },
                         )
@@ -472,7 +488,7 @@ class StateScheduler(StateSchedulerInterface):
         task_group_id = task_params.get("task_group_id")
         jailbreak_dataset_ids = task_params.get("jailbreak_dataset_ids")
         force_refresh = task_params.get("force_refresh", False)
-        encoding_type = task_params.get("encoding_type")
+        attack_path = task_params.get("attack_path", "direct")
 
 
         actual_model_name = model_id
@@ -586,7 +602,7 @@ class StateScheduler(StateSchedulerInterface):
                     task_progress_callback=_task_progress_cb,
                     force_refresh=force_refresh,
                     llm_callback=_llm_call_cb,
-                    encoding_type=encoding_type,
+                    attack_path=attack_path,
                 )
             elif detection_type == "dynamic":
                 static_result = await self._detector.run_static_detection(
@@ -601,7 +617,7 @@ class StateScheduler(StateSchedulerInterface):
                     task_progress_callback=_task_progress_cb,
                     force_refresh=force_refresh,
                     llm_callback=_llm_call_cb,
-                    encoding_type=encoding_type,
+                    attack_path=attack_path,
                 )
                 if static_result["status"] != "completed":
                     result = static_result
@@ -615,7 +631,7 @@ class StateScheduler(StateSchedulerInterface):
                         max_concurrency=suggested_max_concurrency,
                         llm_callback=_llm_call_cb,
                         dynamic_progress_callback=_dynamic_progress_cb,
-                        encoding_type=encoding_type,
+                        attack_path=attack_path,
                         target_dataset_id=dataset_ids[0] if dataset_ids else None,
                     )
                     result = {
@@ -636,7 +652,7 @@ class StateScheduler(StateSchedulerInterface):
                     task_progress_callback=_task_progress_cb,
                     force_refresh=force_refresh,
                     llm_callback=_llm_call_cb,
-                    encoding_type=encoding_type,
+                    attack_path=attack_path,
                 )
                 if static_result["status"] != "completed":
                     result = static_result
@@ -650,7 +666,7 @@ class StateScheduler(StateSchedulerInterface):
                         max_concurrency=suggested_max_concurrency,
                         llm_callback=_llm_call_cb,
                         dynamic_progress_callback=_dynamic_progress_cb,
-                        encoding_type=encoding_type,
+                        attack_path=attack_path,
                         target_dataset_id=dataset_ids[0] if dataset_ids else None,
                     )
                     result = {
@@ -704,7 +720,7 @@ class StateScheduler(StateSchedulerInterface):
                 "task_group_id": task.metadata.get("task_group_id"),
                 "jailbreak_dataset_ids": task.metadata.get("jailbreak_dataset_ids"),
                 "force_refresh": task.metadata.get("force_refresh", False),
-                "encoding_type": task.metadata.get("encoding_type"),
+                "attack_path": task.metadata.get("attack_path", "direct"),
             }
             def _on_done(t: asyncio.Task, tid: str = task.task_id) -> None:  # noqa: ARG001
                 self._task_id_to_bg.pop(tid, None)
@@ -1630,6 +1646,28 @@ class StateScheduler(StateSchedulerInterface):
                 if not has_access:
                     return {"success": False, "error": "无访问权限"}
                 return await self._verify_config_availability(config_id, user_id, config)
+
+            if operation == "multimodal_test":
+                config_id = params["config_id"]
+                config = await self._config.read_config(config_id)
+                if config is None:
+                    return {"success": False, "error": "配置不存在"}
+                has_access = await self._dac.check_access(config_id, user_id)
+                if not has_access:
+                    return {"success": False, "error": "无访问权限"}
+                result = await self._config.multimodal_capability_test(config_id, user_id)
+                return {"success": True, "result": result}
+
+            if operation == "multimodal_check":
+                config_id = params["config_id"]
+                config = await self._config.read_config(config_id)
+                if config is None:
+                    return {"success": True, "result": {"supported_types": []}}
+                has_access = await self._dac.check_access(config_id, user_id)
+                if not has_access:
+                    return {"success": False, "error": "无访问权限"}
+                cached = (config.get("content") or {}).get("multimodal_test_result", {})
+                return {"success": True, "result": {"supported_types": cached.get("supported_types", [])}}
 
             if operation == "read":
                 data = await self._config.read_config(params["config_id"])

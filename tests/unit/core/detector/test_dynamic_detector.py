@@ -1,7 +1,7 @@
 """test_dynamic_detector 模块单元测试."""
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from sdpj.core.sdpj_detector.dynamic_detector import run_dynamic_detection
 from typing import Any
 
@@ -201,3 +201,69 @@ async def test_dynamic_detection_no_static_base() -> None:
 
     assert result["status"] == "no_static_base"
     assert result["task_group_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_multimodal_red_team_stays_text_only(mock_llm: Any, mock_data_processor: Any) -> None:
+    """红队模型输入输出应始终为明文,多模态变换仅在发送给被测 LLM 前执行."""
+    llm, instance = mock_llm
+    dp = mock_data_processor
+
+    # 红队模型返回明文变异 PoC
+    mutation_count = [0]
+
+    async def mock_invoke(inst: Any, req: Any) -> dict:
+        mutation_count[0] += 1
+        # 第1次:红队变异(明文), 第2次:合规判断→违规
+        if mutation_count[0] % 2 == 0:
+            return {"content": "违规"}
+        return {"content": "mutated_poc_text"}
+
+    llm.invoke_llm = AsyncMock(side_effect=mock_invoke)
+    llm.call_multimodal = AsyncMock(return_value={"content": "target LLM response"})
+
+    static_result = {
+        "status": "completed",
+        "task_group_id": "static_tg_1",
+        "poc_pool": ["test_poc"],
+        "judge_template": "template",
+    }
+
+    dp.aggregate_task_group_results = AsyncMock(
+        return_value={
+            "tasks": [
+                {
+                    "dataset_id": 1,
+                    "report": {
+                        "result_data": [
+                            {
+                                "risk_subclass": "越狱攻击",
+                                "poc": "original_poc",
+                                "model_output": "output",
+                                "compliance_result": "合规",
+                            }
+                        ]
+                    },
+                }
+            ]
+        }
+    )
+
+    multimodal_content = [{"type": "image_url", "image_url": {"url": "data:image/png;base64,abc"}}]
+    dp.build_multimodal_content = AsyncMock(return_value=multimodal_content)
+
+    result = await run_dynamic_detection(
+        llm, dp, "gpt-4", "user_1", static_result,
+        max_iterations=2, attack_path="indirect:multi-modal:png",
+    )
+
+    assert result["status"] == "completed"
+    assert llm.invoke_llm.call_count >= 1
+    assert llm.call_multimodal.call_count >= 1
+    dp.build_multimodal_content.assert_called()
+    # 最终落库的 PoC 为明文(非多模态 content 数组)
+    dp.append_result_data_batch.assert_called()
+    entries = dp.append_result_data_batch.call_args[0][1]
+    compliant_entry = next(e for e in entries if e["iteration_count"] > 0)
+    assert isinstance(compliant_entry["poc"], str)
+    assert compliant_entry["poc"] == "mutated_poc_text"

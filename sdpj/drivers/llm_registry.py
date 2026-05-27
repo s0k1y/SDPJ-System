@@ -135,3 +135,12 @@ class LLMRegistry:
 
     async def close_adapter_sessions(self) -> None:  # noqa: D102
         await self._adapter_lib.close_sessions()
+
+    async def call_multimodal(  # noqa: D102
+        self, model_id: str, system_prompt: str, content: list[dict],
+    ) -> dict:
+        available, instance = await self.is_model_available(model_id)
+        if not available or instance is None:
+            msg = f"模型 '{model_id}' 未注册或不可用"
+            raise AdapterNotFoundError(msg)
+        return await instance.call_multimodal(system_prompt, content)

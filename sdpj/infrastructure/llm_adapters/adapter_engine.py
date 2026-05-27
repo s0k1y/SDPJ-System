@@ -45,29 +45,19 @@ class OpenAICompatibleAdapter(LLMAdapter):
         if self._session and not self._session.closed:
             await self._session.close()
 
-    async def call(
+    async def _post_to_endpoint(  # noqa: PLR0913
         self,
-        prompt: str,
-        system_prompt: str = "",
-        max_tokens: int = 2048,
-        temperature: float = 0.0,
-        timeout: int = 60,  # noqa: ASYNC109
+        messages: list[dict],
+        max_tokens: int,
+        temperature: float,
+        timeout: int,
     ) -> dict:
-        """调用 OpenAI 兼容 API(统一接口).
-
-        使用构造时配置的 base_url,api_key,model_name,
-        不允许运行时覆盖配置参数.
-        """
+        """公共 HTTP 请求逻辑,call() 与 call_multimodal() 共用."""
         url = f"{self._base_url}/chat/completions"
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
-        messages = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": prompt})
-
         payload = {
             "model": self._model_name,
             "messages": messages,
@@ -118,6 +108,36 @@ class OpenAICompatibleAdapter(LLMAdapter):
             raise StandardizedLLMError(ErrorCategory.UNKNOWN, str(e), original_error=e)  # noqa: B904
 
         return {}
+
+    async def call(
+        self,
+        prompt: str,
+        system_prompt: str = "",
+        max_tokens: int = 2048,
+        temperature: float = 0.0,
+        timeout: int = 60,  # noqa: ASYNC109
+    ) -> dict:
+        """调用 OpenAI 兼容 API(统一接口)."""
+        messages: list[dict] = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        return await self._post_to_endpoint(messages, max_tokens, temperature, timeout)
+
+    async def call_multimodal(
+        self,
+        system_prompt: str,
+        content: list[dict],
+        max_tokens: int = 2048,
+        temperature: float = 0.0,
+        timeout: int = 60,  # noqa: ASYNC109
+    ) -> dict:
+        """调用 OpenAI 兼容 API(多模态接口)."""
+        messages: list[dict] = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": content})
+        return await self._post_to_endpoint(messages, max_tokens, temperature, timeout)
 
     def get_metadata(self) -> dict:  # noqa: D102
         return {

@@ -56,6 +56,30 @@ class LLMAdapter(ABC):
         """
         ...
 
+    @abstractmethod
+    async def call_multimodal(
+        self,
+        system_prompt: str,
+        content: list[dict],
+        max_tokens: int = 2048,
+        temperature: float = 0.0,
+        timeout: int = 60,  # noqa: ASYNC109
+    ) -> dict:
+        """调用大模型 API(多模态接口).
+
+        Args:
+            system_prompt: 系统提示词(可选)
+            content: OpenAI Chat Completions content 数组,直接透传
+            max_tokens: 最大生成 token 数
+            temperature: 温度参数(0.0-1.0)
+            timeout: 请求超时时间(秒)
+
+        Returns:
+            与 call() 返回结构一致
+
+        """
+        ...
+
     def get_metadata(self) -> dict:
         """返回适配器元信息."""
         return {

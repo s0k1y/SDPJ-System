@@ -62,3 +62,12 @@ async def test_call_401_raises_auth_error() -> None:
         with pytest.raises(StandardizedLLMError) as exc:
             await a.call("hi", "claude-3")
     assert exc.value.category == ErrorCategory.AUTH
+
+
+@pytest.mark.asyncio
+async def test_call_multimodal_raises_not_implemented() -> None:
+    """AnthropicAdapter.call_multimodal 应抛出 NotImplementedError."""
+    a = make_adapter()
+    content = [{"type": "text", "text": "hello"}]
+    with pytest.raises(NotImplementedError, match="Anthropic"):
+        await a.call_multimodal("", content)

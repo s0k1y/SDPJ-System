@@ -27,13 +27,14 @@ class SDPJDetectorInterface(Protocol):
         task_progress_callback: Callable[[str, int, int], None] | None = None,
         force_refresh: bool = False,
         llm_callback: LLMCallCallback | None = None,
-        encoding_type: str | None = None,
+        attack_path: str = "direct",
     ) -> dict:
         """执行静态自检测算法 (Algorithm 1).
 
         Args:
             task_group_id: 可选,复用已有的任务组ID而非创建新的
             poc_progress_callback: 可选,PoC 池构建进度回调 (processed, total, found, score_counts, subtype_stats)  # noqa: E501, E501            llm_callback: 可选, LLM 调用回调 (request_info, response_info)
+            attack_path: 攻击路径鉴别器,格式见 sdpj.infrastructure.utils.attack_path
 
         """
         ...
@@ -48,7 +49,7 @@ class SDPJDetectorInterface(Protocol):
         max_concurrency: int = 10,
         llm_callback: LLMCallCallback | None = None,
         dynamic_progress_callback: DynamicProgressCallback | None = None,
-        encoding_type: str | None = None,
+        attack_path: str = "direct",
         target_dataset_id: int | None = None,
     ) -> dict:
         """执行动态自检测算法 (Algorithm 2).
@@ -56,7 +57,7 @@ class SDPJDetectorInterface(Protocol):
         Args:
             llm_callback: 可选,LLM 调用回调 (request_info, response_info)
             dynamic_progress_callback: 可选,动态检测进度回调 (processed, total, avg_iterations)
-            encoding_type: 可选,编码类型,None 为直接注入
+            attack_path: 攻击路径鉴别器,格式见 sdpj.infrastructure.utils.attack_path
 
         """
         ...
