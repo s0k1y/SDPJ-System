@@ -7,13 +7,14 @@ import pytest
 
 from sdpj.core.task_queue_manager import TaskQueueManager
 from sdpj.core.task_queue_manager_interface import TaskStatus
+from typing import Any
 
 
 @pytest.mark.asyncio
 class TestTaskEnqueue:
     """测试任务入队"""
 
-    async def test_enqueue_task_success(self):
+    async def test_enqueue_task_success(self) -> None:
         """测试成功入队单个任务"""
         manager = TaskQueueManager()
         task_desc = {
@@ -32,7 +33,7 @@ class TestTaskEnqueue:
         status = await manager.get_task_status(task_id)
         assert status == TaskStatus.PENDING
 
-    async def test_enqueue_task_missing_field(self):
+    async def test_enqueue_task_missing_field(self) -> None:
         """测试入队任务缺少必需字段"""
         manager = TaskQueueManager()
         task_desc = {
@@ -44,7 +45,7 @@ class TestTaskEnqueue:
         with pytest.raises(ValueError, match="任务描述缺少必需字段"):
             await manager.enqueue_task(task_desc)
 
-    async def test_enqueue_multiple_tasks(self):
+    async def test_enqueue_multiple_tasks(self) -> None:
         """测试连续入队多个任务"""
         manager = TaskQueueManager()
         task_ids = []
@@ -72,7 +73,7 @@ class TestTaskEnqueue:
 class TestTaskDequeue:
     """测试任务出队"""
 
-    async def test_dequeue_task_success(self):
+    async def test_dequeue_task_success(self) -> None:
         """测试成功出队单个任务"""
         manager = TaskQueueManager()
         task_desc = {
@@ -89,14 +90,14 @@ class TestTaskDequeue:
         assert task.task_id == task_id
         assert task.status == TaskStatus.RUNNING
 
-    async def test_dequeue_task_empty_queue(self):
+    async def test_dequeue_task_empty_queue(self) -> None:
         """测试空队列出队"""
         manager = TaskQueueManager()
         task = await manager.dequeue_task()
 
         assert task is None
 
-    async def test_dequeue_task_fifo_order(self):
+    async def test_dequeue_task_fifo_order(self) -> None:
         """测试 FIFO 顺序"""
         manager = TaskQueueManager()
         task_ids = []
@@ -122,7 +123,7 @@ class TestTaskDequeue:
 class TestTaskDequeueMultiple:
     """测试批量出队"""
 
-    async def test_dequeue_tasks_success(self):
+    async def test_dequeue_tasks_success(self) -> None:
         """测试成功并发出队多个任务"""
         manager = TaskQueueManager()
 
@@ -143,7 +144,7 @@ class TestTaskDequeueMultiple:
         for task in tasks:
             assert task.status == TaskStatus.RUNNING
 
-    async def test_dequeue_tasks_exceeds_queue_size(self):
+    async def test_dequeue_tasks_exceeds_queue_size(self) -> None:
         """测试请求数量超过队列大小"""
         manager = TaskQueueManager()
 
@@ -162,7 +163,7 @@ class TestTaskDequeueMultiple:
 
         assert len(tasks) == 2
 
-    async def test_dequeue_tasks_empty_queue(self):
+    async def test_dequeue_tasks_empty_queue(self) -> None:
         """测试空队列批量出队"""
         manager = TaskQueueManager()
         tasks = await manager.dequeue_tasks(3)
@@ -174,7 +175,7 @@ class TestTaskDequeueMultiple:
 class TestTaskStatusUpdate:
     """测试任务状态更新"""
 
-    async def test_update_task_status_success(self):
+    async def test_update_task_status_success(self) -> None:
         """测试成功更新任务状态"""
         manager = TaskQueueManager()
         task_desc = {
@@ -195,14 +196,14 @@ class TestTaskStatusUpdate:
         status = await manager.get_task_status(task_id)
         assert status == TaskStatus.COMPLETED
 
-    async def test_update_task_status_nonexistent(self):
+    async def test_update_task_status_nonexistent(self) -> None:
         """测试更新不存在的任务"""
         manager = TaskQueueManager()
         result = await manager.update_task_status("nonexistent", TaskStatus.COMPLETED)
 
         assert result is False
 
-    async def test_update_task_status_to_failed(self):
+    async def test_update_task_status_to_failed(self) -> None:
         """测试更新任务状态为异常中断"""
         manager = TaskQueueManager()
         task_desc = {
@@ -228,7 +229,7 @@ class TestTaskStatusUpdate:
 class TestTaskStatusQuery:
     """测试任务状态查询"""
 
-    async def test_get_task_status_success(self):
+    async def test_get_task_status_success(self) -> None:
         """测试成功查询任务状态"""
         manager = TaskQueueManager()
         task_desc = {
@@ -243,7 +244,7 @@ class TestTaskStatusQuery:
 
         assert status == TaskStatus.PENDING
 
-    async def test_get_task_status_nonexistent(self):
+    async def test_get_task_status_nonexistent(self) -> None:
         """测试查询不存在的任务"""
         manager = TaskQueueManager()
         status = await manager.get_task_status("nonexistent")
@@ -255,14 +256,14 @@ class TestTaskStatusQuery:
 class TestQueueView:
     """测试队列视图"""
 
-    async def test_get_queue_view_empty(self):
+    async def test_get_queue_view_empty(self) -> None:
         """测试查询空队列"""
         manager = TaskQueueManager()
         view = await manager.get_queue_view()
 
         assert len(view) == 0
 
-    async def test_get_queue_view_with_tasks(self):
+    async def test_get_queue_view_with_tasks(self) -> None:
         """测试查询非空队列"""
         manager = TaskQueueManager()
 
@@ -282,7 +283,7 @@ class TestQueueView:
         for task in view:
             assert task.status == TaskStatus.PENDING
 
-    async def test_get_queue_view_with_different_statuses(self):
+    async def test_get_queue_view_with_different_statuses(self) -> None:
         """测试队列视图包含不同状态的任务"""
         manager = TaskQueueManager()
 
@@ -298,7 +299,7 @@ class TestQueueView:
             task_id = await manager.enqueue_task(task_desc)
             task_ids.append(task_id)
 
-        # 出队 1 个任务（状态变为 RUNNING）
+        # 出队 1 个任务(状态变为 RUNNING)
         await manager.dequeue_task()
 
         # 更新 1 个任务为 COMPLETED
@@ -317,11 +318,12 @@ class TestQueueView:
 class TestConcurrency:
     """测试并发场景"""
 
-    async def test_concurrent_enqueue(self):
+    async def test_concurrent_enqueue(self) -> None:
         """测试并发入队"""
         manager = TaskQueueManager()
 
-        async def enqueue_task(i):
+        async def enqueue_task(i: Any) -> None:
+            """测试 enqueue task."""
             task_desc = {
                 "user_id": f"user{i}",
                 "model_id": "gpt-4",
@@ -336,7 +338,7 @@ class TestConcurrency:
         assert len(task_ids) == 10
         assert len(set(task_ids)) == 10  # 所有ID唯一
 
-    async def test_concurrent_dequeue(self):
+    async def test_concurrent_dequeue(self) -> None:
         """测试并发出队"""
         manager = TaskQueueManager()
 
@@ -362,7 +364,8 @@ class TestConcurrency:
 class TestTaskCancel:
     """测试任务取消"""
 
-    async def test_cancel_pending_task(self):
+    async def test_cancel_pending_task(self) -> None:
+        """测试 test cancel pending task."""
         manager = TaskQueueManager()
         task_desc = {
             "user_id": "user1",
@@ -378,7 +381,8 @@ class TestTaskCancel:
         status = await manager.get_task_status(task_id)
         assert status == TaskStatus.CANCELLED
 
-    async def test_cancel_running_task(self):
+    async def test_cancel_running_task(self) -> None:
+        """测试 test cancel running task."""
         manager = TaskQueueManager()
         task_desc = {
             "user_id": "user1",
@@ -396,7 +400,8 @@ class TestTaskCancel:
         status = await manager.get_task_status(task_id)
         assert status == TaskStatus.CANCELLED
 
-    async def test_cancel_completed_task_fails(self):
+    async def test_cancel_completed_task_fails(self) -> None:
+        """测试 test cancel completed task fails."""
         manager = TaskQueueManager()
         task_desc = {
             "user_id": "user1",
@@ -415,13 +420,15 @@ class TestTaskCancel:
         status = await manager.get_task_status(task_id)
         assert status == TaskStatus.COMPLETED
 
-    async def test_cancel_nonexistent_task_fails(self):
+    async def test_cancel_nonexistent_task_fails(self) -> None:
+        """测试 test cancel nonexistent task fails."""
         manager = TaskQueueManager()
         result = await manager.cancel_task("nonexistent")
 
         assert result is False
 
-    async def test_cancel_already_cancelled_task_fails(self):
+    async def test_cancel_already_cancelled_task_fails(self) -> None:
+        """测试 test cancel already cancelled task fails."""
         manager = TaskQueueManager()
         task_desc = {
             "user_id": "user1",
@@ -442,7 +449,8 @@ class TestTaskCancel:
 class TestRemoveTask:
     """测试从队列中移除任务"""
 
-    async def test_remove_pending_task(self):
+    async def test_remove_pending_task(self) -> None:
+        """测试 test remove pending task."""
         manager = TaskQueueManager()
         task_desc = {
             "user_id": "user1",
@@ -461,7 +469,8 @@ class TestRemoveTask:
         view = await manager.get_queue_view()
         assert len(view) == 0
 
-    async def test_remove_completed_task(self):
+    async def test_remove_completed_task(self) -> None:
+        """测试 test remove completed task."""
         manager = TaskQueueManager()
         task_desc = {
             "user_id": "user1",
@@ -480,13 +489,15 @@ class TestRemoveTask:
         status = await manager.get_task_status(task_id)
         assert status is None
 
-    async def test_remove_nonexistent_task_fails(self):
+    async def test_remove_nonexistent_task_fails(self) -> None:
+        """测试 test remove nonexistent task fails."""
         manager = TaskQueueManager()
         result = await manager.remove_task("nonexistent")
 
         assert result is False
 
-    async def test_remove_task_not_in_queue_view(self):
+    async def test_remove_task_not_in_queue_view(self) -> None:
+        """测试 test remove task not in queue view."""
         manager = TaskQueueManager()
 
         task_ids = []
@@ -510,9 +521,10 @@ class TestRemoveTask:
 
 @pytest.mark.asyncio
 class TestTerminalStateProtection:
-    """测试终态保护：已处于终态的任务状态不可被覆盖"""
+    """测试终态保护:已处于终态的任务状态不可被覆盖"""
 
-    async def test_update_status_does_not_overwrite_cancelled(self):
+    async def test_update_status_does_not_overwrite_cancelled(self) -> None:
+        """测试 test update status does not overwrite cancelled."""
         manager = TaskQueueManager()
         task_desc = {
             "user_id": "user1",
@@ -531,7 +543,8 @@ class TestTerminalStateProtection:
         status = await manager.get_task_status(task_id)
         assert status == TaskStatus.CANCELLED
 
-    async def test_update_status_does_not_overwrite_completed(self):
+    async def test_update_status_does_not_overwrite_completed(self) -> None:
+        """测试 test update status does not overwrite completed."""
         manager = TaskQueueManager()
         task_desc = {
             "user_id": "user1",
@@ -550,7 +563,8 @@ class TestTerminalStateProtection:
         status = await manager.get_task_status(task_id)
         assert status == TaskStatus.COMPLETED
 
-    async def test_update_status_does_not_overwrite_failed(self):
+    async def test_update_status_does_not_overwrite_failed(self) -> None:
+        """测试 test update status does not overwrite failed."""
         manager = TaskQueueManager()
         task_desc = {
             "user_id": "user1",
@@ -569,7 +583,8 @@ class TestTerminalStateProtection:
         status = await manager.get_task_status(task_id)
         assert status == TaskStatus.FAILED
 
-    async def test_cancelled_task_skipped_on_dequeue(self):
+    async def test_cancelled_task_skipped_on_dequeue(self) -> None:
+        """测试 test cancelled task skipped on dequeue."""
         manager = TaskQueueManager()
 
         task_ids = []

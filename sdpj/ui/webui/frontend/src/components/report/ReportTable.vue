@@ -4,13 +4,14 @@
       <table>
         <thead>
           <tr>
-            <th style="width: 30%">任务组ID / 任务ID</th>
-            <th style="width: 14%">模型</th>
-            <th style="width: 14%">数据集</th>
+            <th style="width: 24%">任务组ID / 任务ID</th>
+            <th style="width: 12%">模型</th>
+            <th style="width: 12%">数据集</th>
+            <th style="width: 12%">攻击路径</th>
             <th style="width: 10%">合规率</th>
             <th style="width: 10%">风险等级</th>
             <th style="width: 8%">状态</th>
-            <th style="width: 14%">操作</th>
+            <th style="width: 12%">操作</th>
           </tr>
         </thead>
         <tbody v-if="!loading && flattenedRows.length > 0">
@@ -30,6 +31,9 @@
               </td>
               <td>
                 <span v-if="row.isLeaf" class="cell-mono">{{ row.dataset_name || '-' }}</span>
+              </td>
+              <td>
+                <span v-if="row.isLeaf" class="attack-path-tag">{{ row.attack_path || '-' }}</span>
               </td>
               <td>
                 <span v-if="row.isLeaf">{{ row.compliance_rate != null ? row.compliance_rate.toFixed(1) + '%' : '-' }}</span>
@@ -115,6 +119,7 @@ const buildFlattenedRows = (groups) => {
           level: 1,
           label: child.task_id,
           dataset_name: child.dataset_name,
+          attack_path: child.attack_path,
           compliance_rate: child.compliance_rate,
           risk_level: child.risk_level,
           status: child.status,
@@ -331,5 +336,13 @@ table tr:last-child td {
 
 .empty-center {
   text-align: center;
+}
+
+.attack-path-tag {
+  font-size: 12px;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 2px 8px;
+  border-radius: 6px;
 }
 </style>

@@ -1,44 +1,44 @@
-"""系统日志仓储层实现
+"""系统日志仓储层实现.
 
-提供系统日志的 CRUD 操作。
+提供系统日志的 CRUD 操作.
 """
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import SystemLog
+from sdpj.infrastructure.database.result_db.models import SystemLog
 
 
 class LogRepository:
-    """系统日志仓储
+    """系统日志仓储.
 
-    封装系统日志的数据访问逻辑。
+    封装系统日志的数据访问逻辑.
     """
 
-    def __init__(self, session: AsyncSession):
-        """初始化仓储
+    def __init__(self, session: AsyncSession) -> None:
+        """初始化仓储.
 
         Args:
             session: 异步数据库会话
+
         """
         self.session = session
 
-    async def create(
+    async def create(  # noqa: PLR0913
         self,
         log_id: str,
         category: str,
         level: str,
         timestamp: datetime,
         source_module: str,
-        user_id: Optional[str],
+        user_id: str | None,
         event_type: str,
         description: str,
-        context: Optional[dict],
+        context: dict | None,
     ) -> SystemLog:
-        """创建日志记录
+        """创建日志记录.
 
         Args:
             log_id: 日志ID
@@ -53,6 +53,7 @@ class LogRepository:
 
         Returns:
             创建的日志对象
+
         """
         log = SystemLog(
             log_id=log_id,
@@ -69,19 +70,19 @@ class LogRepository:
         await self.session.flush()
         return log
 
-    async def query(
+    async def query(  # noqa: PLR0913
         self,
-        category: Optional[str] = None,
-        level: Optional[str] = None,
-        time_start: Optional[datetime] = None,
-        time_end: Optional[datetime] = None,
-        source_module: Optional[str] = None,
-        user_id: Optional[str] = None,
-        user_ids: Optional[list[str]] = None,
+        category: str | None = None,
+        level: str | None = None,
+        time_start: datetime | None = None,
+        time_end: datetime | None = None,
+        source_module: str | None = None,
+        user_id: str | None = None,
+        user_ids: list[str] | None = None,
         limit: int = 1000,
         offset: int = 0,
     ) -> list[SystemLog]:
-        """按条件查询日志
+        """按条件查询日志.
 
         Args:
             category: 日志类别
@@ -90,12 +91,13 @@ class LogRepository:
             time_end: 时间范围结束
             source_module: 来源模块
             user_id: 用户ID
-            user_ids: 用户ID列表（IN查询）
+            user_ids: 用户ID列表(IN查询)
             limit: 返回结果数量限制
             offset: 偏移量
 
         Returns:
             匹配条件的日志列表
+
         """
         conditions = []
 
@@ -123,17 +125,17 @@ class LogRepository:
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
-    async def count(
+    async def count(  # noqa: PLR0913
         self,
-        category: Optional[str] = None,
-        level: Optional[str] = None,
-        time_start: Optional[datetime] = None,
-        time_end: Optional[datetime] = None,
-        source_module: Optional[str] = None,
-        user_id: Optional[str] = None,
-        user_ids: Optional[list[str]] = None,
+        category: str | None = None,
+        level: str | None = None,
+        time_start: datetime | None = None,
+        time_end: datetime | None = None,
+        source_module: str | None = None,
+        user_id: str | None = None,
+        user_ids: list[str] | None = None,
     ) -> int:
-        """按条件统计日志数量
+        """按条件统计日志数量.
 
         Args:
             category: 日志类别
@@ -142,10 +144,11 @@ class LogRepository:
             time_end: 时间范围结束
             source_module: 来源模块
             user_id: 用户ID
-            user_ids: 用户ID列表（IN查询）
+            user_ids: 用户ID列表(IN查询)
 
         Returns:
             匹配条件的日志数量
+
         """
         conditions = []
 
@@ -172,13 +175,14 @@ class LogRepository:
         return result.scalar() or 0
 
     async def delete_old_logs(self, before: datetime) -> int:
-        """删除指定时间之前的日志
+        """删除指定时间之前的日志.
 
         Args:
             before: 删除此时间之前的日志
 
         Returns:
             删除的日志数量
+
         """
         stmt = select(SystemLog).where(SystemLog.timestamp < before)
         result = await self.session.execute(stmt)

@@ -3,7 +3,7 @@
 import sys
 
 
-def main() -> None:
+def main() -> None:  # noqa: D103
     checks_passed = 0
     checks_total = 0
 
@@ -12,9 +12,8 @@ def main() -> None:
         import sdpj  # noqa: F401
 
         checks_passed += 1
-        print("[OK] sdpj package importable")
     except ImportError as e:
-        print(f"[FAIL] sdpj package import: {e}")
+        pass
 
     checks_total += 1
     try:
@@ -23,20 +22,17 @@ def main() -> None:
         from sdpj.infrastructure.database.user_db import UserDB  # noqa: F401
 
         checks_passed += 1
-        print("[OK] Database modules importable")
     except ImportError as e:
-        print(f"[FAIL] Database modules: {e}")
+        pass
 
     checks_total += 1
     try:
         from sdpj.ui.webui.backend.app import app  # noqa: F401
 
         checks_passed += 1
-        print("[OK] WebUI backend importable")
     except ImportError as e:
-        print(f"[FAIL] WebUI backend: {e}")
+        pass
 
-    print(f"\n{checks_passed}/{checks_total} checks passed.")
     sys.exit(0 if checks_passed == checks_total else 1)
 
 

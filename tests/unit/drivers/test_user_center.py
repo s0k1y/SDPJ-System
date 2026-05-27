@@ -1,6 +1,6 @@
 """UserCenter 单元测试
 
-测试 UserCenter 模块的所有功能：
+测试 UserCenter 模块的所有功能:
 - 账号生命周期管理
 - 凭据校验
 - 资源登记与查询
@@ -12,15 +12,18 @@ import pytest
 from unittest.mock import AsyncMock
 from datetime import datetime
 from sdpj.drivers.user_center import UserCenter
+from typing import Any
 
 
 @pytest.fixture
-def mock_user_db():
+def mock_user_db() -> None:
+    """测试 mock user db."""
     return AsyncMock()
 
 
 @pytest.fixture
-def user_center(mock_user_db):
+def user_center(mock_user_db: Any) -> None:
+    """测试 user center."""
     return UserCenter(mock_user_db)
 
 
@@ -28,7 +31,8 @@ def user_center(mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_register_user_success(user_center, mock_user_db):
+async def test_register_user_success(user_center: Any, mock_user_db: Any) -> None:
+    """测试 test register user success."""
     username = "testuser"
     password = "password123"
     mock_user_db.create_user.return_value = 1
@@ -38,9 +42,9 @@ async def test_register_user_success(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_register_user_duplicate_username(user_center, mock_user_db):
+async def test_register_user_duplicate_username(user_center: Any, mock_user_db: Any) -> None:
     """测试注册重复账号"""
-    # 配置 mock：模拟账号已存在
+    # 配置 mock:模拟账号已存在
     mock_user_db.create_user.side_effect = ValueError("账号已存在")
 
     # 执行测试并验证异常
@@ -49,7 +53,7 @@ async def test_register_user_duplicate_username(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_delete_user_success(user_center, mock_user_db):
+async def test_delete_user_success(user_center: Any, mock_user_db: Any) -> None:
     """测试成功注销用户"""
     # 配置 mock
     mock_user_db.delete_user.return_value = True
@@ -63,7 +67,8 @@ async def test_delete_user_success(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_update_user_password_success(user_center, mock_user_db):
+async def test_update_user_password_success(user_center: Any, mock_user_db: Any) -> None:
+    """测试 test update user password success."""
     mock_user_db.update_user_password.return_value = True
     result = await user_center.update_user_password(1, "newpassword456")
     assert result is True
@@ -71,9 +76,9 @@ async def test_update_user_password_success(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_update_user_password_user_not_found(user_center, mock_user_db):
+async def test_update_user_password_user_not_found(user_center: Any, mock_user_db: Any) -> None:
     """测试修改不存在用户的密码"""
-    # 配置 mock：模拟用户不存在
+    # 配置 mock:模拟用户不存在
     mock_user_db.update_user_password.side_effect = ValueError("用户不存在")
 
     # 执行测试并验证异常
@@ -82,7 +87,7 @@ async def test_update_user_password_user_not_found(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_get_user_by_username_success(user_center, mock_user_db):
+async def test_get_user_by_username_success(user_center: Any, mock_user_db: Any) -> None:
     """测试按账号查询用户成功"""
     # 准备测试数据
     username = "testuser"
@@ -99,7 +104,7 @@ async def test_get_user_by_username_success(user_center, mock_user_db):
     # 执行测试
     result = await user_center.get_user_by_username(username)
 
-    # 验证结果：不应包含 password_hash
+    # 验证结果:不应包含 password_hash
     assert result is not None
     assert result["user_id"] == 1
     assert result["username"] == username
@@ -109,7 +114,7 @@ async def test_get_user_by_username_success(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_get_user_by_username_not_found(user_center, mock_user_db):
+async def test_get_user_by_username_not_found(user_center: Any, mock_user_db: Any) -> None:
     """测试按账号查询用户不存在"""
     # 配置 mock
     mock_user_db.get_user_by_username.return_value = None
@@ -122,7 +127,7 @@ async def test_get_user_by_username_not_found(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_get_user_by_id_success(user_center, mock_user_db):
+async def test_get_user_by_id_success(user_center: Any, mock_user_db: Any) -> None:
     """测试按 ID 查询用户成功"""
     # 准备测试数据
     user_id = 1
@@ -139,7 +144,7 @@ async def test_get_user_by_id_success(user_center, mock_user_db):
     # 执行测试
     result = await user_center.get_user_by_id(user_id)
 
-    # 验证结果：不应包含 password_hash
+    # 验证结果:不应包含 password_hash
     assert result is not None
     assert result["user_id"] == user_id
     assert result["username"] == "testuser"
@@ -149,7 +154,7 @@ async def test_get_user_by_id_success(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_get_user_by_id_not_found(user_center, mock_user_db):
+async def test_get_user_by_id_not_found(user_center: Any, mock_user_db: Any) -> None:
     """测试按 ID 查询用户不存在"""
     # 配置 mock
     mock_user_db.get_user_by_id.return_value = None
@@ -165,7 +170,8 @@ async def test_get_user_by_id_not_found(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_verify_credentials_success(user_center, mock_user_db):
+async def test_verify_credentials_success(user_center: Any, mock_user_db: Any) -> None:
+    """测试 test verify credentials success."""
     username = "testuser"
     password = "password123"
     mock_user_db.get_user_by_username.return_value = {
@@ -181,7 +187,8 @@ async def test_verify_credentials_success(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_verify_credentials_wrong_password(user_center, mock_user_db):
+async def test_verify_credentials_wrong_password(user_center: Any, mock_user_db: Any) -> None:
+    """测试 test verify credentials wrong password."""
     mock_user_db.get_user_by_username.return_value = {
         "user_id": 1,
         "username": "testuser",
@@ -195,22 +202,22 @@ async def test_verify_credentials_wrong_password(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_verify_credentials_user_not_found(user_center, mock_user_db):
-    """测试凭据校验失败：用户不存在"""
+async def test_verify_credentials_user_not_found(user_center: Any, mock_user_db: Any) -> None:
+    """测试凭据校验失败:用户不存在"""
     mock_user_db.get_user_by_username.return_value = None
 
     success, user_id, error_msg = await user_center.verify_credentials("nonexistent", "password")
 
     assert success is False
     assert user_id is None
-    assert error_msg == "账号未注册，请先注册"
+    assert error_msg == "账号未注册,请先注册"
 
 
 # ==================== 资源登记与查询测试 ====================
 
 
 @pytest.mark.asyncio
-async def test_register_resource_success(user_center, mock_user_db):
+async def test_register_resource_success(user_center: Any, mock_user_db: Any) -> None:
     """测试成功登记资源"""
     # 准备测试数据
     resource_type = "private_config"
@@ -229,8 +236,8 @@ async def test_register_resource_success(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_register_resource_invalid_owner(user_center, mock_user_db):
-    """测试登记资源失败：拥有者不存在"""
+async def test_register_resource_invalid_owner(user_center: Any, mock_user_db: Any) -> None:
+    """测试登记资源失败:拥有者不存在"""
     # 配置 mock
     mock_user_db.register_resource.side_effect = ValueError("拥有者用户不存在")
 
@@ -240,7 +247,7 @@ async def test_register_resource_invalid_owner(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_delete_resource_success(user_center, mock_user_db):
+async def test_delete_resource_success(user_center: Any, mock_user_db: Any) -> None:
     """测试成功删除资源"""
     # 配置 mock
     mock_user_db.delete_resource.return_value = True
@@ -254,7 +261,7 @@ async def test_delete_resource_success(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_get_resources_by_owner_success(user_center, mock_user_db):
+async def test_get_resources_by_owner_success(user_center: Any, mock_user_db: Any) -> None:
     """测试按拥有者查询资源清单"""
     # 准备测试数据
     user_id = 1
@@ -287,7 +294,7 @@ async def test_get_resources_by_owner_success(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_get_resource_by_id_success(user_center, mock_user_db):
+async def test_get_resource_by_id_success(user_center: Any, mock_user_db: Any) -> None:
     """测试按 ID 查询资源成功"""
     # 准备测试数据
     resource_id = 10
@@ -312,7 +319,7 @@ async def test_get_resource_by_id_success(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_get_resource_by_id_not_found(user_center, mock_user_db):
+async def test_get_resource_by_id_not_found(user_center: Any, mock_user_db: Any) -> None:
     """测试按 ID 查询资源不存在"""
     # 配置 mock
     mock_user_db.get_resource_by_id.return_value = None
@@ -328,7 +335,7 @@ async def test_get_resource_by_id_not_found(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_grant_access_success(user_center, mock_user_db):
+async def test_grant_access_success(user_center: Any, mock_user_db: Any) -> None:
     """测试成功授予访问权"""
     # 准备测试数据
     resource_id = 10
@@ -347,8 +354,8 @@ async def test_grant_access_success(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_grant_access_invalid_resource(user_center, mock_user_db):
-    """测试授予访问权失败：资源不存在"""
+async def test_grant_access_invalid_resource(user_center: Any, mock_user_db: Any) -> None:
+    """测试授予访问权失败:资源不存在"""
     # 配置 mock
     mock_user_db.add_access_control.side_effect = ValueError("资源不存在")
 
@@ -358,7 +365,7 @@ async def test_grant_access_invalid_resource(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_revoke_access_success(user_center, mock_user_db):
+async def test_revoke_access_success(user_center: Any, mock_user_db: Any) -> None:
     """测试成功移除访问权"""
     # 配置 mock
     mock_user_db.delete_access_control.return_value = True
@@ -372,7 +379,7 @@ async def test_revoke_access_success(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_get_access_list_success(user_center, mock_user_db):
+async def test_get_access_list_success(user_center: Any, mock_user_db: Any) -> None:
     """测试查询资源授权清单"""
     # 准备测试数据
     resource_id = 10
@@ -405,7 +412,7 @@ async def test_get_access_list_success(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_check_access_has_permission(user_center, mock_user_db):
+async def test_check_access_has_permission(user_center: Any, mock_user_db: Any) -> None:
     """测试判定用户具备访问权"""
     # 配置 mock
     mock_user_db.check_access_control_exists.return_value = True
@@ -419,7 +426,7 @@ async def test_check_access_has_permission(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_check_access_no_permission(user_center, mock_user_db):
+async def test_check_access_no_permission(user_center: Any, mock_user_db: Any) -> None:
     """测试判定用户不具备访问权"""
     # 配置 mock
     mock_user_db.check_access_control_exists.return_value = False
@@ -435,7 +442,7 @@ async def test_check_access_no_permission(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_write_private_config_success(user_center, mock_user_db):
+async def test_write_private_config_success(user_center: Any, mock_user_db: Any) -> None:
     """测试成功写入私有配置"""
     # 准备测试数据
     config_id = 10
@@ -453,8 +460,8 @@ async def test_write_private_config_success(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_write_private_config_resource_not_found(user_center, mock_user_db):
-    """测试写入私有配置失败：资源不存在"""
+async def test_write_private_config_resource_not_found(user_center: Any, mock_user_db: Any) -> None:
+    """测试写入私有配置失败:资源不存在"""
     # 配置 mock
     mock_user_db.write_private_config.side_effect = ValueError("资源不存在")
 
@@ -464,8 +471,8 @@ async def test_write_private_config_resource_not_found(user_center, mock_user_db
 
 
 @pytest.mark.asyncio
-async def test_write_private_config_already_exists(user_center, mock_user_db):
-    """测试写入私有配置失败：配置已存在"""
+async def test_write_private_config_already_exists(user_center: Any, mock_user_db: Any) -> None:
+    """测试写入私有配置失败:配置已存在"""
     # 配置 mock
     mock_user_db.write_private_config.side_effect = ValueError("配置已存在")
 
@@ -475,7 +482,7 @@ async def test_write_private_config_already_exists(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_read_private_config_success(user_center, mock_user_db):
+async def test_read_private_config_success(user_center: Any, mock_user_db: Any) -> None:
     """测试成功读取私有配置"""
     # 准备测试数据
     config_id = 10
@@ -493,7 +500,7 @@ async def test_read_private_config_success(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_read_private_config_not_found(user_center, mock_user_db):
+async def test_read_private_config_not_found(user_center: Any, mock_user_db: Any) -> None:
     """测试读取私有配置不存在"""
     # 配置 mock
     mock_user_db.read_private_config.return_value = None
@@ -506,7 +513,7 @@ async def test_read_private_config_not_found(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_update_private_config_success(user_center, mock_user_db):
+async def test_update_private_config_success(user_center: Any, mock_user_db: Any) -> None:
     """测试成功更新私有配置"""
     # 准备测试数据
     config_id = 10
@@ -524,8 +531,8 @@ async def test_update_private_config_success(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_update_private_config_not_found(user_center, mock_user_db):
-    """测试更新私有配置失败：配置不存在"""
+async def test_update_private_config_not_found(user_center: Any, mock_user_db: Any) -> None:
+    """测试更新私有配置失败:配置不存在"""
     # 配置 mock
     mock_user_db.update_private_config.side_effect = ValueError("配置不存在")
 
@@ -535,7 +542,7 @@ async def test_update_private_config_not_found(user_center, mock_user_db):
 
 
 @pytest.mark.asyncio
-async def test_delete_private_config_success(user_center, mock_user_db):
+async def test_delete_private_config_success(user_center: Any, mock_user_db: Any) -> None:
     """测试成功删除私有配置"""
     # 配置 mock
     mock_user_db.delete_private_config.return_value = True

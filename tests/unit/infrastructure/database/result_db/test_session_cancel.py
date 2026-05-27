@@ -8,16 +8,17 @@
 import asyncio
 import pytest
 from sdpj.infrastructure.database.result_db.session import SessionManager
+from typing import Any
 
 
 @pytest.mark.asyncio
-async def test_basic_cancelled_during_yield():
+async def test_basic_cancelled_during_yield() -> None:
     """简单取消: yield 期间 CancelledError 触发 asyncgen cleanup"""
     mgr = SessionManager("sqlite+aiosqlite:///:memory:")
     await mgr.initialize()
     await mgr.create_tables()
 
-    async def task():
+    async def task() -> None:
         async with mgr.session() as session:
             await session.execute(
                 __import__('sqlalchemy').text("SELECT 1")
@@ -33,13 +34,13 @@ async def test_basic_cancelled_during_yield():
 
 
 @pytest.mark.asyncio
-async def test_cancelled_during_commit():
+async def test_cancelled_during_commit() -> None:
     """commit 阶段取消: 在 commit 前抛出 CancelledError"""
     mgr = SessionManager("sqlite+aiosqlite:///:memory:")
     await mgr.initialize()
     await mgr.create_tables()
 
-    async def task():
+    async def task() -> None:
         async with mgr.session() as session:
             await session.execute(
                 __import__('sqlalchemy').text("SELECT 1")
@@ -55,16 +56,16 @@ async def test_cancelled_during_commit():
 
 
 @pytest.mark.asyncio
-async def test_concurrent_close_and_cancel():
+async def test_concurrent_close_and_cancel() -> None:
     """
-    精确复现: 并发执行 (1) session.close() 和 (2) 连接池关闭。
+    精确复现: 并发执行 (1) session.close() 和 (2) 连接池关闭.
     模拟 CancelledError 在 _connection_for_bind 进行中时触发 close()
     """
     mgr = SessionManager("sqlite+aiosqlite:///:memory:")
     await mgr.initialize()
     await mgr.create_tables()
 
-    async def use_and_cancel():
+    async def use_and_cancel() -> None:
         async with mgr.session() as session:
             await session.execute(
                 __import__('sqlalchemy').text("SELECT 1")

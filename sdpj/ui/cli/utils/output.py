@@ -1,4 +1,4 @@
-"""CLI 输出格式化工具 — Rich 渲染"""
+"""CLI 输出格式化工具 — Rich 渲染."""
 
 from rich.console import Console
 from rich.table import Table as RichTable
@@ -7,19 +7,19 @@ from rich.text import Text
 _console = Console()
 
 
-def success(msg: str) -> None:
+def success(msg: str) -> None:  # noqa: D103
     _console.print(Text(f"✓ {msg}", style="bold green"))
 
 
-def error(msg: str) -> None:
+def error(msg: str) -> None:  # noqa: D103
     _console.print(Text(f"✗ {msg}", style="bold red"))
 
 
-def info(msg: str) -> None:
+def info(msg: str) -> None:  # noqa: D103
     _console.print(Text(f"  {msg}", style="dim"))
 
 
-def table(headers: list[str], rows: list[list[str]]) -> None:
+def table(headers: list[str], rows: list[list[str]]) -> None:  # noqa: D103
     if not rows:
         _console.print(Text("  (无数据)", style="dim"))
         return
@@ -31,7 +31,7 @@ def table(headers: list[str], rows: list[list[str]]) -> None:
     _console.print(rt)
 
 
-def kv(data: dict, indent: int = 2) -> None:
+def kv(data: dict, indent: int = 2) -> None:  # noqa: D103
     lines = []
     for k, v in data.items():
         k_text = Text(f"{k}: ", style="bold cyan")

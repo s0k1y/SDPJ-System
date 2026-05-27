@@ -6,12 +6,12 @@
 - 2.1.3 选择检测数据集
 - 2.1.4 调度检测任务
 - 2.1.5 生成可视化检测结果报告
-- 2.1.6 管理检测结果报告(查询、查看、下载、删除)
+- 2.1.6 管理检测结果报告(查询,查看,下载,删除)
 - 2.1.7 系统状态管理与异常处理
 - 2.1.8.1.1.1 用户注册与登录
-- 2.1.8.1.1.2 用户管理(密码修改、账号切换、私有配置增删改查)
+- 2.1.8.1.1.2 用户管理(密码修改,账号切换,私有配置增删改查)
 - 2.1.8.1.2 用户权限管理(授予/移除)
-- 2.1.8.2 加密通信(账号密码、私有配置文件)
+- 2.1.8.2 加密通信(账号密码,私有配置文件)
 """
 
 import pytest
@@ -23,11 +23,11 @@ from tests.fixtures.sample_data import REAL_MODEL_ID
 class TestWebUIUserManagement:
     """测试用户管理功能 (2.1.8.1.1)"""
 
-    def setup_method(self):
+    def setup_method(self) -> None:  # noqa: D102
         self.unique_username = f"e2e_webui_{uuid.uuid4().hex[:8]}"
         self.password = "test_password_123"
 
-    def test_user_registration(self, client):
+    def test_user_registration(self, client) -> None:  # noqa: ANN001
         """测试用户注册 (2.1.8.1.1.1)"""
         response = client.post(
             "/api/auth/register", json={"username": self.unique_username, "password": self.password}
@@ -36,7 +36,7 @@ class TestWebUIUserManagement:
         if response.status_code == 200:
             assert response.json()["success"] is True
 
-    def test_user_login(self, client):
+    def test_user_login(self, client) -> None:  # noqa: ANN001
         """测试用户登录 (2.1.8.1.1.1)"""
         client.post(
             "/api/auth/register", json={"username": self.unique_username, "password": self.password}
@@ -51,7 +51,7 @@ class TestWebUIUserManagement:
             data = response.json()
             assert data["success"] is True
 
-    def test_encrypted_communication(self, client):
+    def test_encrypted_communication(self, client) -> None:  # noqa: ANN001
         """测试加密通信 (2.1.8.2) - 账号密码加密传输"""
         response = client.post(
             "/api/auth/register",
@@ -66,12 +66,12 @@ class TestWebUIUserManagement:
 class TestWebUIDetectionCore:
     """测试核心检测功能 (2.1.1-2.1.6)"""
 
-    def setup_method(self):
+    def setup_method(self) -> None:  # noqa: D102
         self.unique_username = f"e2e_detect_{uuid.uuid4().hex[:8]}"
         self.password = "test_password_123"
         self.session_id = None
 
-    def _register_and_login(self, client):
+    def _register_and_login(self, client) -> None:  # noqa: ANN001
         """辅助方法: 注册并登录"""
         client.post(
             "/api/auth/register", json={"username": self.unique_username, "password": self.password}
@@ -83,7 +83,7 @@ class TestWebUIDetectionCore:
             data = login_response.json()
             self.session_id = data.get("session_id") or data.get("token")
 
-    def test_static_detection(self, client):
+    def test_static_detection(self, client) -> None:  # noqa: ANN001
         """测试静态检测算法 (2.1.1)"""
         self._register_and_login(client)
 
@@ -98,7 +98,7 @@ class TestWebUIDetectionCore:
         )
         assert response.status_code in [200, 400, 401, 500]
 
-    def test_dynamic_detection(self, client):
+    def test_dynamic_detection(self, client) -> None:  # noqa: ANN001
         """测试动态检测算法 (2.1.2)"""
         self._register_and_login(client)
 
@@ -113,15 +113,15 @@ class TestWebUIDetectionCore:
         )
         assert response.status_code in [200, 400, 401, 500]
 
-    def test_dataset_selection(self, client):
+    def test_dataset_selection(self, client) -> None:  # noqa: ANN001
         """测试选择检测数据集 (2.1.3)"""
         self._register_and_login(client)
 
         response = client.get("/api/detection/datasets")
         assert response.status_code in [200, 401, 500]
 
-    def test_report_management(self, client):
-        """测试报告管理 (2.1.6) - 查询、查看"""
+    def test_report_management(self, client) -> None:  # noqa: ANN001
+        """测试报告管理 (2.1.6) - 查询,查看"""
         self._register_and_login(client)
 
         response = client.get("/api/reports/list")
@@ -131,13 +131,13 @@ class TestWebUIDetectionCore:
 class TestWebUISystemManagement:
     """测试系统状态管理 (2.1.7)"""
 
-    def test_system_status(self, client):
+    def test_system_status(self, client) -> None:  # noqa: ANN001
         """测试系统状态管理 (2.1.7.1)"""
         response = client.get("/api/status")
         assert response.status_code in [200, 500]
         assert "status" in response.json()["data"]
 
-    def test_health_check(self, client):
+    def test_health_check(self, client) -> None:  # noqa: ANN001
         """测试健康检查"""
         response = client.get("/health")
         assert response.status_code in [200, 500]
@@ -146,13 +146,12 @@ class TestWebUISystemManagement:
 class TestWebUIFullWorkflow:
     """测试完整工作流"""
 
-    def setup_method(self):
+    def setup_method(self) -> None:  # noqa: D102
         self.unique_username = f"e2e_full_{uuid.uuid4().hex[:8]}"
         self.password = "test_password_123"
 
-    def test_complete_detection_workflow(self, client):
+    def test_complete_detection_workflow(self, client) -> None:  # noqa: ANN001
         """测试完整检测流程: 注册 -> 登录 -> 选择数据集 -> 启动检测 -> 查询状态 -> 查看报告"""
-
         # 1. 用户注册 (2.1.8.1.1.1)
         reg_response = client.post(
             "/api/auth/register", json={"username": self.unique_username, "password": self.password}
@@ -197,13 +196,13 @@ class TestWebUIFullWorkflow:
 class TestWebUIAPIs:
     """测试 WebUI API 端点可用性"""
 
-    def test_root_endpoint(self, client):
+    def test_root_endpoint(self, client) -> None:  # noqa: ANN001
         """测试根端点"""
         response = client.get("/")
         assert response.status_code in [200, 500]
         assert "SDPJ-System" in response.json()["data"]["name"]
 
-    def test_api_routes_exist(self, client):
+    def test_api_routes_exist(self, client) -> None:  # noqa: ANN001
         """测试关键 API 路由存在"""
         routes = [route.path for route in app.routes]
 
@@ -213,12 +212,12 @@ class TestWebUIAPIs:
         assert "/api/auth/register" in routes
         assert "/api/auth/login" in routes
 
-    def test_register_endpoint_validation(self, client):
+    def test_register_endpoint_validation(self, client) -> None:  # noqa: ANN001
         """测试注册端点参数验证"""
         response = client.post("/api/auth/register", json={"username": "testuser"})
         assert response.status_code in [400, 422, 500]
 
-    def test_login_endpoint_validation(self, client):
+    def test_login_endpoint_validation(self, client) -> None:  # noqa: ANN001
         """测试登录端点参数验证"""
         response = client.post("/api/auth/login", json={"username": "testuser"})
         assert response.status_code in [400, 422, 500]

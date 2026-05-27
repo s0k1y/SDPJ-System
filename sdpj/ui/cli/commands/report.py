@@ -1,4 +1,4 @@
-"""报告交互命令 (职责 4-7)"""
+"""报告交互命令 (职责 4-7)."""
 
 import asyncio
 from pathlib import Path
@@ -27,7 +27,7 @@ def _bar(ratio: float, width: int = 28) -> str:
     return "█" * filled + " " * (width - filled)
 
 
-def _render_visualization(data: dict, *, group_id: str = "") -> None:
+def _render_visualization(data: dict, *, group_id: str = "") -> None:  # noqa: PLR0915
     color_map = {"通过": "green", "合规": "green", "失败": "red", "违规": "red"}
     _console.print()
 
@@ -85,7 +85,7 @@ def _render_visualization(data: dict, *, group_id: str = "") -> None:
             passed = item.get("passed", 0)
             failed = item.get("failed", 0)
             rate = item.get("rate", 0)
-            rate_color = "green" if rate >= 70 else "yellow" if rate >= 40 else "red"
+            rate_color = "green" if rate >= 70 else "yellow" if rate >= 40 else "red"  # noqa: PLR2004
             table.add_row(
                 str(item.get("category", "?")),
                 str(item.get("total", 0)),
@@ -109,8 +109,8 @@ def _render_visualization(data: dict, *, group_id: str = "") -> None:
             total = item.get("total", 0)
             rate = item.get("compliance_rate", 0)
             risk_lvl = item.get("risk_level", "?")
-            risk_lvl_color = "red" if "高" in str(risk_lvl) else "yellow" if "中" in str(risk_lvl) else "green"
-            rate_color = "green" if rate >= 70 else "yellow" if rate >= 40 else "red"
+            risk_lvl_color = "red" if "高" in str(risk_lvl) else "yellow" if "中" in str(risk_lvl) else "green"  # noqa: E501
+            rate_color = "green" if rate >= 70 else "yellow" if rate >= 40 else "red"  # noqa: PLR2004
             table.add_row(
                 ds_id,
                 str(total),
@@ -123,8 +123,8 @@ def _render_visualization(data: dict, *, group_id: str = "") -> None:
 
 
 @click.group("Report", cls=OrderedGroup, no_args_is_help=True)
-def report_group():
-    """检测报告管理"""
+def report_group() -> None:
+    """检测报告管理."""
 
 
 # ── 报告生成与查看 ──
@@ -133,11 +133,11 @@ def report_group():
 @report_group.command("generate", hidden=True)
 @click.option("--group-id", required=True, help="任务组ID")
 @click.pass_context
-def generate(ctx, group_id):
-    """生成检测报告"""
+def generate(ctx, group_id) -> None:  # noqa: ANN001
+    """生成检测报告."""
     user_id = ctx.obj.require_login()
     result = asyncio.run(
-        ctx.obj.scheduler.generate_report(group_id, user_id=user_id)
+        ctx.obj.scheduler.generate_report(group_id, user_id=user_id),
     )
     data = unwrap(result, required="report")
     output.success("报告已生成")
@@ -147,8 +147,8 @@ def generate(ctx, group_id):
 @report_group.command("view")
 @click.option("--group-id", required=True, help="任务组ID")
 @click.pass_context
-def view(ctx, group_id):
-    """查看单份检测报告"""
+def view(ctx, group_id) -> None:  # noqa: ANN001
+    """查看单份检测报告."""
     user_id = ctx.obj.require_login()
     result = asyncio.run(ctx.obj.scheduler.view_report(group_id, user_id=user_id))
     data = unwrap(result, required="report")
@@ -158,8 +158,8 @@ def view(ctx, group_id):
 @report_group.command("list")
 @click.option("--model-id", default=None, help="按模型ID过滤")
 @click.pass_context
-def list_reports(ctx, model_id):
-    """查询检测报告列表"""
+def list_reports(ctx, model_id) -> None:  # noqa: ANN001
+    """查询检测报告列表."""
     user_id = ctx.obj.require_login()
     filters = {"user_id": user_id}
     if model_id:
@@ -187,19 +187,19 @@ def list_reports(ctx, model_id):
     type=click.Choice(["json", "yaml", "jsonl"]),
     help="导出格式",
 )
-@click.option("--task-id", default=None, help="子任务ID（导出单任务级别报告）")
+@click.option("--task-id", default=None, help="子任务ID(导出单任务级别报告)")
 @click.option("--output", "output_path", default=None, help="输出文件路径")
 @click.pass_context
-def export(ctx, group_id, target_format, task_id, output_path):
-    """导出检测报告文件"""
+def export(ctx, group_id, target_format, task_id, output_path) -> None:  # noqa: ANN001
+    """导出检测报告文件."""
     user_id = ctx.obj.require_login()
     params = ReportExportParams(
-        task_group_id=group_id, target_format=target_format, task_id=task_id
+        task_group_id=group_id, target_format=target_format, task_id=task_id,
     )
     result = asyncio.run(
         ctx.obj.scheduler.export_report(
-            params.task_group_id, params.target_format, user_id=user_id, task_id=params.task_id
-        )
+            params.task_group_id, params.target_format, user_id=user_id, task_id=params.task_id,
+        ),
     )
     data = unwrap(result)
     filename = data.get("filename", f"report.{target_format}")
@@ -224,8 +224,8 @@ def export(ctx, group_id, target_format, task_id, output_path):
     help="删除粒度: task_group=任务组, task=子任务",
 )
 @click.pass_context
-def delete(ctx, target_id, granularity):
-    """删除检测报告"""
+def delete(ctx, target_id, granularity) -> None:  # noqa: ANN001
+    """删除检测报告."""
     user_id = ctx.obj.require_login()
     result = asyncio.run(ctx.obj.scheduler.delete_report(target_id, user_id, granularity))
     unwrap(result)
@@ -237,8 +237,8 @@ def delete(ctx, target_id, granularity):
 
 @report_group.command("statistics")
 @click.pass_context
-def statistics(ctx):
-    """查询合规统计数据"""
+def statistics(ctx) -> None:  # noqa: ANN001
+    """查询合规统计数据."""
     result = asyncio.run(ctx.obj.scheduler.query_compliance_statistics())
     data = unwrap(result)
     if not data:
@@ -251,16 +251,17 @@ def statistics(ctx):
 @click.option("--group-id", default=None, help="任务组ID")
 @click.option("--task-id", default=None, help="任务ID")
 @click.pass_context
-def visualization(ctx, group_id, task_id):
-    """获取可视化数据"""
+def visualization(ctx, group_id, task_id) -> None:  # noqa: ANN001
+    """获取可视化数据."""
     if not group_id and not task_id:
-        raise click.UsageError("必须指定 --group-id 或 --task-id")
+        msg = "必须指定 --group-id 或 --task-id"
+        raise click.UsageError(msg)
     user_id = ctx.obj.require_login()
     if group_id:
-        result = asyncio.run(ctx.obj.scheduler.prepare_visualization_data(group_id, user_id=user_id))
+        result = asyncio.run(ctx.obj.scheduler.prepare_visualization_data(group_id, user_id=user_id))  # noqa: E501
         label = group_id
     else:
-        result = asyncio.run(ctx.obj.scheduler.prepare_task_visualization_data(task_id, user_id=user_id))
+        result = asyncio.run(ctx.obj.scheduler.prepare_task_visualization_data(task_id, user_id=user_id))  # noqa: E501
         label = task_id
     data = unwrap(result, required="data")
     _render_visualization(data["data"], group_id=label)

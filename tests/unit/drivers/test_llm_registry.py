@@ -23,29 +23,34 @@ from sdpj.infrastructure.llm_adapters.errors import (
     AdapterNotFoundError,
 )
 from tests.fixtures.sample_data import REAL_MODEL_ID, REAL_MODEL_ID_2
+from typing import Any
 
 
 class MockServiceInstance:
     """模拟服务实例"""
 
-    def __init__(self, model_id: str, active: bool = True):
+    def __init__(self, model_id: str, active: bool = True) -> None:
+        """测试 init."""
         self.model_id = model_id
         self._active = active
         self.closed = False
 
     @property
     def active(self) -> bool:
+        """测试 active."""
         return self._active
 
-    async def call(self, prompt: str, **kwargs):
+    async def call(self, prompt: str, **kwargs: Any) -> None:
+        """测试 call."""
         return {"response": "mock response"}
 
-    async def close(self):
+    async def close(self) -> None:
+        """测试 close."""
         self.closed = True
 
 
 @pytest.fixture
-def mock_adapter_lib():
+def mock_adapter_lib() -> None:
     """模拟 LLMAdapterLib"""
     lib = MagicMock()
     lib.get_service_instance = AsyncMock()
@@ -55,14 +60,14 @@ def mock_adapter_lib():
 
 
 @pytest.fixture
-def mock_utils_lib():
+def mock_utils_lib() -> None:
     """模拟 UtilsLib"""
     utils = MagicMock()
     return utils
 
 
 @pytest.fixture
-def llm_registry(mock_adapter_lib, mock_utils_lib):
+def llm_registry(mock_adapter_lib: Any, mock_utils_lib: Any) -> None:
     """创建 LLMRegistry 实例"""
     return LLMRegistry(adapter_lib=mock_adapter_lib, utils_lib=mock_utils_lib)
 
@@ -71,7 +76,7 @@ def llm_registry(mock_adapter_lib, mock_utils_lib):
 class TestLLMRegistryInitialize:
     """测试启动时批量注册"""
 
-    async def test_initialize_success(self, llm_registry, mock_adapter_lib):
+    async def test_initialize_success(self, llm_registry: Any, mock_adapter_lib: Any) -> None:
         """测试成功批量注册已入库大模型"""
         metadata1 = {
             "model_id": REAL_MODEL_ID,
@@ -93,7 +98,7 @@ class TestLLMRegistryInitialize:
         assert REAL_MODEL_ID in llm_registry._registry
         assert REAL_MODEL_ID_2 in llm_registry._registry
 
-    async def test_initialize_with_missing_instance(self, llm_registry, mock_adapter_lib):
+    async def test_initialize_with_missing_instance(self, llm_registry: Any, mock_adapter_lib: Any) -> None:
         """测试批量注册时部分服务实例不存在"""
         metadata1 = {
             "model_id": REAL_MODEL_ID,
@@ -115,7 +120,7 @@ class TestLLMRegistryInitialize:
         assert result is False
         assert REAL_MODEL_ID in llm_registry._registry
 
-    async def test_initialize_failure(self, llm_registry, mock_adapter_lib):
+    async def test_initialize_failure(self, llm_registry: Any, mock_adapter_lib: Any) -> None:
         """测试批量注册失败"""
         mock_adapter_lib.list_adapters.side_effect = Exception("数据库错误")
 
@@ -128,7 +133,7 @@ class TestLLMRegistryInitialize:
 class TestLLMRegistryListModels:
     """测试查询已注册大模型清单"""
 
-    async def test_list_registered_models_success(self, llm_registry, mock_adapter_lib):
+    async def test_list_registered_models_success(self, llm_registry: Any, mock_adapter_lib: Any) -> None:
         """测试成功查询已注册大模型清单"""
         service1 = MockServiceInstance(REAL_MODEL_ID)
         service2 = MockServiceInstance(REAL_MODEL_ID_2)
@@ -156,14 +161,14 @@ class TestLLMRegistryListModels:
         assert len(models) == 2
         assert isinstance(models[0], ModelInfo)
 
-    async def test_list_registered_models_empty(self, llm_registry):
+    async def test_list_registered_models_empty(self, llm_registry: Any) -> None:
         """测试查询空注册表"""
         models = await llm_registry.list_registered_models()
         assert len(models) == 0
 
     async def test_list_registered_models_with_missing_metadata(
-        self, llm_registry, mock_adapter_lib
-    ):
+        self, llm_registry: Any, mock_adapter_lib: Any
+    ) -> None:
         """测试查询时部分元信息不存在"""
         service1 = MockServiceInstance(REAL_MODEL_ID)
         service2 = MockServiceInstance(REAL_MODEL_ID_2)
@@ -191,7 +196,7 @@ class TestLLMRegistryListModels:
 class TestLLMRegistryIsModelAvailable:
     """测试按标识校验大模型是否可用"""
 
-    async def test_is_model_available_true(self, llm_registry):
+    async def test_is_model_available_true(self, llm_registry: Any) -> None:
         """测试大模型可用"""
         service = MockServiceInstance(REAL_MODEL_ID)
         llm_registry._registry = {REAL_MODEL_ID: service}
@@ -201,22 +206,26 @@ class TestLLMRegistryIsModelAvailable:
         assert is_available is True
         assert instance is service
 
-    async def test_is_model_available_false(self, llm_registry):
-        """测试大模型不可用"""
+    async def test_is_model_available_false(self, llm_registry: Any) -> None:
+        """测试大模型不可用(不在 registry 也不在 adapter_lib)"""
+        llm_registry._adapter_lib.get_service_instance.side_effect = AdapterNotFoundError()
+
         is_available, instance = await llm_registry.is_model_available(REAL_MODEL_ID)
 
         assert is_available is False
         assert instance is None
 
-    async def test_is_model_available_inactive(self, llm_registry):
-        """测试大模型实例已失活"""
+    async def test_is_model_available_inactive(self, llm_registry: Any) -> None:
+        """测试大模型实例已失活但 adapter_lib 中仍存在，自动恢复"""
         service = MockServiceInstance(REAL_MODEL_ID, active=False)
         llm_registry._registry = {REAL_MODEL_ID: service}
+        recovered = MockServiceInstance(REAL_MODEL_ID)
+        llm_registry._adapter_lib.get_service_instance.return_value = recovered
 
         is_available, instance = await llm_registry.is_model_available(REAL_MODEL_ID)
 
-        assert is_available is False
-        assert instance is None
+        assert is_available is True
+        assert instance is recovered
 
 
 @pytest.mark.asyncio
@@ -224,8 +233,8 @@ class TestLLMRegistryRegisterPrivateModel:
     """测试注册用户上传的私有大模型"""
 
     async def test_register_private_model_success(
-        self, llm_registry, mock_adapter_lib, mock_utils_lib
-    ):
+        self, llm_registry: Any, mock_adapter_lib: Any, mock_utils_lib: Any
+    ) -> None:
         """测试成功注册私有大模型"""
         adapter_content = json.dumps(
             {
@@ -251,7 +260,7 @@ class TestLLMRegistryRegisterPrivateModel:
         assert error == ""
         assert model_id in llm_registry._registry
 
-    async def test_register_private_model_invalid_format(self, llm_registry, mock_utils_lib):
+    async def test_register_private_model_invalid_format(self, llm_registry: Any, mock_utils_lib: Any) -> None:
         """测试文件格式校验失败"""
         adapter_content = "invalid json"
         model_id = REAL_MODEL_ID
@@ -267,8 +276,8 @@ class TestLLMRegistryRegisterPrivateModel:
         assert "格式" in error or "校验" in error
 
     async def test_register_private_model_validation_error(
-        self, llm_registry, mock_adapter_lib, mock_utils_lib
-    ):
+        self, llm_registry: Any, mock_adapter_lib: Any, mock_utils_lib: Any
+    ) -> None:
         """测试适配器不符合规范"""
         adapter_content = json.dumps({"adapter_name": "DeepSeek V4 Pro", "version": "1.0.0"})
         model_id = REAL_MODEL_ID
@@ -286,8 +295,8 @@ class TestLLMRegistryRegisterPrivateModel:
         assert "校验" in error or "适配器" in error
 
     async def test_register_private_model_already_exists(
-        self, llm_registry, mock_adapter_lib, mock_utils_lib
-    ):
+        self, llm_registry: Any, mock_adapter_lib: Any, mock_utils_lib: Any
+    ) -> None:
         """测试适配器已存在"""
         adapter_content = json.dumps({"adapter_name": "DeepSeek V4 Pro", "version": "1.0.0"})
         model_id = REAL_MODEL_ID
@@ -309,7 +318,7 @@ class TestLLMRegistryRegisterPrivateModel:
 class TestLLMRegistryUnregisterPrivateModel:
     """测试注销用户移除的私有大模型"""
 
-    async def test_unregister_private_model_success(self, llm_registry, mock_adapter_lib):
+    async def test_unregister_private_model_success(self, llm_registry: Any, mock_adapter_lib: Any) -> None:
         """测试成功注销私有大模型"""
         model_id = REAL_MODEL_ID
         service = MockServiceInstance(model_id)
@@ -321,14 +330,14 @@ class TestLLMRegistryUnregisterPrivateModel:
         assert error == ""
         assert model_id not in llm_registry._registry
 
-    async def test_unregister_private_model_not_found(self, llm_registry):
+    async def test_unregister_private_model_not_found(self, llm_registry: Any) -> None:
         """测试注销不存在的大模型"""
         success, error = await llm_registry.unregister_private_model(REAL_MODEL_ID)
 
         assert success is False
         assert "未注册" in error
 
-    async def test_unregister_private_model_exception(self, llm_registry, mock_adapter_lib):
+    async def test_unregister_private_model_exception(self, llm_registry: Any, mock_adapter_lib: Any) -> None:
         """测试注销时发生异常"""
         model_id = REAL_MODEL_ID
         service = MockServiceInstance(model_id)
@@ -346,7 +355,7 @@ class TestLLMRegistryUnregisterPrivateModel:
 class TestLLMRegistryShutdown:
     """测试关闭期批量销毁全部服务实例"""
 
-    async def test_shutdown_success(self, llm_registry, mock_adapter_lib):
+    async def test_shutdown_success(self, llm_registry: Any, mock_adapter_lib: Any) -> None:
         """测试成功批量销毁服务实例"""
         service1 = MockServiceInstance(REAL_MODEL_ID)
         service2 = MockServiceInstance(REAL_MODEL_ID_2)
@@ -358,7 +367,7 @@ class TestLLMRegistryShutdown:
         assert len(llm_registry._registry) == 0
         assert mock_adapter_lib.destroy_service_instance.call_count == 2
 
-    async def test_shutdown_with_partial_failure(self, llm_registry, mock_adapter_lib):
+    async def test_shutdown_with_partial_failure(self, llm_registry: Any, mock_adapter_lib: Any) -> None:
         """测试部分服务实例销毁失败"""
         service1 = MockServiceInstance(REAL_MODEL_ID)
         service2 = MockServiceInstance(REAL_MODEL_ID_2)
@@ -371,7 +380,7 @@ class TestLLMRegistryShutdown:
         assert result is True
         assert len(llm_registry._registry) == 0
 
-    async def test_shutdown_empty_registry(self, llm_registry):
+    async def test_shutdown_empty_registry(self, llm_registry: Any) -> None:
         """测试关闭空注册表"""
         result = await llm_registry.shutdown()
 

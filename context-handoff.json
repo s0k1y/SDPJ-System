@@ -1,68 +1,79 @@
 {
   "handoff_version": "1.0",
-  "created_at": "2026-05-26T18:30:00+08:00",
-  "session_id": "multi-encoding-implementation-final",
+  "created_at": "2026-05-27T18:30:00+08:00",
+  "session_id": "dynamic-detection-ui-fix-session",
 
   "wakeup": {
-    "step_1": "pwd",
-    "step_2": "git log --oneline -20",
-    "step_3": "read context-handoff.json (本文件)"
+    "step_1": "cd e:\\Sky毕业设计\\4.系统源代码\\SDPJ-System",
+    "step_2": "conda activate SDPJ-System",
+    "step_3": "git log --oneline -10",
+    "step_4": "read context-handoff.json",
+    "step_5": "python -m pytest tests/unit/ tests/integration/ tests/e2e/ -q"
   },
 
   "project_state": {
-    "phase": "feature_development",
+    "phase": "bugfixing",
     "total_features": 15,
-    "completed": 15,
-    "in_progress": null,
-    "broken": []
+    "completed": 14,
+    "in_progress": "动态检测任务显示与进度展示修复",
+    "broken": ["数据库中历史残留任务49761dce的task_status=running但实际已结束,algorithm_type误标为static"]
   },
 
   "next_task": {
-    "id": "VERIFY-01",
-    "description": "浏览器端到端手动验证：启动WebUI，创建多编码检测任务，验证攻击路径选择器、报告列表攻击路径列、报告详情攻击路径统计是否正常渲染",
-    "priority": "medium",
+    "id": "BUG-001",
+    "description": "重启服务后验证动态检测进度在Dashboard上的完整生命周期展示(静态3/3 -> 动态迭代x/108 -> completed),确认每个子任务都能正确显示动态阶段进度",
+    "priority": "high",
     "blocked_by": []
   },
 
   "environment": {
     "branch": "master",
-    "last_commit": "e3bb7cf",
-    "dev_server": "cd sdpj/ui/webui && npm run dev (前端) + python -m sdpj (后端)",
+    "last_commit": "bf3c9fa",
+    "dev_server": "python -m sdpj (后端uvicorn https://localhost:8000 + 前端dev https://localhost:5173)",
     "python_env": "conda activate SDPJ-System",
-    "test_command": "D:/Anaconda/envs/SDPJ-System/python.exe -m pytest tests/ -x -q"
+    "test_command": "python -m pytest tests/unit/ tests/integration/ tests/e2e/ -q"
   },
 
   "known_issues": [
     {
       "id": "KI-001",
       "severity": "minor",
-      "description": "mypy 有 14 个既有类型错误分布在 6 个文件(cli/__init__.py, scripts/migrate_timestamps_utc.py, scripts/log_manager.py, cli/main.py)，均为本次改动未涉及的既有代码",
-      "workaround": "不影响运行，可后续统一修复",
-      "files": [
-        "sdpj/ui/cli/__init__.py",
-        "sdpj/infrastructure/utils/scripts/migrate_timestamps_utc.py",
-        "sdpj/infrastructure/utils/scripts/log_manager.py",
-        "sdpj/ui/cli/main.py"
-      ]
+      "description": "数据库中历史任务49761dce-5a5e-4602-b6bb-9237a52558fe的task_status仍为running但实际已结束,algorithm_type误标为static(应为dynamic),这是本次修改前创建的残留数据",
+      "workaround": "手动SQL更新: UPDATE DetectionTask SET task_status='completed', algorithm_type='dynamic' WHERE task_id='49761dce-5a5e-4602-b6bb-9237a52558fe'",
+      "files": ["sdpj/infrastructure/database/sdpj.db"]
     },
     {
       "id": "KI-002",
+      "severity": "major",
+      "description": "动态检测进度显示为迭代级别(total=合规样本数*PoC池条目数*max_iterations),因双层早停机制实际迭代次数远低于上限,进度条会长期停留在低位(如15/108)即使检测接近完成",
+      "workaround": "用户需理解这是上限而非实际总量,tooltip中已有说明",
+      "files": ["sdpj/core/sdpj_detector/dynamic_detector.py", "sdpj/ui/webui/frontend/src/components/detection/TaskList.vue"]
+    },
+    {
+      "id": "KI-003",
       "severity": "minor",
-      "description": "前端 Vue 组件(DetectionForm/ReportTable/ReportChart)已修改但未在浏览器中实际验证渲染效果",
-      "workaround": "启动 dev server 后手动验证",
-      "files": [
-        "sdpj/ui/webui/frontend/src/components/detection/DetectionForm.vue",
-        "sdpj/ui/webui/frontend/src/components/report/ReportTable.vue",
-        "sdpj/ui/webui/frontend/src/components/report/ReportChart.vue"
-      ]
+      "description": "git工作区有大量未提交修改(本次session的动态检测UI修复),需在验证通过后提交",
+      "workaround": "验证通过后git add并commit",
+      "files": []
     }
   ],
 
   "recent_decisions": [
-    "使用 DetectionTask.metadata_json 已有 JSON 字段存储 encoding_type 和 attack_path，零数据库 Schema 变更",
-    "state_scheduler 中采用 数据集x编码 双循环拆分任务，每个子任务独立编码类型",
-    "attack_path 数据流：state_scheduler 写入 metadata_json → result_db compute_reports_summary 查询 → report_manager 聚合 → 前端展示",
-    "前端攻击路径选择器使用 el-tree-select 树形多选，顶层为 直接注入/间接注入(多编码)，间接注入下挂 13 种编码子节点",
-    "不兼容中文的编码(rot13/caesar/vigenere/morse)在选择器中标注提示，由 _ENCODING_META.chinese_compatible 控制"
-  ]
+    "消除动态检测的独立tg_任务组:run_dynamic_detection()不再调用create_task_group()创建新的tg_前缀TaskGroup,而是复用静态检测的UUID TaskGroup,动态检测子任务挂在同一TaskGroup下,避免报告页出现两个并列任务",
+    "动态检测子任务algorithm_type标记为dynamic:之前create_detection_task()未传algorithm_type参数导致默认为static,已添加algorithm_type='dynamic'",
+    "进度显示从样本级改为迭代级:total从total_compliant改为total_compliant*len(poc_pool)*max_iterations,processed从dynamic_sample_count改为total_iterations",
+    "进度信息展示在子任务行而非任务组行:动态检测运行时,已完成静态检测的子任务(completed状态)被改回running并显示动态迭代进度,每个子任务经历静态->动态->完成的完整生命周期",
+    "进度数字增加tooltip说明:hover时显示总量上限的因子分解(合规样本数*PoC池条目数*max_iterations)和双层早停机制说明",
+    "DynamicProgressCallback签名扩展:从Callable[[int,int,float],None]改为Callable[[int,int,float,dict|None],None],新增breakdown参数传递因子信息"
+  ],
+
+  "changes_summary": {
+    "modified_files": [
+      "sdpj/core/sdpj_detector/dynamic_detector.py - 消除tg_任务组创建,复用static_tg_id;进度改为迭代级;回调签名增加breakdown参数;algorithm_type标记为dynamic",
+      "sdpj/control/state_scheduler.py - 结果字典统一为task_group_id;动态进度显示在子任务行(completed->running);进度文案更新;_dynamic_progress_cb增加breakdown透传",
+      "sdpj/ui/webui/frontend/src/components/detection/TaskList.vue - 进度数字增加tooltip(含breakdown因子说明);移除dataset_id=dynamic_detecting的取消按钮特殊判断",
+      "tests/unit/core/detector/test_dynamic_detector.py - 断言从dyn_tg_1改为static_tg_1"
+    ],
+    "test_status": "669 passed (552 unit + 47 integration + 70 e2e)"
+  }
 }

@@ -9,9 +9,10 @@ import pytest
 
 from sdpj.core.event_logger import EventLogger
 from sdpj.core.event_logger_interface import LogCategory, LogLevel
+from typing import Any
 
 
-def _query(logger, **kwargs):
+def _query(logger: Any, **kwargs: Any) -> None:
     """同步包装异步 query_logs"""
     result, _ = asyncio.run(logger.query_logs(**kwargs))
     return result
@@ -20,7 +21,7 @@ def _query(logger, **kwargs):
 class TestOperationLogging:
     """测试操作日志记录"""
 
-    def test_log_operation_success(self):
+    def test_log_operation_success(self) -> None:
         """测试成功记录用户操作"""
         logger = EventLogger()
         log_id = logger.log_operation(
@@ -38,7 +39,7 @@ class TestOperationLogging:
         assert logs[0].log_id == log_id
         assert logs[0].category == LogCategory.OPERATION
 
-    def test_log_multiple_operations(self):
+    def test_log_multiple_operations(self) -> None:
         """测试记录多个用户操作"""
         logger = EventLogger()
         log_ids = []
@@ -54,8 +55,8 @@ class TestOperationLogging:
         logs = _query(logger, category=LogCategory.OPERATION)
         assert len(logs) == 3
 
-    def test_log_operation_with_sensitive_info(self):
-        """测试记录包含敏感信息的操作（已脱敏）"""
+    def test_log_operation_with_sensitive_info(self) -> None:
+        """测试记录包含敏感信息的操作(已脱敏)"""
         logger = EventLogger()
         log_id = logger.log_operation(
             user_id="user1",
@@ -64,7 +65,7 @@ class TestOperationLogging:
         )
 
         logs = _query(logger, user_id="user1")
-        # 验证直接记录，不做额外脱敏
+        # 验证直接记录,不做额外脱敏
         assert len(logs) == 1
         assert logs[0].context["password"] == "***"
 
@@ -72,7 +73,7 @@ class TestOperationLogging:
 class TestRuntimeLogging:
     """测试运行日志记录"""
 
-    def test_log_runtime_success(self):
+    def test_log_runtime_success(self) -> None:
         """测试成功记录系统运行事件"""
         logger = EventLogger()
         log_id = logger.log_runtime(
@@ -87,7 +88,7 @@ class TestRuntimeLogging:
         assert len(logs) == 1
         assert logs[0].category == LogCategory.RUNTIME
 
-    def test_log_task_progress(self):
+    def test_log_task_progress(self) -> None:
         """测试记录检测任务进度"""
         logger = EventLogger()
         log_id = logger.log_runtime(
@@ -98,7 +99,7 @@ class TestRuntimeLogging:
         assert len(logs) == 1
         assert "50%" in logs[0].description
 
-    def test_log_llm_call_phase(self):
+    def test_log_llm_call_phase(self) -> None:
         """测试记录大模型调用阶段"""
         logger = EventLogger()
         log_id = logger.log_runtime(
@@ -114,7 +115,7 @@ class TestRuntimeLogging:
 class TestErrorLogging:
     """测试错误日志记录"""
 
-    def test_log_error_success(self):
+    def test_log_error_success(self) -> None:
         """测试成功记录错误日志"""
         logger = EventLogger()
         log_id = logger.log_error(
@@ -127,7 +128,7 @@ class TestErrorLogging:
         assert len(logs) == 1
         assert logs[0].level == LogLevel.ERROR
 
-    def test_log_database_error(self):
+    def test_log_database_error(self) -> None:
         """测试记录数据库访问错误"""
         logger = EventLogger()
         log_id = logger.log_error(
@@ -137,7 +138,7 @@ class TestErrorLogging:
         logs = _query(logger, source_module="UserDB")
         assert len(logs) == 1
 
-    def test_log_permission_error(self):
+    def test_log_permission_error(self) -> None:
         """测试记录权限校验失败"""
         logger = EventLogger()
         log_id = logger.log_error(
@@ -154,7 +155,7 @@ class TestErrorLogging:
 class TestLogQuery:
     """测试日志查询"""
 
-    def test_query_by_category(self):
+    def test_query_by_category(self) -> None:
         """测试按日志类别查询"""
         logger = EventLogger()
         logger.log_operation("user1", "login", {})
@@ -166,7 +167,7 @@ class TestLogQuery:
         assert len(error_logs) == 1
         assert error_logs[0].category == LogCategory.ERROR
 
-    def test_query_by_time_range(self):
+    def test_query_by_time_range(self) -> None:
         """测试按时间范围查询"""
         logger = EventLogger()
         now = datetime.now(timezone.utc)
@@ -178,7 +179,7 @@ class TestLogQuery:
         logs = _query(logger, time_start=past, time_end=future)
         assert len(logs) == 1
 
-    def test_query_by_source_module(self):
+    def test_query_by_source_module(self) -> None:
         """测试按来源模块查询"""
         logger = EventLogger()
         logger.log_runtime("SDPJDetector", "event1", "描述1")
@@ -188,7 +189,7 @@ class TestLogQuery:
         assert len(logs) == 1
         assert logs[0].source_module == "SDPJDetector"
 
-    def test_query_by_user_id(self):
+    def test_query_by_user_id(self) -> None:
         """测试按用户ID查询"""
         logger = EventLogger()
         logger.log_operation("user1", "login", {})
@@ -198,7 +199,7 @@ class TestLogQuery:
         assert len(logs) == 1
         assert logs[0].user_id == "user1"
 
-    def test_query_multiple_conditions(self):
+    def test_query_multiple_conditions(self) -> None:
         """测试多条件组合查询"""
         logger = EventLogger()
         now = datetime.now(timezone.utc)
@@ -212,7 +213,7 @@ class TestLogQuery:
         assert len(logs) == 1
         assert logs[0].user_id == "user1"
 
-    def test_query_no_results(self):
+    def test_query_no_results(self) -> None:
         """测试查询无结果"""
         logger = EventLogger()
         logger.log_operation("user1", "login", {})
@@ -224,23 +225,23 @@ class TestLogQuery:
 class TestLogLevelManagement:
     """测试日志级别管理"""
 
-    def test_set_log_level_error(self):
+    def test_set_log_level_error(self) -> None:
         """测试设置日志级别为 ERROR"""
         logger = EventLogger()
         result = logger.set_log_level(LogLevel.ERROR)
         assert result is True
 
-        # 记录 INFO 级别日志（应被过滤）
+        # 记录 INFO 级别日志(应被过滤)
         logger.log_operation("user1", "login", {})
         logs = _query(logger)
         assert len(logs) == 0
 
-        # 记录 ERROR 级别日志（应被记录）
+        # 记录 ERROR 级别日志(应被记录)
         logger.log_error("module", "error", "错误")
         logs = _query(logger)
         assert len(logs) == 1
 
-    def test_set_log_level_debug(self):
+    def test_set_log_level_debug(self) -> None:
         """测试设置日志级别为 DEBUG"""
         logger = EventLogger()
         logger.set_log_level(LogLevel.DEBUG)
@@ -253,7 +254,7 @@ class TestLogLevelManagement:
         logs = _query(logger)
         assert len(logs) == 3
 
-    def test_log_level_filtering(self):
+    def test_log_level_filtering(self) -> None:
         """测试日志级别过滤"""
         logger = EventLogger()
         logger.set_log_level(LogLevel.WARN)
@@ -267,19 +268,19 @@ class TestLogLevelManagement:
 class TestOutputTargetManagement:
     """测试输出目标管理"""
 
-    def test_set_output_target_console(self):
+    def test_set_output_target_console(self) -> None:
         """测试设置输出到控制台"""
         logger = EventLogger()
         result = logger.set_output_target("console")
         assert result is True
 
-    def test_set_output_target_memory(self):
+    def test_set_output_target_memory(self) -> None:
         """测试设置输出到内存缓冲"""
         logger = EventLogger()
         result = logger.set_output_target("memory")
         assert result is True
 
-    def test_set_multiple_output_targets(self):
+    def test_set_multiple_output_targets(self) -> None:
         """测试设置多个输出目标"""
         logger = EventLogger()
         logger.set_output_target("console")
@@ -290,7 +291,7 @@ class TestOutputTargetManagement:
         logs = _query(logger)
         assert len(logs) == 1
 
-    def test_set_duplicate_output_target(self):
+    def test_set_duplicate_output_target(self) -> None:
         """测试添加重复的输出目标"""
         logger = EventLogger()
         logger.set_output_target("console")
@@ -302,14 +303,14 @@ class TestOutputTargetManagement:
 
 
 class TestTimestampSorting:
-    """测试时间戳排序BUG修复：旧日志本地时间 vs 新日志UTC时间"""
+    """测试时间戳排序BUG修复:旧日志本地时间 vs 新日志UTC时间"""
 
-    def test_sort_utc_aware_before_local_naive(self):
-        """UTC-aware日志应排在naive(本地时间)日志之前(降序，最新在前)
+    def test_sort_utc_aware_before_local_naive(self) -> None:
+        """UTC-aware日志应排在naive(本地时间)日志之前(降序,最新在前)
 
-        模拟BUG场景：旧日志用本地时间23:40(CST/UTC+8)，新日志用UTC时间21:06。
-        实际UTC时间：旧日志=15:40 UTC，新日志=21:06 UTC。
-        正确排序：新日志(21:06)应在旧日志(15:40)前面。
+        模拟BUG场景:旧日志用本地时间23:40(CST/UTC+8),新日志用UTC时间21:06.
+        实际UTC时间:旧日志=15:40 UTC,新日志=21:06 UTC.
+        正确排序:新日志(21:06)应在旧日志(15:40)前面.
         """
         logger = EventLogger()
 
@@ -325,8 +326,8 @@ class TestTimestampSorting:
         assert logs[0].source_module == "NewModule"
         assert logs[1].source_module == "OldModule"
 
-    def test_sort_mixed_timestamps_across_midnight(self):
-        """跨午夜场景：本地时间01:00(CST) = UTC 17:00(前一天)"""
+    def test_sort_mixed_timestamps_across_midnight(self) -> None:
+        """跨午夜场景:本地时间01:00(CST) = UTC 17:00(前一天)"""
         logger = EventLogger()
 
         local_naive_ts = datetime(2026, 5, 6, 1, 0, 0)
@@ -341,7 +342,7 @@ class TestTimestampSorting:
         assert logs[0].source_module == "UtcMod"
         assert logs[1].source_module == "LocalMod"
 
-    def test_sort_all_utc_aware(self):
+    def test_sort_all_utc_aware(self) -> None:
         """全部UTC-aware时间戳排序应正确"""
         logger = EventLogger()
 
@@ -359,7 +360,7 @@ class TestTimestampSorting:
         assert logs[1].source_module == "Mod2"
         assert logs[2].source_module == "Mod1"
 
-    def test_sort_all_naive(self):
+    def test_sort_all_naive(self) -> None:
         """全部naive时间戳排序应正确(视为UTC)"""
         logger = EventLogger()
 
@@ -377,8 +378,8 @@ class TestTimestampSorting:
         assert logs[1].source_module == "Mod2"
         assert logs[2].source_module == "Mod1"
 
-    def test_save_to_db_preserves_utc_aware(self):
-        """_save_to_db应保留UTC-aware时间戳（不剥离时区信息）"""
+    def test_save_to_db_preserves_utc_aware(self) -> None:
+        """_save_to_db应保留UTC-aware时间戳(不剥离时区信息)"""
         from unittest.mock import AsyncMock, MagicMock
         from sdpj.core.event_logger_interface import LogEntry
 
@@ -411,7 +412,7 @@ class TestTimestampSorting:
         assert saved_ts.hour == 21
         assert saved_ts.minute == 6
 
-    def test_save_to_db_annotates_naive_as_utc(self):
+    def test_save_to_db_annotates_naive_as_utc(self) -> None:
         """_save_to_db应将naive时间戳标注为UTC时区"""
         from unittest.mock import AsyncMock
         from sdpj.core.event_logger_interface import LogEntry
@@ -445,7 +446,7 @@ class TestTimestampSorting:
 class TestTimestampMigration:
     """测试时间戳迁移逻辑"""
 
-    def test_normalize_aware_timestamp(self):
+    def test_normalize_aware_timestamp(self) -> None:
         """有时区信息的时间戳应转为UTC-naive"""
         from sdpj.infrastructure.database.result_db.session import SessionManager
         from datetime import timedelta
@@ -459,7 +460,7 @@ class TestTimestampMigration:
         assert "+00:00" not in result
         assert result.startswith("2026-05-05 21:06")
 
-    def test_normalize_naive_local_timestamp(self):
+    def test_normalize_naive_local_timestamp(self) -> None:
         """无时区信息的本地时间戳应减去偏移量转为UTC"""
         from sdpj.infrastructure.database.result_db.session import SessionManager
         from datetime import timedelta
@@ -472,7 +473,7 @@ class TestTimestampMigration:
         assert result is not None
         assert result.startswith("2026-05-05 15:40")
 
-    def test_normalize_z_suffix_timestamp(self):
+    def test_normalize_z_suffix_timestamp(self) -> None:
         """Z后缀的时间戳应正确处理"""
         from sdpj.infrastructure.database.result_db.session import SessionManager
         from datetime import timedelta
@@ -485,7 +486,7 @@ class TestTimestampMigration:
         assert result is not None
         assert result.startswith("2026-05-05 21:06")
 
-    def test_normalize_datetime_object_aware(self):
+    def test_normalize_datetime_object_aware(self) -> None:
         """datetime对象(aware)应正确归一化"""
         from sdpj.infrastructure.database.result_db.session import SessionManager
         from datetime import timedelta
@@ -498,7 +499,7 @@ class TestTimestampMigration:
         assert result is not None
         assert result.startswith("2026-05-05 21:06")
 
-    def test_normalize_datetime_object_naive(self):
+    def test_normalize_datetime_object_naive(self) -> None:
         """datetime对象(naive)应减去偏移量"""
         from sdpj.infrastructure.database.result_db.session import SessionManager
         from datetime import timedelta
@@ -511,7 +512,7 @@ class TestTimestampMigration:
         assert result is not None
         assert result.startswith("2026-05-05 15:40")
 
-    def test_normalize_invalid_timestamp_returns_none(self):
+    def test_normalize_invalid_timestamp_returns_none(self) -> None:
         """无效时间戳应返回None"""
         from sdpj.infrastructure.database.result_db.session import SessionManager
         from datetime import timedelta

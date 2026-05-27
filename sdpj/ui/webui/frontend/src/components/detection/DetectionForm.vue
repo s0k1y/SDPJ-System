@@ -38,13 +38,13 @@
               </template>
             </el-form-item>
 
-            <el-form-item label="检测类型" prop="detection_type">
-              <el-select v-model="form.detection_type" placeholder="请选择检测类型" style="width: 100%">
+            <el-form-item label="检测算法" prop="detection_type">
+              <el-select v-model="form.detection_type" placeholder="请选择检测算法" style="width: 100%">
                 <el-option label="静态检测" value="static" />
                 <el-option label="动态检测" value="dynamic" />
               </el-select>
               <template #label>
-                <span>检测类型</span>
+                <span>检测算法</span>
                 <el-tooltip
                   content="静态检测：遍历检测样本库生成静态检测报告（Algorithm 1）；动态检测：在静态检测基础上进行迭代变异攻击（Algorithm 2，包含静态步骤）"
                   placement="top"
@@ -137,6 +137,31 @@
           </div>
 
           <div v-show="currentStep === 2">
+            <el-form-item label="攻击路径" prop="attack_paths">
+              <el-tree-select
+                v-model="form.attack_paths"
+                :data="attackPathTree"
+                multiple
+                show-checkbox
+                placeholder="请选择攻击路径"
+                style="width: 100%"
+                node-key="id"
+                :props="{ label: 'label', children: 'children' }"
+              />
+              <template #label>
+                <span>攻击路径</span>
+                <el-tooltip
+                  content="选择检测攻击路径：直接注入为原始PoC直接发送；间接注入通过编码变换PoC后再发送，可多选"
+                  placement="top"
+                >
+                  <span class="tooltip-icon">?</span>
+                </el-tooltip>
+              </template>
+            </el-form-item>
+
+          </div>
+
+          <div v-show="currentStep === 3">
             <div class="summary-box">
               <div class="summary-row">
                 <span class="summary-label">模型适配器</span>
@@ -149,6 +174,16 @@
               <div class="summary-row">
                 <span class="summary-label">检测数据集</span>
                 <span class="summary-value">{{ datasetSummary }}</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">攻击路径</span>
+                <span class="summary-value">{{ attackPathSummary }}</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">子任务数</span>
+                <span class="summary-value">{{ subtaskCount }}
+                  <span v-if="subtaskCount > 20" class="subtask-warn">（子任务数较多，检测耗时可能较长）</span>
+                </span>
               </div>
               <div v-if="form.force_refresh" class="summary-row">
                 <span class="summary-label">用于PoC池构建的越狱数据集</span>
@@ -180,14 +215,14 @@
         >上一步</el-button>
 
         <el-button
-          v-if="currentStep < 2"
+          v-if="currentStep < 3"
           class="btn-next"
           @click="nextStep"
           :disabled="modelsLoading && modelAdapters.length === 0"
         >下一步</el-button>
 
         <el-button
-          v-if="currentStep === 2"
+          v-if="currentStep === 3"
           class="btn-submit"
           @click="handleSubmit"
           :loading="submitting"
@@ -203,7 +238,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { startDetection, getDatasets, detectionConfig } from '../../api/detection'
+import { startDetection, getDatasets, detectionConfig, getEncodingTypes } from '../../api/detection'
 import { useDetectionStore } from '../../store'
 
 const detectionStore = useDetectionStore()
@@ -221,20 +256,45 @@ const modelAdapters = ref([])
 const jailbreakDatasets = ref([])
 const jailbreakDatasetTree = ref([])
 
+const encodingTypes = ref([])
+const attackPathTree = ref([])
+
 const form = ref({
   model_id: '',
   detection_type: 'static',
   dataset_ids: [],
   jailbreak_dataset_ids: [],
   max_iterations: 3,
-  force_refresh: false
+  force_refresh: false,
+  attack_paths: []
 })
 
 const rules = {
   model_id: [{ required: true, message: '请选择模型适配器', trigger: 'change' }],
-  detection_type: [{ required: true, message: '请选择检测类型', trigger: 'change' }],
-  dataset_ids: [{ required: true, type: 'array', min: 1, message: '请选择至少一个数据集', trigger: 'change' }]
+  detection_type: [{ required: true, message: '请选择检测算法', trigger: 'change' }],
+  dataset_ids: [{ required: true, type: 'array', min: 1, message: '请选择至少一个数据集', trigger: 'change' }],
+  attack_paths: [{ required: true, type: 'array', min: 1, message: '请至少选择一种攻击路径', trigger: 'change' }]
 }
+
+const effectiveAttackPaths = computed(() => {
+  return form.value.attack_paths.filter(id => id === 'direct' || _ENCODING_LEAF_IDS.value.has(id))
+})
+
+const attackPathSummary = computed(() => {
+  const paths = effectiveAttackPaths.value
+  if (!paths.length) return '-'
+  const parts = []
+  if (paths.includes('direct')) parts.push('直接注入')
+  const indirect = paths.filter(p => p !== 'direct')
+  if (indirect.length) parts.push(`间接注入(${indirect.join(', ')})`)
+  return parts.join(' + ')
+})
+
+const subtaskCount = computed(() => {
+  const dsCount = form.value.dataset_ids.length || 0
+  const pathCount = effectiveAttackPaths.value.length || 0
+  return dsCount * pathCount
+})
 
 const modelLabel = computed(() => {
   const selected = modelAdapters.value.find(m => m.config_id === form.value.model_id)
@@ -313,6 +373,8 @@ const validateStep = async (step) => {
     await formRef.value.validateField('detection_type')
   } else if (step === 1) {
     await formRef.value.validateField('dataset_ids')
+  } else if (step === 2) {
+    await formRef.value.validateField('attack_paths')
   }
 }
 
@@ -370,18 +432,15 @@ const fetchDatasets = async () => {
     const allDatasets = res.data || []
 
     const jailbreak = []
-    const nonJailbreak = []
     for (const ds of allDatasets) {
       if (ds.risk_type === 'jailbreak') {
         jailbreak.push(ds)
-      } else {
-        nonJailbreak.push(ds)
       }
     }
 
-    datasets.value = nonJailbreak
+    datasets.value = allDatasets
     jailbreakDatasets.value = jailbreak
-    datasetTree.value = buildDatasetTree(nonJailbreak)
+    datasetTree.value = buildDatasetTree(allDatasets)
     jailbreakDatasetTree.value = buildDatasetTree(jailbreak)
     const defaultStems = ['jailbreak_llm', 'augmented_jailbreak', 'jailbreakv_28k']
     form.value.jailbreak_dataset_ids = jailbreak
@@ -411,12 +470,54 @@ const fetchModelAdapters = async () => {
   }
 }
 
+const _ENCODING_LEAF_IDS = computed(() => new Set(encodingTypes.value.map(t => t.name)))
+
+const buildAttackPathTree = (types) => {
+  return [
+    { id: 'direct', label: '直接注入' },
+    {
+      id: 'indirect_injection',
+      label: '间接注入',
+      children: [
+        {
+          id: 'multimodal',
+          label: '多模态注入',
+        },
+        {
+          id: 'multi_encoding',
+          label: '多编码注入',
+          children: types.map(t => ({
+            id: t.name,
+            label: `${t.label}${t.chinese_compatible ? '' : ' (仅对英文PoC有效)'}`,
+          }))
+        }
+      ]
+    }
+  ]
+}
+
+const fetchEncodingTypes = async () => {
+  try {
+    const res = await getEncodingTypes()
+    if (res.success) {
+      encodingTypes.value = res.data || []
+      attackPathTree.value = buildAttackPathTree(encodingTypes.value)
+    }
+  } catch {
+    encodingTypes.value = []
+    attackPathTree.value = [{ id: 'direct', label: '直接注入' }]
+  }
+}
+
 const handleSubmit = async () => {
   await formRef.value.validate()
   submitting.value = true
   try {
     const selectedModel = modelAdapters.value.find(m => m.config_id === form.value.model_id)
     const realModelId = selectedModel?.content?.model_id || selectedModel?.content?.model || form.value.model_id
+    const paths = effectiveAttackPaths.value
+    const hasDirect = paths.includes('direct')
+    const encodingTypes = paths.filter(p => p !== 'direct')
     const payload = {
       model_id: realModelId,
       config_id: form.value.model_id,
@@ -424,7 +525,9 @@ const handleSubmit = async () => {
       dataset_ids: form.value.dataset_ids,
       jailbreak_dataset_ids: form.value.force_refresh ? form.value.jailbreak_dataset_ids : [],
       max_iterations: form.value.max_iterations,
-      force_refresh: form.value.force_refresh
+      force_refresh: form.value.force_refresh,
+      has_direct: hasDirect,
+      encoding_types: encodingTypes.length > 0 ? encodingTypes : null
     }
     const res = await startDetection(payload)
     if (res.success) {
@@ -451,6 +554,7 @@ const handleReset = () => {
 onMounted(() => {
   fetchDatasets()
   fetchModelAdapters()
+  fetchEncodingTypes()
 })
 
 defineExpose({ currentStep })
@@ -605,5 +709,11 @@ defineExpose({ currentStep })
 
 .btn-reset:hover {
   background: #f5f5f5;
+}
+
+.subtask-warn {
+  font-size: 12px;
+  color: #f59e0b;
+  font-weight: 400;
 }
 </style>

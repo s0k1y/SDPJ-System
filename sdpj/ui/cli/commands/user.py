@@ -1,4 +1,4 @@
-"""用户账号与权限交互命令 (职责 11-13)"""
+"""用户账号与权限交互命令 (职责 11-13)."""
 
 import asyncio
 
@@ -12,8 +12,8 @@ from sdpj.ui.cli.utils.result import unwrap
 
 
 @click.group("User", cls=OrderedGroup, no_args_is_help=True)
-def user_group():
-    """用户账号与权限管理"""
+def user_group() -> None:
+    """用户账号与权限管理."""
 
 
 # ── 账号生命周期 (注册→登录→登出→切换) ──
@@ -23,11 +23,11 @@ def user_group():
 @click.option("--username", prompt="用户名", help="用户名")
 @click.option("--password", prompt="密码", hide_input=True, help="密码")
 @click.pass_context
-def register(ctx, username, password):
-    """注册新用户"""
+def register(ctx, username, password) -> None:  # noqa: ANN001
+    """注册新用户."""
     params = AuthParams(username=username, password=password)
     result = asyncio.run(
-        ctx.obj.scheduler.schedule_user_auth(params.username, params.password, "register")
+        ctx.obj.scheduler.schedule_user_auth(params.username, params.password, "register"),
     )
     data = unwrap(result)
     output.success(data.get("message", "注册成功"))
@@ -37,11 +37,11 @@ def register(ctx, username, password):
 @click.option("--username", prompt="用户名", help="用户名")
 @click.option("--password", prompt="密码", hide_input=True, help="密码")
 @click.pass_context
-def login(ctx, username, password):
-    """用户登录"""
+def login(ctx, username, password) -> None:  # noqa: ANN001
+    """用户登录."""
     params = AuthParams(username=username, password=password)
     result = asyncio.run(
-        ctx.obj.scheduler.schedule_user_auth(params.username, params.password, "login")
+        ctx.obj.scheduler.schedule_user_auth(params.username, params.password, "login"),
     )
     data = unwrap(result, required="user_id")
     ctx.obj.current_user_id = data["user_id"]
@@ -51,8 +51,8 @@ def login(ctx, username, password):
 
 @user_group.command("logout")
 @click.pass_context
-def logout(ctx):
-    """用户登出"""
+def logout(ctx) -> None:  # noqa: ANN001
+    """用户登出."""
     user_id = ctx.obj.current_user_id
     params = {"user_id": user_id} if user_id else {}
     asyncio.run(ctx.obj.scheduler.schedule_account_operation("logout", params))
@@ -65,12 +65,12 @@ def logout(ctx):
 @click.option("--username", prompt="用户名", help="目标用户名")
 @click.option("--password", prompt="密码", hide_input=True, help="密码")
 @click.pass_context
-def switch(ctx, username, password):
-    """切换账号"""
+def switch(ctx, username, password) -> None:  # noqa: ANN001
+    """切换账号."""
     result = asyncio.run(
         ctx.obj.scheduler.schedule_account_operation(
-            "switch_account", {"username": username, "password": password}
-        )
+            "switch_account", {"username": username, "password": password},
+        ),
     )
     data = unwrap(result, required="user_id")
     ctx.obj.current_user_id = data["user_id"]
@@ -83,11 +83,11 @@ def switch(ctx, username, password):
 
 @user_group.command("profile")
 @click.pass_context
-def profile(ctx):
-    """查询当前用户资料"""
+def profile(ctx) -> None:  # noqa: ANN001
+    """查询当前用户资料."""
     user_id = ctx.obj.require_login()
     result = asyncio.run(
-        ctx.obj.scheduler.schedule_account_operation("get_profile", {"user_id": user_id})
+        ctx.obj.scheduler.schedule_account_operation("get_profile", {"user_id": user_id}),
     )
     data = unwrap(result, required="profile")
     output.kv(data["profile"])
@@ -97,14 +97,14 @@ def profile(ctx):
 @click.option("--old", "old_password", prompt="旧密码", hide_input=True)
 @click.option("--new", "new_password", prompt="新密码", hide_input=True)
 @click.pass_context
-def change_password(ctx, old_password, new_password):
-    """修改当前用户密码"""
+def change_password(ctx, old_password, new_password) -> None:  # noqa: ANN001
+    """修改当前用户密码."""
     user_id = ctx.obj.require_login()
     result = asyncio.run(
         ctx.obj.scheduler.schedule_account_operation(
             "change_password",
             {"user_id": user_id, "old_password": old_password, "new_password": new_password},
-        )
+        ),
     )
     unwrap(result)
     output.success("密码已修改")
@@ -116,11 +116,11 @@ def change_password(ctx, old_password, new_password):
 @user_group.command("unregister")
 @click.confirmation_option(prompt="确认注销当前账号?")
 @click.pass_context
-def unregister(ctx):
-    """注销当前账号"""
+def unregister(ctx) -> None:  # noqa: ANN001
+    """注销当前账号."""
     user_id = ctx.obj.require_login()
     result = asyncio.run(
-        ctx.obj.scheduler.schedule_account_operation("unregister", {"user_id": user_id})
+        ctx.obj.scheduler.schedule_account_operation("unregister", {"user_id": user_id}),
     )
     unwrap(result)
     ctx.obj.current_user_id = None
@@ -130,11 +130,11 @@ def unregister(ctx):
 
 @user_group.command("resources")
 @click.pass_context
-def resources(ctx):
-    """列出当前用户拥有的受控资源"""
+def resources(ctx) -> None:  # noqa: ANN001
+    """列出当前用户拥有的受控资源."""
     user_id = ctx.obj.require_login()
     result = asyncio.run(
-        ctx.obj.scheduler.schedule_account_operation("list_resources", {"user_id": user_id})
+        ctx.obj.scheduler.schedule_account_operation("list_resources", {"user_id": user_id}),
     )
     res_list = result.get("resources", [])
     shared_list = result.get("shared_resources", [])
@@ -169,16 +169,16 @@ def resources(ctx):
 
 
 @user_group.group("auth", cls=OrderedGroup, no_args_is_help=True)
-def auth_group():
-    """访问授权管理"""
+def auth_group() -> None:
+    """访问授权管理."""
 
 
 @auth_group.command("grant")
 @click.option("--resource-id", required=True, type=int, help="资源ID")
 @click.option("--target-username", required=True, help="被授权用户名")
 @click.pass_context
-def grant(ctx, resource_id, target_username):
-    """授予其他用户对私有资源的读权限"""
+def grant(ctx, resource_id, target_username) -> None:  # noqa: ANN001
+    """授予其他用户对私有资源的读权限."""
     caller = ctx.obj.require_login()
     result = asyncio.run(
         ctx.obj.scheduler.schedule_dac_operation(
@@ -188,7 +188,7 @@ def grant(ctx, resource_id, target_username):
                 "target_username": target_username,
                 "caller_user_id": caller,
             },
-        )
+        ),
     )
     data = unwrap(result)
     output.success(data.get("message", "已授权"))
@@ -197,8 +197,8 @@ def grant(ctx, resource_id, target_username):
 @auth_group.command("revoke")
 @click.option("--acl-id", required=True, type=int, help="访问控制项ID")
 @click.pass_context
-def revoke(ctx, acl_id):
-    """移除已授予的读权限"""
+def revoke(ctx, acl_id) -> None:  # noqa: ANN001
+    """移除已授予的读权限."""
     caller = ctx.obj.require_login()
     result = asyncio.run(
         ctx.obj.scheduler.schedule_dac_operation(
@@ -207,7 +207,7 @@ def revoke(ctx, acl_id):
                 "acl_id": acl_id,
                 "caller_user_id": caller,
             },
-        )
+        ),
     )
     data = unwrap(result)
     output.success(data.get("message", "已移除"))
@@ -216,8 +216,8 @@ def revoke(ctx, acl_id):
 @auth_group.command("show")
 @click.option("--resource-id", required=True, type=int, help="资源ID")
 @click.pass_context
-def show_acl(ctx, resource_id):
-    """查询指定资源的授权清单"""
+def show_acl(ctx, resource_id) -> None:  # noqa: ANN001
+    """查询指定资源的授权清单."""
     caller = ctx.obj.require_login()
     result = asyncio.run(
         ctx.obj.scheduler.schedule_dac_operation(
@@ -226,7 +226,7 @@ def show_acl(ctx, resource_id):
                 "resource_id": resource_id,
                 "caller_user_id": caller,
             },
-        )
+        ),
     )
     data = unwrap(result)
     acl_list = data.get("acl_list", [])
@@ -243,8 +243,8 @@ def show_acl(ctx, resource_id):
 @auth_group.command("check")
 @click.option("--resource-id", required=True, type=int, help="资源ID")
 @click.pass_context
-def check_access(ctx, resource_id):
-    """检查当前用户对指定资源的访问权限"""
+def check_access(ctx, resource_id) -> None:  # noqa: ANN001
+    """检查当前用户对指定资源的访问权限."""
     user_id = ctx.obj.require_login()
     has_access = asyncio.run(ctx.obj.scheduler.check_resource_access(resource_id, user_id))
     if has_access:
@@ -258,8 +258,8 @@ def check_access(ctx, resource_id):
 
 @user_group.command("list")
 @click.pass_context
-def list_users(ctx):
-    """列出所有用户"""
+def list_users(ctx) -> None:  # noqa: ANN001
+    """列出所有用户."""
     users = asyncio.run(ctx.obj.scheduler.list_all_users())
     if not users:
         output.info("暂无用户")
@@ -274,10 +274,10 @@ def list_users(ctx):
 @click.option("--user-id", required=True, type=int, help="目标用户ID")
 @click.confirmation_option(prompt="确认删除该用户?")
 @click.pass_context
-def delete_user(ctx, user_id):
-    """管理员删除用户"""
+def delete_user(ctx, user_id) -> None:  # noqa: ANN001
+    """管理员删除用户."""
     result = asyncio.run(
-        ctx.obj.scheduler.schedule_account_operation("admin_delete_user", {"user_id": user_id})
+        ctx.obj.scheduler.schedule_account_operation("admin_delete_user", {"user_id": user_id}),
     )
     data = unwrap(result)
     output.success(data.get("message", "用户已删除"))

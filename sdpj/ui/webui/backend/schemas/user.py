@@ -1,26 +1,25 @@
-"""用户相关 Pydantic 模型"""
+"""用户相关 Pydantic 模型."""
 
-from typing import Optional
 
 from pydantic import BaseModel
 
 
-class AuthRequest(BaseModel):
+class AuthRequest(BaseModel):  # noqa: D101
     username: str
     password: str
 
 
-class AuthResponse(BaseModel):
+class AuthResponse(BaseModel):  # noqa: D101
     success: bool
     message: str = ""
-    user_id: Optional[int] = None
+    user_id: int | None = None
 
 
-class AccountOperationRequest(BaseModel):
+class AccountOperationRequest(BaseModel):  # noqa: D101
     operation: str
     params: dict = {}
 
 
-class DACOperationRequest(BaseModel):
+class DACOperationRequest(BaseModel):  # noqa: D101
     operation: str
     params: dict

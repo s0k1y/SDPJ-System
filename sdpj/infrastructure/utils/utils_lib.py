@@ -1,10 +1,10 @@
-"""UtilsLib 主模块"""
+"""UtilsLib 主模块."""
 
 from . import crypto, encoding, file, serialization
 
 
 class UtilsLib:
-    """杂项组件库"""
+    """杂项组件库."""
 
     # 加密
     symmetric_encrypt = staticmethod(crypto.symmetric_encrypt)

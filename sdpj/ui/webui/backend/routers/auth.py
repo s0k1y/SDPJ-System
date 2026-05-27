@@ -1,4 +1,6 @@
-"""认证路由 (职责 11)"""
+"""认证路由 (职责 11)."""
+
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
@@ -13,12 +15,12 @@ _rsa_private_key = None
 _rsa_public_key = None
 
 
-def _get_or_create_rsa_keys():
-    global _rsa_private_key, _rsa_public_key
+def _get_or_create_rsa_keys():  # noqa: ANN202
+    global _rsa_private_key, _rsa_public_key  # noqa: PLW0603
     if _rsa_public_key is None:
-        from cryptography.hazmat.primitives.asymmetric import rsa
-        from cryptography.hazmat.primitives import serialization
-        from cryptography.hazmat.backends import default_backend
+        from cryptography.hazmat.backends import default_backend  # noqa: PLC0415
+        from cryptography.hazmat.primitives import serialization  # noqa: PLC0415
+        from cryptography.hazmat.primitives.asymmetric import rsa  # noqa: PLC0415
 
         key = rsa.generate_private_key(
             public_exponent=65537,
@@ -38,28 +40,28 @@ def _get_or_create_rsa_keys():
 
 
 @router.get("/public-key")
-async def public_key():
+async def public_key():  # noqa: ANN201, D103
     return success_response(data={"public_key": _get_or_create_rsa_keys()})
 
 
 @router.post("/register")
-async def register(
+async def register(  # noqa: ANN201, D103
     req: AuthRequest,
-    scheduler: StateSchedulerInterface = Depends(get_scheduler),
+    scheduler: Annotated[StateSchedulerInterface, Depends(get_scheduler)],
 ):
     result = await scheduler.schedule_user_auth(req.username, req.password, "register")
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result.get("message", "注册失败"))
     return success_response(
-        data={"user_id": result.get("user_id")}, message=result.get("message", "")
+        data={"user_id": result.get("user_id")}, message=result.get("message", ""),
     )
 
 
 @router.post("/login")
-async def login(
+async def login(  # noqa: ANN201, D103
     req: AuthRequest,
     request: Request,
-    scheduler: StateSchedulerInterface = Depends(get_scheduler),
+    scheduler: Annotated[StateSchedulerInterface, Depends(get_scheduler)],
 ):
     result = await scheduler.schedule_user_auth(req.username, req.password, "login")
     if not result["success"]:
@@ -70,11 +72,11 @@ async def login(
 
 
 @router.get("/me")
-async def me(
+async def me(  # noqa: ANN201
     request: Request,
-    scheduler: StateSchedulerInterface = Depends(get_scheduler),
+    scheduler: Annotated[StateSchedulerInterface, Depends(get_scheduler)],
 ):
-    """返回当前会话用户信息，供前端校验会话有效性"""
+    """返回当前会话用户信息,供前端校验会话有效性."""
     user_id = request.state.user_id
     result = await scheduler.schedule_account_operation("get_profile", {"user_id": user_id})
     profile = result.get("profile")
@@ -84,6 +86,6 @@ async def me(
 
 
 @router.post("/logout")
-async def logout(request: Request):
+async def logout(request: Request):  # noqa: ANN201, D103
     request.session.clear()
     return success_response()

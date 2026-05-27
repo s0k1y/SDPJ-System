@@ -1,32 +1,40 @@
+"""test_adapter_engine 模块单元测试."""
+
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from sdpj.infrastructure.llm_adapters.adapter_engine import OpenAICompatibleAdapter
 from sdpj.infrastructure.llm_adapters.errors import StandardizedLLMError, ErrorCategory
+from typing import Any
 
 
-def make_adapter():
+def make_adapter() -> None:
+    """测试 make adapter."""
     return OpenAICompatibleAdapter("gpt-4", "https://api.openai.com", "sk-test")
 
 
-def test_get_metadata():
+def test_get_metadata() -> None:
+    """测试 test get metadata."""
     a = make_adapter()
     m = a.get_metadata()
     assert m["model_id"] == "gpt-4"
     assert m["base_url"] == "https://api.openai.com"
 
 
-def test_url_construction_openai():
+def test_url_construction_openai() -> None:
+    """测试 test url construction openai."""
     a = OpenAICompatibleAdapter("gpt-4", "https://api.openai.com/v1", "sk-test")
     assert a._base_url == "https://api.openai.com/v1"
 
 
-def test_url_construction_zhipu():
+def test_url_construction_zhipu() -> None:
+    """测试 test url construction zhipu."""
     a = OpenAICompatibleAdapter("glm-4-flash", "https://open.bigmodel.cn/api/paas/v4", "test-key")
     assert a._base_url == "https://open.bigmodel.cn/api/paas/v4"
 
 
 @pytest.mark.asyncio
-async def test_call_success():
+async def test_call_success() -> None:
+    """测试 test call success."""
     a = make_adapter()
     mock_resp = MagicMock()
     mock_resp.status = 200
@@ -51,7 +59,8 @@ async def test_call_success():
 
 
 @pytest.mark.asyncio
-async def test_call_401_raises_auth_error():
+async def test_call_401_raises_auth_error() -> None:
+    """测试 test call 401 raises auth error."""
     a = make_adapter()
     mock_resp = MagicMock()
     mock_resp.status = 401
@@ -71,7 +80,8 @@ async def test_call_401_raises_auth_error():
 
 
 @pytest.mark.asyncio
-async def test_call_429_raises_rate_limit():
+async def test_call_429_raises_rate_limit() -> None:
+    """测试 test call 429 raises rate limit."""
     a = make_adapter()
     mock_resp = MagicMock()
     mock_resp.status = 429

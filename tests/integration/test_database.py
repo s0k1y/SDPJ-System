@@ -15,7 +15,7 @@ from sdpj.infrastructure.database.user_db.repositories.private_config_repo impor
 
 
 @pytest_asyncio.fixture
-async def session():
+async def session():  # noqa: ANN201, D103
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
         poolclass=StaticPool,
@@ -23,7 +23,7 @@ async def session():
     )
 
     @event.listens_for(engine.sync_engine, "connect")
-    def _fk(conn, _):
+    def _fk(conn, _) -> None:  # noqa: ANN001
         conn.execute("PRAGMA foreign_keys=ON")
 
     async with engine.begin() as conn:
@@ -37,22 +37,22 @@ async def session():
 
 
 @pytest.mark.asyncio
-class TestUserRepository:
-    async def test_create_and_get(self, session):
+class TestUserRepository:  # noqa: D101
+    async def test_create_and_get(self, session) -> None:  # noqa: ANN001, D102
         repo = UserRepository(session)
         user = await repo.create("alice", "hashed_pw")
         await session.commit()
         found = await repo.get_by_username("alice")
         assert found is not None and found.user_id == user.user_id
 
-    async def test_duplicate_raises(self, session):
+    async def test_duplicate_raises(self, session) -> None:  # noqa: ANN001, D102
         repo = UserRepository(session)
         await repo.create("bob", "pw")
         await session.commit()
         with pytest.raises(ValueError, match="已存在"):
             await repo.create("bob", "pw2")
 
-    async def test_delete(self, session):
+    async def test_delete(self, session) -> None:  # noqa: ANN001, D102
         repo = UserRepository(session)
         user = await repo.create("carol", "pw")
         await session.commit()
@@ -61,7 +61,7 @@ class TestUserRepository:
         assert deleted is True
         assert await repo.get_by_id(user.user_id) is None
 
-    async def test_update_password(self, session):
+    async def test_update_password(self, session) -> None:  # noqa: ANN001, D102
         repo = UserRepository(session)
         user = await repo.create("dave", "old_pw")
         await session.commit()
@@ -71,13 +71,13 @@ class TestUserRepository:
         updated = await repo.get_by_id(user.user_id)
         assert updated.password == "new_pw"
 
-    async def test_get_nonexistent(self, session):
+    async def test_get_nonexistent(self, session) -> None:  # noqa: ANN001, D102
         assert await UserRepository(session).get_by_id(9999) is None
 
 
 @pytest.mark.asyncio
-class TestPrivateConfigRepository:
-    async def _make_resource(self, session, owner_id: int) -> int:
+class TestPrivateConfigRepository:  # noqa: D101
+    async def _make_resource(self, session, owner_id: int) -> int:  # noqa: ANN001
         user_repo = UserRepository(session)
         user = await user_repo.create(f"owner_{owner_id}", "pw")
         await session.commit()
@@ -86,7 +86,7 @@ class TestPrivateConfigRepository:
         await session.commit()
         return resource.resource_id
 
-    async def test_create_and_read(self, session):
+    async def test_create_and_read(self, session) -> None:  # noqa: ANN001, D102
         rid = await self._make_resource(session, 1)
         repo = PrivateConfigRepository(session)
         await repo.create(rid, {"model_id": "gpt-4", "api_key": "sk-test"})
@@ -94,7 +94,7 @@ class TestPrivateConfigRepository:
         data = await repo.get_by_id(rid)
         assert data["model_id"] == "gpt-4"
 
-    async def test_update(self, session):
+    async def test_update(self, session) -> None:  # noqa: ANN001, D102
         rid = await self._make_resource(session, 2)
         repo = PrivateConfigRepository(session)
         await repo.create(rid, {"v": 1})
@@ -103,7 +103,7 @@ class TestPrivateConfigRepository:
         await session.commit()
         assert (await repo.get_by_id(rid))["v"] == 2
 
-    async def test_delete(self, session):
+    async def test_delete(self, session) -> None:  # noqa: ANN001, D102
         rid = await self._make_resource(session, 3)
         repo = PrivateConfigRepository(session)
         await repo.create(rid, {"v": 1})

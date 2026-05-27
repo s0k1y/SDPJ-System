@@ -1,3 +1,5 @@
+"""sample_data 模块单元测试."""
+
 REAL_CONFIGS = {
     "deepseek_openai": {
         "model": "deepseek-v4-pro",

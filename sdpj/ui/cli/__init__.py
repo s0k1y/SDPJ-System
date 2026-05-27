@@ -1,4 +1,7 @@
-"""CLI 命令行界面模块"""
+"""CLI 命令行界面模块."""
+
+from collections.abc import Sequence
+from typing import Any
 
 import click
 
@@ -6,10 +9,10 @@ import click
 
 BANNER = (
     "   _____    ____     ____        __          _____                    __                   \n"
-    "  / ___/   / __ \\   / __ \\      / /         / ___/   __  __   _____  / /_  ___    ____ ___ \n"
-    "  \\__ \\   / / / /  / /_/ / __  / /  ______  \\__ \\   / / / /  / ___/ / __/ / _ \\  / __ `__ \\ \n"
+    "  / ___/   / __ \\   / __ \\      / /         / ___/   __  __   _____  / /_  ___    ____ ___ \n"  # noqa: E501
+    "  \\__ \\   / / / /  / /_/ / __  / /  ______  \\__ \\   / / / /  / ___/ / __/ / _ \\  / __ `__ \\ \n"  # noqa: E501
     " ___/ /  / /_/ /  / ____/ / /_/ /  /_____/ ___/ /  / /_/ /  (__  ) / /_  /  __/ / / / / / / \n"
-    "/____/  /_____/  /_/      \\____/          /____/   \\__, /  /____/  \\__/  \\___/ /_/ /_/ /_/ \n"
+    "/____/  /_____/  /_/      \\____/          /____/   \\__, /  /____/  \\__/  \\___/ /_/ /_/ /_/ \n"  # noqa: E501
     "                                                  /____/                                   \n"
     "                   Self-Detection based on Post-Jialbreak-System V1.0.0                    \n"
 )
@@ -19,12 +22,12 @@ BANNER = (
 
 
 class _BoldHelpFormatter(click.HelpFormatter):
-    """加粗小节标题，空行分隔"""
+    """加粗小节标题,空行分隔."""
 
-    def write_heading(self, heading):
+    def write_heading(self, heading) -> None:  # noqa: ANN001
         super().write_heading(click.style(heading, bold=True))
 
-    def write_dl(self, rows, **kwargs):
+    def write_dl(self, rows: Sequence[tuple[str, str]], col_max: int = 30, col_spacing: int = 2, **kwargs: Any) -> None:  # noqa: ANN003
         start = 0
         for i, (name, value) in enumerate(rows):
             if name == "" and value == "":
@@ -40,27 +43,26 @@ class _BoldHelpFormatter(click.HelpFormatter):
 
 
 class OrderedGroup(click.Group):
-    """按注册顺序显示命令，不使用字母排序。支持命令分组和 Banner。"""
+    """按注册顺序显示命令,不使用字母排序.支持命令分组和 Banner.."""
 
-    def __init__(self, name=None, commands=None, groups=None, banner=None, **attrs):
+    def __init__(self, name=None, commands=None, groups=None, banner=None, **attrs) -> None:  # noqa: ANN001, ANN003, D107
         super().__init__(name, commands, **attrs)
         self._groups = groups  # [(group_title, [cmd_names]), ...] 或 None
         self._banner = banner  # 顶层帮助横幅文本
 
-    def list_commands(self, ctx):
+    def list_commands(self, ctx):  # noqa: ANN001, ANN201, ARG002, D102
         return list(self.commands.keys())
 
-    def format_commands(self, ctx, formatter):
+    def format_commands(self, ctx, formatter) -> None:  # noqa: ANN001, C901, D102, PLR0912
         if self._groups is None:
             rows = []
             names = self.list_commands(ctx)
-            for i, name in enumerate(names):
+            for _i, name in enumerate(names):
                 cmd = self.commands.get(name)
                 if cmd is None or cmd.hidden:
                     continue
-                is_group = isinstance(cmd, click.Group)
                 rows.append((name, cmd.get_short_help_str()))
-                if is_group:
+                if isinstance(cmd, click.Group):
                     rows.append(("", ""))
                     for sub_name, sub_cmd in cmd.commands.items():
                         if sub_cmd.hidden:
@@ -87,12 +89,12 @@ class OrderedGroup(click.Group):
                 with formatter.section(f"  {group_title}"):
                     formatter.write_dl(rows)
 
-    def format_help(self, ctx, formatter):
+    def format_help(self, ctx, formatter) -> None:  # noqa: ANN001, D102
         if self._banner and ctx.parent is None:
             formatter.write(click.style(self._banner, fg="green") + "\n")
         super().format_help(ctx, formatter)
 
-    def get_help(self, ctx):
+    def get_help(self, ctx):  # noqa: ANN001, ANN201, D102
         formatter = _BoldHelpFormatter(width=ctx.terminal_width)
         self.format_help(ctx, formatter)
         return formatter.getvalue() + "\n"

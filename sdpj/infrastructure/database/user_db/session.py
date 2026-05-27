@@ -1,11 +1,11 @@
-"""UserDB 数据库会话管理
+"""UserDB 数据库会话管理.
 
-基于 SQLAlchemy 2.0 异步 API 的会话管理。
-使用 aiosqlite 作为异步 SQLite 驱动。
+基于 SQLAlchemy 2.0 异步 API 的会话管理.
+使用 aiosqlite 作为异步 SQLite 驱动.
 """
 
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager, suppress
 
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
@@ -20,15 +20,15 @@ from .models import Base
 
 
 class UserDBSessionManager:
-    """UserDB 会话管理器
+    """UserDB 会话管理器.
 
-    职责：
+    职责:
     - 管理数据库引擎生命周期
     - 提供异步会话工厂
     - 提供会话上下文管理器
     """
 
-    def __init__(self, database_url: str, echo: bool = False, engine: AsyncEngine | None = None):
+    def __init__(self, database_url: str, echo: bool = False, engine: AsyncEngine | None = None) -> None:  # noqa: D107, E501, FBT001, FBT002
         if engine is not None:
             self._engine = engine
         else:
@@ -42,7 +42,7 @@ class UserDBSessionManager:
             if "sqlite" in database_url:
 
                 @event.listens_for(self._engine.sync_engine, "connect")
-                def _enable_fk(dbapi_conn, connection_record):
+                def _enable_fk(dbapi_conn, connection_record) -> None:  # noqa: ANN001, ARG001
                     cursor = dbapi_conn.cursor()
                     cursor.execute("PRAGMA foreign_keys=ON")
                     cursor.close()
@@ -56,17 +56,17 @@ class UserDBSessionManager:
         )
 
     async def initialize(self) -> None:
-        """初始化（兼容性方法，实际在 __init__ 中已初始化）"""
+        """初始化(兼容性方法,实际在 __init__ 中已初始化)."""
 
     async def create_tables(self) -> None:
-        """创建所有表（如果不存在）"""
+        """创建所有表(如果不存在)."""
         async with self._engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         await self._migrate_schema()
 
     async def _migrate_schema(self) -> None:
-        """检测并补齐 ORM 模型中定义但数据库缺失的列"""
-        from sqlalchemy import text
+        """检测并补齐 ORM 模型中定义但数据库缺失的列."""
+        from sqlalchemy import text  # noqa: PLC0415
 
         async with self._engine.begin() as conn:
             for table_name, table_obj in Base.metadata.tables.items():
@@ -75,7 +75,7 @@ class UserDBSessionManager:
                     result = await conn.execute(text(f'PRAGMA table_info("{table_name}")'))
                     for row in result:
                         existing_cols.add(row[1])
-                except Exception:
+                except Exception:  # noqa: BLE001, S112
                     continue
                 for col in table_obj.columns:
                     if col.name not in existing_cols:
@@ -84,29 +84,29 @@ class UserDBSessionManager:
                         default = ""
                         if col.server_default is not None:
                             default = f" DEFAULT {getattr(col.server_default, 'arg', None)}"
-                        elif col.default is not None:
+                        elif col.default is not None:  # noqa: SIM102
                             if col.default.is_scalar:
-                                val = getattr(col.default, 'arg', None)
+                                val = getattr(col.default, "arg", None)
                                 if isinstance(val, str):
                                     default = f" DEFAULT '{val}'"
                                 else:
                                     default = f" DEFAULT {val}"
                         await conn.execute(
                             text(
-                                f'ALTER TABLE "{table_name}" ADD COLUMN {col.name} {col_type}{nullable}{default}'
-                            )
+                                f'ALTER TABLE "{table_name}" ADD COLUMN {col.name} {col_type}{nullable}{default}',  # noqa: E501
+                            ),
                         )
 
     async def drop_tables(self) -> None:
-        """删除所有表（慎用，仅用于测试）"""
+        """删除所有表(慎用,仅用于测试)."""
         async with self._engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
 
     @asynccontextmanager
     async def session(self) -> AsyncGenerator[AsyncSession, None]:
-        """提供异步会话上下文管理器
+        """提供异步会话上下文管理器.
 
-        使用示例：
+        使用示例:
             async with session_manager.session() as session:
                 # 执行数据库操作
                 result = await session.execute(select(User))
@@ -120,16 +120,14 @@ class UserDBSessionManager:
             await session.rollback()
             raise
         finally:
-            try:
+            with suppress(Exception):
                 await session.close()
-            except Exception:
-                pass
 
     async def close(self) -> None:
-        """关闭数据库引擎"""
+        """关闭数据库引擎."""
         await self._engine.dispose()
 
     @property
     def engine(self) -> AsyncEngine:
-        """获取数据库引擎"""
+        """获取数据库引擎."""
         return self._engine

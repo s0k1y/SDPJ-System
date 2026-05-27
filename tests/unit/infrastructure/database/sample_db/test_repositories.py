@@ -7,10 +7,11 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from sqlalchemy.pool import StaticPool
 from sdpj.infrastructure.database.sample_db.models import Base, Dataset, DetectionSample
 from sdpj.infrastructure.database.sample_db.repositories import DatasetRepository, SampleRepository
+from typing import Any
 
 
 @pytest_asyncio.fixture
-async def async_session():
+async def async_session() -> None:
     """创建测试用的异步数据库会话"""
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
@@ -20,7 +21,7 @@ async def async_session():
     )
 
     @event.listens_for(engine.sync_engine, "connect")
-    def _enable_fk(dbapi_conn, connection_record):
+    def _enable_fk(dbapi_conn: Any, connection_record: Any) -> None:
         cursor = dbapi_conn.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
@@ -40,7 +41,7 @@ async def async_session():
 
 
 @pytest.mark.asyncio
-async def test_dataset_repo_create(async_session):
+async def test_dataset_repo_create(async_session: Any) -> None:
     """测试数据集仓储创建功能"""
     repo = DatasetRepository(async_session)
     dataset = await repo.create("测试数据集", "越狱攻击")
@@ -52,7 +53,7 @@ async def test_dataset_repo_create(async_session):
 
 
 @pytest.mark.asyncio
-async def test_dataset_repo_create_duplicate_name(async_session):
+async def test_dataset_repo_create_duplicate_name(async_session: Any) -> None:
     """测试数据集仓储创建重复名称时抛出异常"""
     repo = DatasetRepository(async_session)
     await repo.create("重复名称", "提示词注入")
@@ -63,7 +64,7 @@ async def test_dataset_repo_create_duplicate_name(async_session):
 
 
 @pytest.mark.asyncio
-async def test_dataset_repo_get_by_id(async_session):
+async def test_dataset_repo_get_by_id(async_session: Any) -> None:
     """测试数据集仓储按 ID 查询"""
     repo = DatasetRepository(async_session)
     dataset = await repo.create("查询测试", "安全基准")
@@ -79,7 +80,7 @@ async def test_dataset_repo_get_by_id(async_session):
 
 
 @pytest.mark.asyncio
-async def test_dataset_repo_get_by_name(async_session):
+async def test_dataset_repo_get_by_name(async_session: Any) -> None:
     """测试数据集仓储按名称查询"""
     repo = DatasetRepository(async_session)
     await repo.create("名称查询测试", "越狱攻击")
@@ -94,7 +95,7 @@ async def test_dataset_repo_get_by_name(async_session):
 
 
 @pytest.mark.asyncio
-async def test_dataset_repo_get_all(async_session):
+async def test_dataset_repo_get_all(async_session: Any) -> None:
     """测试数据集仓储查询所有数据集"""
     repo = DatasetRepository(async_session)
     await repo.create("数据集1", "越狱攻击")
@@ -107,7 +108,7 @@ async def test_dataset_repo_get_all(async_session):
 
 
 @pytest.mark.asyncio
-async def test_dataset_repo_get_by_risk_type(async_session):
+async def test_dataset_repo_get_by_risk_type(async_session: Any) -> None:
     """测试数据集仓储按风险类型筛选"""
     repo = DatasetRepository(async_session)
     await repo.create("越狱数据集1", "越狱攻击")
@@ -123,7 +124,7 @@ async def test_dataset_repo_get_by_risk_type(async_session):
 
 
 @pytest.mark.asyncio
-async def test_dataset_repo_delete(async_session):
+async def test_dataset_repo_delete(async_session: Any) -> None:
     """测试数据集仓储删除功能"""
     repo = DatasetRepository(async_session)
     dataset = await repo.create("待删除数据集", "越狱攻击")
@@ -145,7 +146,7 @@ async def test_dataset_repo_delete(async_session):
 
 
 @pytest.mark.asyncio
-async def test_sample_repo_create(async_session):
+async def test_sample_repo_create(async_session: Any) -> None:
     """测试样本仓储创建功能"""
     # 先创建数据集
     dataset_repo = DatasetRepository(async_session)
@@ -164,7 +165,7 @@ async def test_sample_repo_create(async_session):
 
 
 @pytest.mark.asyncio
-async def test_sample_repo_create_invalid_dataset(async_session):
+async def test_sample_repo_create_invalid_dataset(async_session: Any) -> None:
     """测试样本仓储创建时数据集不存在抛出异常"""
     sample_repo = SampleRepository(async_session)
 
@@ -173,7 +174,7 @@ async def test_sample_repo_create_invalid_dataset(async_session):
 
 
 @pytest.mark.asyncio
-async def test_sample_repo_get_by_id(async_session):
+async def test_sample_repo_get_by_id(async_session: Any) -> None:
     """测试样本仓储按 ID 查询"""
     # 创建数据集和样本
     dataset_repo = DatasetRepository(async_session)
@@ -195,7 +196,7 @@ async def test_sample_repo_get_by_id(async_session):
 
 
 @pytest.mark.asyncio
-async def test_sample_repo_get_by_dataset(async_session):
+async def test_sample_repo_get_by_dataset(async_session: Any) -> None:
     """测试样本仓储按数据集查询"""
     # 创建数据集
     dataset_repo = DatasetRepository(async_session)
@@ -215,7 +216,7 @@ async def test_sample_repo_get_by_dataset(async_session):
 
 
 @pytest.mark.asyncio
-async def test_sample_repo_delete(async_session):
+async def test_sample_repo_delete(async_session: Any) -> None:
     """测试样本仓储删除功能"""
     # 创建数据集和样本
     dataset_repo = DatasetRepository(async_session)

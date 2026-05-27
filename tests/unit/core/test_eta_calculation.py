@@ -1,17 +1,24 @@
+"""test_eta_calculation 模块单元测试."""
+
 import asyncio
 import time
 import pytest
 from sdpj.core.task_queue_manager import TaskQueueManager
+from typing import Any
 
 
 @pytest.fixture
-def tqm():
+def tqm() -> None:
+    """测试 tqm."""
     return TaskQueueManager()
 
 
 class TestTaskProgressWithETA:
+    """测试 TestTaskProgressWithETA 类."""
+
     @pytest.mark.asyncio
-    async def test_first_update_sets_start_time(self, tqm):
+    async def test_first_update_sets_start_time(self, tqm: Any) -> None:
+        """测试 test first update sets start time."""
         await tqm.update_task_progress("t1", 10, 100)
         prog = await tqm.get_task_progress("t1")
         assert prog["start_time"] is not None
@@ -20,7 +27,8 @@ class TestTaskProgressWithETA:
         assert prog["recent_speeds"] == []
 
     @pytest.mark.asyncio
-    async def test_speed_tracking(self, tqm):
+    async def test_speed_tracking(self, tqm: Any) -> None:
+        """测试 test speed tracking."""
         await tqm.update_task_progress("t1", 10, 100)
         await asyncio.sleep(0.05)
         await tqm.update_task_progress("t1", 20, 100)
@@ -29,7 +37,8 @@ class TestTaskProgressWithETA:
         assert prog["recent_speeds"][0] > 0
 
     @pytest.mark.asyncio
-    async def test_sliding_window_max_5(self, tqm):
+    async def test_sliding_window_max_5(self, tqm: Any) -> None:
+        """测试 test sliding window max 5."""
         await tqm.update_task_progress("t1", 10, 100)
         for i in range(10):
             await asyncio.sleep(0.01)
@@ -38,7 +47,8 @@ class TestTaskProgressWithETA:
         assert len(prog["recent_speeds"]) <= 5
 
     @pytest.mark.asyncio
-    async def test_clear_task_progress(self, tqm):
+    async def test_clear_task_progress(self, tqm: Any) -> None:
+        """测试 test clear task progress."""
         await tqm.update_task_progress("t1", 10, 100)
         await tqm.clear_task_progress("t1")
         prog = await tqm.get_task_progress("t1")
@@ -46,8 +56,11 @@ class TestTaskProgressWithETA:
 
 
 class TestDynamicProgressWithETA:
+    """测试 TestDynamicProgressWithETA 类."""
+
     @pytest.mark.asyncio
-    async def test_update_and_get(self, tqm):
+    async def test_update_and_get(self, tqm: Any) -> None:
+        """测试 test update and get."""
         await tqm.update_dynamic_progress(
             "g1", {"processed": 5, "total": 50, "avg_iterations": 2.5}
         )
@@ -58,7 +71,8 @@ class TestDynamicProgressWithETA:
         assert prog["start_time"] is not None
 
     @pytest.mark.asyncio
-    async def test_speed_tracking(self, tqm):
+    async def test_speed_tracking(self, tqm: Any) -> None:
+        """测试 test speed tracking."""
         await tqm.update_dynamic_progress(
             "g1", {"processed": 5, "total": 50, "avg_iterations": 2.0}
         )
@@ -71,7 +85,8 @@ class TestDynamicProgressWithETA:
         assert prog["recent_speeds"][0] > 0
 
     @pytest.mark.asyncio
-    async def test_clear_dynamic_progress(self, tqm):
+    async def test_clear_dynamic_progress(self, tqm: Any) -> None:
+        """测试 test clear dynamic progress."""
         await tqm.update_dynamic_progress(
             "g1", {"processed": 5, "total": 50, "avg_iterations": 2.5}
         )
@@ -80,14 +95,18 @@ class TestDynamicProgressWithETA:
         assert prog is None
 
     @pytest.mark.asyncio
-    async def test_nonexistent_returns_none(self, tqm):
+    async def test_nonexistent_returns_none(self, tqm: Any) -> None:
+        """测试 test nonexistent returns none."""
         prog = await tqm.get_dynamic_progress("nonexistent")
         assert prog is None
 
 
 class TestPoCProgressWithSubtypeStats:
+    """测试 TestPoCProgressWithSubtypeStats 类."""
+
     @pytest.mark.asyncio
-    async def test_subtype_stats_stored(self, tqm):
+    async def test_subtype_stats_stored(self, tqm: Any) -> None:
+        """测试 test subtype stats stored."""
         subtype_stats = {
             "jailbreakv": {"current": 5, "target": 9, "event_set": False},
             "role_play": {"current": 3, "target": 3, "event_set": True},

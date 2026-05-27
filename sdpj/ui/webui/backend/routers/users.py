@@ -1,4 +1,6 @@
-"""用户管理与权限路由 (职责 12-14)"""
+"""用户管理与权限路由 (职责 12-14)."""
+
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 
@@ -14,54 +16,54 @@ router = APIRouter(prefix="/api/users", tags=["users"])
 
 
 @router.post("/account")
-async def account_operation(
+async def account_operation(  # noqa: ANN201, D103
     req: AccountOperationRequest,
     request: Request,
-    scheduler: StateSchedulerInterface = Depends(get_scheduler),
+    scheduler: Annotated[StateSchedulerInterface, Depends(get_scheduler)],
 ):
     params = {**req.params, "user_id": request.state.user_id}
     return wrap_scheduler_result(await scheduler.schedule_account_operation(req.operation, params))
 
 
 @router.get("/profile")
-async def profile(
+async def profile(  # noqa: ANN201, D103
     request: Request,
-    scheduler: StateSchedulerInterface = Depends(get_scheduler),
+    scheduler: Annotated[StateSchedulerInterface, Depends(get_scheduler)],
 ):
     return wrap_scheduler_result(
         await scheduler.schedule_account_operation(
-            "get_profile", {"user_id": request.state.user_id}
-        )
+            "get_profile", {"user_id": request.state.user_id},
+        ),
     )
 
 
 @router.get("/resources")
-async def resources(
+async def resources(  # noqa: ANN201, D103
     request: Request,
-    scheduler: StateSchedulerInterface = Depends(get_scheduler),
+    scheduler: Annotated[StateSchedulerInterface, Depends(get_scheduler)],
 ):
     return wrap_scheduler_result(
         await scheduler.schedule_account_operation(
-            "list_resources", {"user_id": request.state.user_id}
-        )
+            "list_resources", {"user_id": request.state.user_id},
+        ),
     )
 
 
 @router.post("/dac")
-async def dac_operation(
+async def dac_operation(  # noqa: ANN201, D103
     req: DACOperationRequest,
     request: Request,
-    scheduler: StateSchedulerInterface = Depends(get_scheduler),
+    scheduler: Annotated[StateSchedulerInterface, Depends(get_scheduler)],
 ):
     params = {**req.params, "caller_user_id": request.state.user_id}
     return wrap_scheduler_result(await scheduler.schedule_dac_operation(req.operation, params))
 
 
 @router.get("/dac/check")
-async def check_access(
+async def check_access(  # noqa: ANN201, D103
     resource_id: int,
     request: Request,
-    scheduler: StateSchedulerInterface = Depends(get_scheduler),
+    scheduler: Annotated[StateSchedulerInterface, Depends(get_scheduler)],
 ):
     has_access = await scheduler.check_resource_access(resource_id, request.state.user_id)
     return success_response(data={"has_access": has_access})

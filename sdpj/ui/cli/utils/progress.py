@@ -1,15 +1,15 @@
-"""CLI 进度条显示工具 — Rich 渲染"""
+"""CLI 进度条显示工具 — Rich 渲染."""
 
 from contextlib import contextmanager
 
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
 
 _console = Console()
 
 
 @contextmanager
-def spinner(msg: str):
+def spinner(msg: str):  # noqa: ANN201, D103
     progress = Progress(
         SpinnerColumn(),
         TextColumn(f"[bold cyan]{msg}[/bold cyan]"),
@@ -23,7 +23,7 @@ def spinner(msg: str):
         progress.stop()
 
 
-def show_progress(items: list, label: str = "处理中"):
+def show_progress(items: list, label: str = "处理中"):  # noqa: ANN201, D103
     progress = Progress(
         TextColumn(f"[bold]{label}[/bold]"),
         BarColumn(),

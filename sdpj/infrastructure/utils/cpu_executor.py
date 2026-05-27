@@ -1,14 +1,15 @@
-"""CPU 密集型操作异步卸载工具
+"""CPU 密集型操作异步卸载工具.
 
-将同步的 CPU 密集操作卸载到 ThreadPoolExecutor 中执行，
-避免阻塞 asyncio 事件循环。
+将同步的 CPU 密集操作卸载到 ThreadPoolExecutor 中执行,
+避免阻塞 asyncio 事件循环.
 """
 
 import asyncio
 import atexit
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-from typing import Callable, TypeVar
+from typing import TypeVar
 
 T = TypeVar("T")
 
@@ -16,8 +17,8 @@ _cpu_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="sdpj-cpu")
 atexit.register(_cpu_executor.shutdown, wait=False)
 
 
-async def run_cpu(func: Callable[..., T], *args, **kwargs) -> T:
-    """将同步 CPU 密集操作卸载到线程池执行
+async def run_cpu(func: Callable[..., T], *args, **kwargs) -> T:  # noqa: ANN002, ANN003
+    """将同步 CPU 密集操作卸载到线程池执行.
 
     Args:
         func: 同步函数
@@ -26,6 +27,7 @@ async def run_cpu(func: Callable[..., T], *args, **kwargs) -> T:
 
     Returns:
         函数执行结果
+
     """
     loop = asyncio.get_running_loop()
     if kwargs:

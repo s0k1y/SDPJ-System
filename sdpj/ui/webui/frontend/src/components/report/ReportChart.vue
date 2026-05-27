@@ -22,6 +22,36 @@
         </div>
       </div>
 
+      <div class="section" v-if="taskDetails.length > 0">
+        <h3 class="section-title">任务明细</h3>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 20%">攻击路径</th>
+                <th style="width: 20%">总数</th>
+                <th style="width: 20%">合规</th>
+                <th style="width: 20%">违规</th>
+                <th style="width: 20%">合规率</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="td in taskDetails" :key="td.task_id">
+                <td>{{ td.attack_path || '-' }}</td>
+                <td>{{ td.total }}</td>
+                <td>{{ td.compliant }}</td>
+                <td>{{ td.non_compliant }}</td>
+                <td>
+                  <span :style="{ color: getProgressColor(td.compliance_rate) }">
+                    {{ td.compliance_rate.toFixed(1) }}%
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="section">
         <h3 class="section-title">详细数据</h3>
         <div class="table-wrapper">
@@ -83,6 +113,11 @@ const subtypeItems = computed(() => {
   return chartData.value.subtype_compliance || []
 })
 
+const taskDetails = computed(() => {
+  if (!chartData.value) return []
+  return chartData.value.task_details || []
+})
+
 const fetchData = async () => {
   if (!props.targetId) return
   loading.value = true
@@ -132,6 +167,12 @@ watch(() => [props.targetId, props.granularity], fetchData, { immediate: true })
 .stat-unit {
   font-size: 18px;
   color: #8b8b8b;
+}
+
+.stat-text {
+  font-size: 16px;
+  line-height: 1.4;
+  word-break: break-all;
 }
 
 .section {

@@ -1,11 +1,11 @@
-"""ResultDB 数据库会话管理
+"""ResultDB 数据库会话管理.
 
-提供异步数据库会话的创建和管理。
+提供异步数据库会话的创建和管理.
 """
 
-from contextlib import asynccontextmanager
-from datetime import datetime, timezone
-from typing import AsyncGenerator, Optional
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager, suppress
+from datetime import UTC, datetime
 
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
@@ -20,23 +20,23 @@ from .models import Base
 
 
 class SessionManager:
-    """数据库会话管理器
+    """数据库会话管理器.
 
-    负责创建和管理异步数据库引擎和会话。
+    负责创建和管理异步数据库引擎和会话.
     """
 
-    def __init__(self, database_url: str, echo: bool = False, engine: Optional[AsyncEngine] = None):
+    def __init__(self, database_url: str, echo: bool = False, engine: AsyncEngine | None = None) -> None:  # noqa: D107, E501, FBT001, FBT002
         self.database_url = database_url
         self.echo = echo
-        self.engine: Optional[AsyncEngine] = engine
+        self.engine: AsyncEngine | None = engine
         self.async_session_maker = None
         if engine is not None:
             self.async_session_maker = async_sessionmaker(
-                engine, class_=AsyncSession, expire_on_commit=False
+                engine, class_=AsyncSession, expire_on_commit=False,
             )
 
     async def initialize(self) -> None:
-        """初始化数据库引擎和会话工厂"""
+        """初始化数据库引擎和会话工厂."""
         if self.engine is None:
             is_memory = ":memory:" in self.database_url
             pool_kwargs: dict[str, object]
@@ -55,7 +55,7 @@ class SessionManager:
             if "sqlite" in self.database_url:
 
                 @event.listens_for(self.engine.sync_engine, "connect")
-                def _set_pragmas(dbapi_conn, connection_record):
+                def _set_pragmas(dbapi_conn, connection_record) -> None:  # noqa: ANN001, ARG001
                     cursor = dbapi_conn.cursor()
                     cursor.execute("PRAGMA foreign_keys=ON")
                     cursor.execute("PRAGMA busy_timeout=5000")
@@ -64,52 +64,49 @@ class SessionManager:
                     cursor.close()
 
             self.async_session_maker = async_sessionmaker(
-                self.engine, class_=AsyncSession, expire_on_commit=False
+                self.engine, class_=AsyncSession, expire_on_commit=False,
             )
 
-    async def create_tables(self) -> None:
-        from sdpj.infrastructure.database.result_db.models import SystemLog  # noqa
-        from sdpj.infrastructure.database.sample_db.models import Dataset  # noqa
-        from sdpj.infrastructure.database.user_db.models import User  # noqa
+    async def create_tables(self) -> None:  # noqa: D102
 
         if self.engine is None:
             await self.initialize()
-        assert self.engine is not None
+        assert self.engine is not None  # noqa: S101
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
             await self._migrate_detection_task(conn)
             await self._migrate_timestamps_to_utc(conn)
 
-    async def _migrate_detection_task(self, conn) -> None:
-        """为 DetectionTask 表补充 algorithm_type、metadata_json 和 error_message 列"""
+    async def _migrate_detection_task(self, conn) -> None:  # noqa: ANN001
+        """为 DetectionTask 表补充 algorithm_type,metadata_json 和 error_message 列."""
         try:
             result = await conn.exec_driver_sql("PRAGMA table_info('DetectionTask')")
             columns = {row[1] for row in await result.fetchall()}
             if "algorithm_type" not in columns:
                 await conn.exec_driver_sql(
-                    "ALTER TABLE DetectionTask ADD COLUMN algorithm_type VARCHAR(20) NOT NULL DEFAULT 'static'"
+                    "ALTER TABLE DetectionTask ADD COLUMN algorithm_type VARCHAR(20) NOT NULL DEFAULT 'static'",  # noqa: E501
                 )
             if "metadata_json" not in columns:
                 await conn.exec_driver_sql(
-                    "ALTER TABLE DetectionTask ADD COLUMN metadata_json JSON"
+                    "ALTER TABLE DetectionTask ADD COLUMN metadata_json JSON",
                 )
             if "error_message" not in columns:
                 await conn.exec_driver_sql(
-                    "ALTER TABLE DetectionTask ADD COLUMN error_message TEXT"
+                    "ALTER TABLE DetectionTask ADD COLUMN error_message TEXT",
                 )
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
-    async def _migrate_timestamps_to_utc(self, conn) -> None:
-        """将旧本地时间戳迁移为UTC-naive格式
+    async def _migrate_timestamps_to_utc(self, conn) -> None:  # noqa: ANN001, C901, PLR0912
+        """将旧本地时间戳迁移为UTC-naive格式.
 
-        旧日志使用本地时间(naive datetime)存储，新日志使用UTC时间存储。
-        此迁移将所有时间戳统一为UTC-naive格式，确保排序正确。
-        使用 _utc_migrated 标记避免重复迁移。
+        旧日志使用本地时间(naive datetime)存储,新日志使用UTC时间存储.
+        此迁移将所有时间戳统一为UTC-naive格式,确保排序正确.
+        使用 _utc_migrated 标记避免重复迁移.
         """
         try:
             result = await conn.exec_driver_sql(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='_utc_migrated'"
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='_utc_migrated'",
             )
             if result.fetchall():
                 return
@@ -129,7 +126,7 @@ class SessionManager:
                 if not result.fetchall():
                     continue
 
-                result = await conn.exec_driver_sql(f"SELECT COUNT(*) FROM {table_name}")
+                result = await conn.exec_driver_sql(f"SELECT COUNT(*) FROM {table_name}")  # noqa: S608
                 total = (await result.fetchone())[0]
                 if total == 0:
                     continue
@@ -145,7 +142,7 @@ class SessionManager:
 
                 for col in ts_columns:
                     result = await conn.exec_driver_sql(
-                        f"SELECT {pk_col}, {col} FROM {table_name} WHERE {col} IS NOT NULL"
+                        f"SELECT {pk_col}, {col} FROM {table_name} WHERE {col} IS NOT NULL",  # noqa: S608
                     )
                     rows = await result.fetchall()
                     for row in rows:
@@ -157,40 +154,41 @@ class SessionManager:
                         new_ts = self._normalize_timestamp(ts_val, local_offset)
                         if new_ts is not None:
                             await conn.exec_driver_sql(
-                                f"UPDATE {table_name} SET {col} = ? WHERE {pk_col} = ?",
+                                f"UPDATE {table_name} SET {col} = ? WHERE {pk_col} = ?",  # noqa: S608
                                 (new_ts, pk_val),
                             )
 
             await conn.exec_driver_sql(
-                "CREATE TABLE _utc_migrated (done INTEGER NOT NULL DEFAULT 1)"
+                "CREATE TABLE _utc_migrated (done INTEGER NOT NULL DEFAULT 1)",
             )
             await conn.exec_driver_sql("INSERT INTO _utc_migrated (done) VALUES (1)")
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
     @staticmethod
-    def _normalize_timestamp(ts_val, local_offset) -> str | None:
-        """将时间戳值归一化为UTC-naive格式字符串
+    def _normalize_timestamp(ts_val, local_offset) -> str | None:  # noqa: ANN001
+        """将时间戳值归一化为UTC-naive格式字符串.
 
         Args:
             ts_val: 数据库中的时间戳值(str或datetime)
             local_offset: 本地时区偏移(timedelta)
 
         Returns:
-            UTC-naive格式字符串，或None表示无需转换
+            UTC-naive格式字符串,或None表示无需转换
+
         """
         try:
             if isinstance(ts_val, str):
                 has_tz = "+" in ts_val[10:] or ts_val.endswith("Z")
                 if has_tz:
-                    dt = datetime.fromisoformat(ts_val.replace("Z", "+00:00"))
-                    utc_naive = dt.astimezone(timezone.utc).replace(tzinfo=None)
+                    dt = datetime.fromisoformat(ts_val)
+                    utc_naive = dt.astimezone(UTC).replace(tzinfo=None)
                 else:
                     dt = datetime.fromisoformat(ts_val)
                     utc_naive = dt - local_offset
             elif isinstance(ts_val, datetime):
                 if ts_val.tzinfo is not None:
-                    utc_naive = ts_val.astimezone(timezone.utc).replace(tzinfo=None)
+                    utc_naive = ts_val.astimezone(UTC).replace(tzinfo=None)
                 else:
                     utc_naive = ts_val - local_offset
             else:
@@ -201,19 +199,19 @@ class SessionManager:
             return None
 
     async def drop_tables(self) -> None:
-        """删除所有表"""
+        """删除所有表."""
         if self.engine is None:
             await self.initialize()
-        assert self.engine is not None
+        assert self.engine is not None  # noqa: S101
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
 
     @asynccontextmanager
     async def session(self) -> AsyncGenerator[AsyncSession, None]:
-        """获取数据库会话的上下文管理器"""
+        """获取数据库会话的上下文管理器."""
         if self.async_session_maker is None:
             await self.initialize()
-        assert self.async_session_maker is not None
+        assert self.async_session_maker is not None  # noqa: S101
         session: AsyncSession = self.async_session_maker()
         try:
             yield session
@@ -222,12 +220,10 @@ class SessionManager:
             await session.rollback()
             raise
         finally:
-            try:
+            with suppress(Exception):
                 await session.close()
-            except Exception:
-                pass
 
     async def close(self) -> None:
-        """关闭数据库引擎"""
+        """关闭数据库引擎."""
         if self.engine:
             await self.engine.dispose()

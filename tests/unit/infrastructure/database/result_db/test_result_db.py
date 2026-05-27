@@ -1,17 +1,20 @@
+"""test_result_db 模块单元测试."""
+
 from tests.fixtures.sample_data import REAL_MODEL_ID, REAL_MODEL_ID_2
 
 """ResultDB 主实现类单元测试
 
-测试 ResultDB 类实现的所有接口能力。
+测试 ResultDB 类实现的所有接口能力.
 """
 
 import pytest
 from datetime import datetime, timedelta
 from sdpj.infrastructure.database.result_db import ResultDB, SessionManager
+from typing import Any
 
 
 @pytest.fixture
-async def result_db():
+async def result_db() -> None:
     """创建测试用的 ResultDB 实例"""
     session_manager = SessionManager("sqlite+aiosqlite:///:memory:", echo=False)
     await session_manager.create_tables()
@@ -43,14 +46,14 @@ async def result_db():
 
 
 @pytest.mark.asyncio
-async def test_create_task_group(result_db):
+async def test_create_task_group(result_db: Any) -> None:
     """测试创建检测任务组"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     assert task_group_id.startswith("tg_")
 
 
 @pytest.mark.asyncio
-async def test_get_task_group(result_db):
+async def test_get_task_group(result_db: Any) -> None:
     """测试查询单个任务组"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
 
@@ -61,14 +64,14 @@ async def test_get_task_group(result_db):
 
 
 @pytest.mark.asyncio
-async def test_get_task_group_not_found(result_db):
+async def test_get_task_group_not_found(result_db: Any) -> None:
     """测试查询不存在的任务组"""
     with pytest.raises(ValueError, match="不存在"):
         await result_db.get_task_group("non-existent")
 
 
 @pytest.mark.asyncio
-async def test_list_task_groups(result_db):
+async def test_list_task_groups(result_db: Any) -> None:
     """测试查询任务组列表"""
     tg1 = await result_db.create_task_group(1, REAL_MODEL_ID)
     tg2 = await result_db.create_task_group(1, REAL_MODEL_ID_2)
@@ -85,7 +88,7 @@ async def test_list_task_groups(result_db):
 
 
 @pytest.mark.asyncio
-async def test_delete_task_group(result_db):
+async def test_delete_task_group(result_db: Any) -> None:
     """测试删除任务组"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
 
@@ -100,7 +103,7 @@ async def test_delete_task_group(result_db):
 
 
 @pytest.mark.asyncio
-async def test_create_detection_task(result_db):
+async def test_create_detection_task(result_db: Any) -> None:
     """测试创建检测任务"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
 
@@ -110,14 +113,14 @@ async def test_create_detection_task(result_db):
 
 
 @pytest.mark.asyncio
-async def test_create_detection_task_invalid_group(result_db):
+async def test_create_detection_task_invalid_group(result_db: Any) -> None:
     """测试创建任务时任务组不存在"""
     with pytest.raises(ValueError, match="不存在"):
         await result_db.create_detection_task("non-existent", 1, "running", datetime.now())
 
 
 @pytest.mark.asyncio
-async def test_get_detection_task(result_db):
+async def test_get_detection_task(result_db: Any) -> None:
     """测试查询单个检测任务"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(task_group_id, 1, "running", datetime.now())
@@ -129,7 +132,7 @@ async def test_get_detection_task(result_db):
 
 
 @pytest.mark.asyncio
-async def test_update_task_status(result_db):
+async def test_update_task_status(result_db: Any) -> None:
     """测试更新任务状态"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(task_group_id, 1, "running", datetime.now())
@@ -144,7 +147,7 @@ async def test_update_task_status(result_db):
 
 
 @pytest.mark.asyncio
-async def test_list_tasks_by_group(result_db):
+async def test_list_tasks_by_group(result_db: Any) -> None:
     """测试按任务组查询任务列表"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
 
@@ -156,7 +159,7 @@ async def test_list_tasks_by_group(result_db):
 
 
 @pytest.mark.asyncio
-async def test_delete_detection_task(result_db):
+async def test_delete_detection_task(result_db: Any) -> None:
     """测试删除检测任务"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(task_group_id, 1, "running", datetime.now())
@@ -172,7 +175,7 @@ async def test_delete_detection_task(result_db):
 
 
 @pytest.mark.asyncio
-async def test_create_detection_report(result_db):
+async def test_create_detection_report(result_db: Any) -> None:
     """测试创建检测报告"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(task_group_id, 1, "completed", datetime.now())
@@ -182,14 +185,14 @@ async def test_create_detection_report(result_db):
 
 
 @pytest.mark.asyncio
-async def test_create_detection_report_invalid_task(result_db):
+async def test_create_detection_report_invalid_task(result_db: Any) -> None:
     """测试创建报告时任务不存在"""
     with pytest.raises(ValueError, match="不存在"):
         await result_db.create_detection_report("non-existent")
 
 
 @pytest.mark.asyncio
-async def test_get_detection_report(result_db):
+async def test_get_detection_report(result_db: Any) -> None:
     """测试查询单份检测报告"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(task_group_id, 1, "completed", datetime.now())
@@ -201,7 +204,7 @@ async def test_get_detection_report(result_db):
 
 
 @pytest.mark.asyncio
-async def test_get_report_by_task(result_db):
+async def test_get_report_by_task(result_db: Any) -> None:
     """测试按任务ID查询报告"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(task_group_id, 1, "completed", datetime.now())
@@ -213,7 +216,7 @@ async def test_get_report_by_task(result_db):
 
 
 @pytest.mark.asyncio
-async def test_list_detection_reports(result_db):
+async def test_list_detection_reports(result_db: Any) -> None:
     """测试查询报告列表"""
     tg1 = await result_db.create_task_group(1, REAL_MODEL_ID)
     tg2 = await result_db.create_task_group(2, REAL_MODEL_ID)
@@ -234,7 +237,7 @@ async def test_list_detection_reports(result_db):
 
 
 @pytest.mark.asyncio
-async def test_delete_detection_report(result_db):
+async def test_delete_detection_report(result_db: Any) -> None:
     """测试删除检测报告"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(task_group_id, 1, "completed", datetime.now())
@@ -251,7 +254,7 @@ async def test_delete_detection_report(result_db):
 
 
 @pytest.mark.asyncio
-async def test_append_result_data(result_db):
+async def test_append_result_data(result_db: Any) -> None:
     """测试追加检测结果数据"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(task_group_id, 1, "completed", datetime.now())
@@ -264,7 +267,7 @@ async def test_append_result_data(result_db):
 
 
 @pytest.mark.asyncio
-async def test_append_result_data_invalid_report(result_db):
+async def test_append_result_data_invalid_report(result_db: Any) -> None:
     """测试追加结果数据时报告不存在"""
     with pytest.raises(ValueError, match="不存在"):
         await result_db.append_result_data(
@@ -273,7 +276,7 @@ async def test_append_result_data_invalid_report(result_db):
 
 
 @pytest.mark.asyncio
-async def test_list_result_data_by_report(result_db):
+async def test_list_result_data_by_report(result_db: Any) -> None:
     """测试按报告ID查询结果数据"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(task_group_id, 1, "completed", datetime.now())
@@ -289,7 +292,7 @@ async def test_list_result_data_by_report(result_db):
 
 
 @pytest.mark.asyncio
-async def test_append_result_data_with_iteration_count(result_db):
+async def test_append_result_data_with_iteration_count(result_db: Any) -> None:
     """测试追加结果数据时包含迭代次数"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(task_group_id, 1, "completed", datetime.now())
@@ -306,8 +309,8 @@ async def test_append_result_data_with_iteration_count(result_db):
 
 
 @pytest.mark.asyncio
-async def test_append_result_data_without_iteration_count(result_db):
-    """测试追加结果数据时不传迭代次数（静态检测）"""
+async def test_append_result_data_without_iteration_count(result_db: Any) -> None:
+    """测试追加结果数据时不传迭代次数(静态检测)"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(task_group_id, 1, "completed", datetime.now())
     report_id = await result_db.create_detection_report(task_id)
@@ -323,8 +326,8 @@ async def test_append_result_data_without_iteration_count(result_db):
 
 
 @pytest.mark.asyncio
-async def test_append_result_data_zero_iterations(result_db):
-    """测试追加结果数据时迭代次数为0（动态检测中静态就违规的样本）"""
+async def test_append_result_data_zero_iterations(result_db: Any) -> None:
+    """测试追加结果数据时迭代次数为0(动态检测中静态就违规的样本)"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(task_group_id, 1, "completed", datetime.now())
     report_id = await result_db.create_detection_report(task_id)
@@ -340,7 +343,7 @@ async def test_append_result_data_zero_iterations(result_db):
 
 
 @pytest.mark.asyncio
-async def test_delete_result_data(result_db):
+async def test_delete_result_data(result_db: Any) -> None:
     """测试删除结果数据"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(task_group_id, 1, "completed", datetime.now())
@@ -360,7 +363,7 @@ async def test_delete_result_data(result_db):
 
 
 @pytest.mark.asyncio
-async def test_cascade_delete_full_chain(result_db):
+async def test_cascade_delete_full_chain(result_db: Any) -> None:
     """测试完整的级联删除链"""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
     task_id = await result_db.create_detection_task(task_group_id, 1, "completed", datetime.now())
@@ -388,7 +391,7 @@ async def test_cascade_delete_full_chain(result_db):
 
 
 @pytest.mark.asyncio
-async def test_save_and_get_poc_pool_cache(result_db):
+async def test_save_and_get_poc_pool_cache(result_db: Any) -> None:
     """测试保存并读取 PoC 池缓存"""
     entries = [
         {"subtype": "模板化越狱", "poc_text": "poc_1", "score": 5},
@@ -405,14 +408,14 @@ async def test_save_and_get_poc_pool_cache(result_db):
 
 
 @pytest.mark.asyncio
-async def test_get_poc_pool_cache_empty(result_db):
+async def test_get_poc_pool_cache_empty(result_db: Any) -> None:
     """测试无缓存时返回空列表"""
     cached = await result_db.get_poc_pool_cache(REAL_MODEL_ID)
     assert cached == []
 
 
 @pytest.mark.asyncio
-async def test_save_poc_pool_cache_replaces_old(result_db):
+async def test_save_poc_pool_cache_replaces_old(result_db: Any) -> None:
     """测试保存缓存会替换同模型旧缓存"""
     entries_v1 = [{"subtype": "模板化越狱", "poc_text": "old_poc", "score": 3}]
     await result_db.save_poc_pool_cache(REAL_MODEL_ID, entries_v1, "v1")
@@ -430,7 +433,7 @@ async def test_save_poc_pool_cache_replaces_old(result_db):
 
 
 @pytest.mark.asyncio
-async def test_invalidate_poc_pool_cache(result_db):
+async def test_invalidate_poc_pool_cache(result_db: Any) -> None:
     """测试手动失效缓存"""
     entries = [{"subtype": "模板化越狱", "poc_text": "poc_1", "score": 5}]
     await result_db.save_poc_pool_cache(REAL_MODEL_ID, entries, "v1")
@@ -443,14 +446,14 @@ async def test_invalidate_poc_pool_cache(result_db):
 
 
 @pytest.mark.asyncio
-async def test_invalidate_nonexistent_cache(result_db):
+async def test_invalidate_nonexistent_cache(result_db: Any) -> None:
     """测试失效不存在的缓存返回0"""
     deleted = await result_db.invalidate_poc_pool_cache("no-such-model")
     assert deleted == 0
 
 
 @pytest.mark.asyncio
-async def test_cache_isolation_between_models(result_db):
+async def test_cache_isolation_between_models(result_db: Any) -> None:
     """测试不同模型的缓存互不影响"""
     entries_gpt = [{"subtype": "模板化越狱", "poc_text": "gpt_poc", "score": 5}]
     entries_claude = [{"subtype": "说服式越狱", "poc_text": "claude_poc", "score": 4}]
@@ -470,7 +473,8 @@ async def test_cache_isolation_between_models(result_db):
 
 
 @pytest.mark.asyncio
-async def test_create_detection_task_idempotent_same_group_and_dataset(result_db):
+async def test_create_detection_task_idempotent_same_group_and_dataset(result_db: Any) -> None:
+    """测试 test create detection task idempotent same group and dataset."""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
 
     task_id_1 = await result_db.create_detection_task(task_group_id, 1, "pending", datetime.now())
@@ -484,7 +488,8 @@ async def test_create_detection_task_idempotent_same_group_and_dataset(result_db
 
 
 @pytest.mark.asyncio
-async def test_create_detection_task_different_dataset_creates_new(result_db):
+async def test_create_detection_task_different_dataset_creates_new(result_db: Any) -> None:
+    """测试 test create detection task different dataset creates new."""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
 
     task_id_1 = await result_db.create_detection_task(task_group_id, 1, "pending", datetime.now())
@@ -498,7 +503,8 @@ async def test_create_detection_task_different_dataset_creates_new(result_db):
 
 
 @pytest.mark.asyncio
-async def test_create_detection_task_with_custom_task_id_idempotent(result_db):
+async def test_create_detection_task_with_custom_task_id_idempotent(result_db: Any) -> None:
+    """测试 test create detection task with custom task id idempotent."""
     task_group_id = await result_db.create_task_group(1, REAL_MODEL_ID)
 
     custom_id = "custom_task_001"

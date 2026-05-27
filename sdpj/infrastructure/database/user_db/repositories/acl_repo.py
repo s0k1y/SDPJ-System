@@ -1,50 +1,53 @@
-"""访问控制列表仓储层
+"""访问控制列表仓储层.
 
-负责访问控制表的 CRUD 操作。
+负责访问控制表的 CRUD 操作.
 """
 
-from typing import Optional, cast
-
-from sqlalchemy.engine import CursorResult
+from typing import TYPE_CHECKING, cast
 
 from sqlalchemy import and_, delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from ..models import AccessControl
+from sdpj.infrastructure.database.user_db.models import AccessControl
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import CursorResult
 
 
 class ACLRepository:
-    """访问控制列表仓储
+    """访问控制列表仓储.
 
-    职责：
+    职责:
     - 添加访问控制项
     - 删除访问控制项
     - 按资源 ID 查询访问控制项列表
     - 判定访问控制项是否存在
     """
 
-    def __init__(self, session: AsyncSession):
-        """初始化访问控制列表仓储
+    def __init__(self, session: AsyncSession) -> None:
+        """初始化访问控制列表仓储.
 
         Args:
             session: 数据库会话
+
         """
         self._session = session
 
     async def create(self, resource_id: int, grantee_user_id: int) -> AccessControl:
-        """添加访问控制项
+        """添加访问控制项.
 
         Args:
             resource_id: 资源 ID
             grantee_user_id: 被授权用户 ID
 
         Returns:
-            新创建的访问控制项对象（若已存在则返回现有对象）
+            新创建的访问控制项对象(若已存在则返回现有对象)
 
         Raises:
             ValueError: 资源 ID 或被授权用户 ID 不存在时抛出
+
         """
         # 先检查是否已存在
         existing = await self.get_by_resource_and_grantee(resource_id, grantee_user_id)
@@ -57,31 +60,34 @@ class ACLRepository:
             await self._session.flush()
         except IntegrityError as e:
             await self._session.rollback()
-            raise ValueError(f"资源 ID {resource_id} 或用户 ID {grantee_user_id} 不存在") from e
+            msg = f"资源 ID {resource_id} 或用户 ID {grantee_user_id} 不存在"
+            raise ValueError(msg) from e
         return acl
 
     async def delete(self, acl_id: int) -> bool:
-        """删除访问控制项
+        """删除访问控制项.
 
         Args:
             acl_id: 访问控制项 ID
 
         Returns:
-            删除结果（True 表示成功）
+            删除结果(True 表示成功)
+
         """
         stmt = delete(AccessControl).where(AccessControl.acl_id == acl_id)
         result = await self._session.execute(stmt)
         await self._session.flush()
-        return cast(CursorResult, result).rowcount > 0
+        return cast("CursorResult", result).rowcount > 0
 
     async def get_by_resource(self, resource_id: int) -> list[AccessControl]:
-        """按资源 ID 查询访问控制项列表
+        """按资源 ID 查询访问控制项列表.
 
         Args:
             resource_id: 资源 ID
 
         Returns:
             该资源下全部访问控制项列表
+
         """
         stmt = (
             select(AccessControl)
@@ -92,34 +98,36 @@ class ACLRepository:
         return list(result.scalars().unique().all())
 
     async def get_by_resource_and_grantee(
-        self, resource_id: int, grantee_user_id: int
-    ) -> Optional[AccessControl]:
-        """按资源 ID 和被授权用户 ID 查询访问控制项
+        self, resource_id: int, grantee_user_id: int,
+    ) -> AccessControl | None:
+        """按资源 ID 和被授权用户 ID 查询访问控制项.
 
         Args:
             resource_id: 资源 ID
             grantee_user_id: 被授权用户 ID
 
         Returns:
-            访问控制项对象，不存在时返回 None
+            访问控制项对象,不存在时返回 None
+
         """
         stmt = select(AccessControl).where(
             and_(
                 AccessControl.resource_id == resource_id,
                 AccessControl.grantee_user_id == grantee_user_id,
-            )
+            ),
         )
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
     async def get_by_grantee(self, grantee_user_id: int) -> list[AccessControl]:
-        """按被授权用户 ID 查询所有访问控制项（含关联资源）
+        """按被授权用户 ID 查询所有访问控制项(含关联资源).
 
         Args:
             grantee_user_id: 被授权用户 ID
 
         Returns:
             该用户被授权的全部访问控制项列表
+
         """
         stmt = (
             select(AccessControl)
@@ -129,13 +137,13 @@ class ACLRepository:
         result = await self._session.execute(stmt)
         return list(result.scalars().unique().all())
 
-    async def get_by_id(self, acl_id: int) -> Optional[AccessControl]:
+    async def get_by_id(self, acl_id: int) -> AccessControl | None:  # noqa: D102
         stmt = select(AccessControl).where(AccessControl.acl_id == acl_id)
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
     async def exists(self, resource_id: int, grantee_user_id: int) -> bool:
-        """判定访问控制项是否存在
+        """判定访问控制项是否存在.
 
         Args:
             resource_id: 资源 ID
@@ -143,14 +151,15 @@ class ACLRepository:
 
         Returns:
             对应授权项是否存在的布尔判定
+
         """
         acl = await self.get_by_resource_and_grantee(resource_id, grantee_user_id)
         return acl is not None
 
     async def get_accessible_resource_ids(self, user_id: int, resource_ids: list[int]) -> set[int]:
-        """批量查询用户在指定资源中有访问权限的资源 ID 集合
+        """批量查询用户在指定资源中有访问权限的资源 ID 集合.
 
-        拥有者自动有权限，此外检查 ACL 表
+        拥有者自动有权限,此外检查 ACL 表
 
         Args:
             user_id: 用户 ID
@@ -158,10 +167,11 @@ class ACLRepository:
 
         Returns:
             用户有访问权限的资源 ID 集合
+
         """
         if not resource_ids:
             return set()
-        from ..models import Resource
+        from sdpj.infrastructure.database.user_db.models import Resource  # noqa: PLC0415
 
         owner_stmt = select(Resource.resource_id).where(
             Resource.resource_id.in_(resource_ids),

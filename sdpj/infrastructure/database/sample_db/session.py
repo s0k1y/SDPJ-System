@@ -1,11 +1,11 @@
-"""SampleDB 数据库会话管理
+"""SampleDB 数据库会话管理.
 
-提供异步数据库会话的创建和管理功能。
-使用 SQLAlchemy 2.0 异步引擎和会话。
+提供异步数据库会话的创建和管理功能.
+使用 SQLAlchemy 2.0 异步引擎和会话.
 """
 
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Optional
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager, suppress
 
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
@@ -20,19 +20,19 @@ from .models import Base
 
 
 class SampleDBSessionManager:
-    """SampleDB 会话管理器
+    """SampleDB 会话管理器.
 
-    负责管理数据库引擎和会话的生命周期。
+    负责管理数据库引擎和会话的生命周期.
     """
 
-    def __init__(
+    def __init__(  # noqa: D107
         self,
         database_url: str = "sqlite+aiosqlite:///./sdpj/infrastructure/database/sdpj.db",
-        engine: Optional[AsyncEngine] = None,
-    ):
+        engine: AsyncEngine | None = None,
+    ) -> None:
         self.database_url = database_url
-        self._engine: Optional[AsyncEngine] = engine
-        self._session_factory: Optional[async_sessionmaker[AsyncSession]] = None
+        self._engine: AsyncEngine | None = engine
+        self._session_factory: async_sessionmaker[AsyncSession] | None = None
         if engine is not None:
             self._session_factory = async_sessionmaker(
                 engine,
@@ -43,7 +43,7 @@ class SampleDBSessionManager:
             )
 
     async def initialize(self) -> None:
-        """初始化数据库引擎和会话工厂"""
+        """初始化数据库引擎和会话工厂."""
         if self._engine is None:
             is_memory = ":memory:" in self.database_url
             self._engine = create_async_engine(
@@ -57,7 +57,7 @@ class SampleDBSessionManager:
             if "sqlite" in self.database_url:
 
                 @event.listens_for(self._engine.sync_engine, "connect")
-                def _enable_fk(dbapi_conn, connection_record):
+                def _enable_fk(dbapi_conn, connection_record) -> None:  # noqa: ANN001, ARG001
                     cursor = dbapi_conn.cursor()
                     cursor.execute("PRAGMA foreign_keys=ON")
                     cursor.close()
@@ -71,33 +71,33 @@ class SampleDBSessionManager:
             )
 
     async def create_tables(self) -> None:
-        """创建所有数据表
+        """创建所有数据表.
 
-        注意：仅用于开发和测试环境。
-        生产环境应使用 Alembic 迁移管理数据库结构。
+        注意:仅用于开发和测试环境.
+        生产环境应使用 Alembic 迁移管理数据库结构.
         """
         if self._engine is None:
             await self.initialize()
-        assert self._engine is not None
+        assert self._engine is not None  # noqa: S101
         async with self._engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
     async def drop_tables(self) -> None:
-        """删除所有数据表
+        """删除所有数据表.
 
-        警告：此操作会删除所有数据，仅用于测试环境。
+        警告:此操作会删除所有数据,仅用于测试环境.
         """
         if self._engine is None:
             await self.initialize()
-        assert self._engine is not None
+        assert self._engine is not None  # noqa: S101
         async with self._engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
 
     @asynccontextmanager
     async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
-        """获取数据库会话（上下文管理器）
+        """获取数据库会话(上下文管理器).
 
-        使用示例：
+        使用示例:
             async with session_manager.get_session() as session:
                 # 执行数据库操作
                 result = await session.execute(...)
@@ -105,10 +105,11 @@ class SampleDBSessionManager:
 
         Yields:
             AsyncSession: 异步数据库会话
+
         """
         if self._session_factory is None:
             await self.initialize()
-        assert self._session_factory is not None
+        assert self._session_factory is not None  # noqa: S101
         session: AsyncSession = self._session_factory()
         try:
             yield session
@@ -117,15 +118,13 @@ class SampleDBSessionManager:
             await session.rollback()
             raise
         finally:
-            try:
+            with suppress(Exception):
                 await session.close()
-            except Exception:
-                pass
 
     async def close(self) -> None:
-        """关闭数据库引擎
+        """关闭数据库引擎.
 
-        释放所有数据库连接资源。
+        释放所有数据库连接资源.
         """
         if self._engine is not None:
             await self._engine.dispose()
@@ -133,22 +132,23 @@ class SampleDBSessionManager:
             self._session_factory = None
 
 
-# 全局会话管理器实例（单例模式）
-_session_manager: Optional[SampleDBSessionManager] = None
+# 全局会话管理器实例(单例模式)
+_session_manager: SampleDBSessionManager | None = None
 
 
 def get_session_manager(
     database_url: str = "sqlite+aiosqlite:///./sdpj/infrastructure/database/sdpj.db",
 ) -> SampleDBSessionManager:
-    """获取全局会话管理器实例
+    """获取全局会话管理器实例.
 
     Args:
         database_url: 数据库连接 URL
 
     Returns:
         SampleDBSessionManager: 会话管理器实例
+
     """
-    global _session_manager
+    global _session_manager  # noqa: PLW0603
     if _session_manager is None:
         _session_manager = SampleDBSessionManager(database_url)
     return _session_manager

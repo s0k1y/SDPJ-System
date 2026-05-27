@@ -1,10 +1,10 @@
-"""清理脚本 — 清理构建产物和缓存"""
+"""清理脚本 — 清理构建产物和缓存."""
 
 import shutil
 from pathlib import Path
 
 
-def main() -> None:
+def main() -> None:  # noqa: D103
     root = Path(__file__).resolve().parents[4]
     targets = [
         root / "dist",
@@ -23,7 +23,6 @@ def main() -> None:
             else:
                 target.unlink()
             removed += 1
-    print(f"Cleaned {removed} items.")
 
 
 if __name__ == "__main__":

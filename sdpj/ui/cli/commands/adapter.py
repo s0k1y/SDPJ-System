@@ -1,4 +1,4 @@
-"""私有资源交互命令 (职责 14-15)"""
+"""私有资源交互命令 (职责 14-15)."""
 
 import asyncio
 import pathlib
@@ -11,8 +11,8 @@ from sdpj.ui.cli.utils.result import unwrap
 
 
 @click.group("Config", cls=OrderedGroup, no_args_is_help=True)
-def config_group():
-    """私有检测配置与资源管理"""
+def config_group() -> None:
+    """私有检测配置与资源管理."""
 
 
 # ── 检测配置 CRUD (职责 14) ──
@@ -27,8 +27,8 @@ def config_group():
 @click.option("--max-rps", required=True, type=float, help="每秒最大请求数")
 @click.option("--max-concurrency", required=True, type=int, help="最大并发数")
 @click.pass_context
-def create_config(ctx, model, request_format, api_key, base_url, timeout, max_rps, max_concurrency):
-    """创建私有检测配置并自动注册适配器"""
+def create_config(ctx, model, request_format, api_key, base_url, timeout, max_rps, max_concurrency) -> None:  # noqa: ANN001, E501, PLR0913
+    """创建私有检测配置并自动注册适配器."""
     content = {
         "model": model,
         "model_id": model,
@@ -42,8 +42,8 @@ def create_config(ctx, model, request_format, api_key, base_url, timeout, max_rp
     user_id = ctx.obj.require_login()
     result = asyncio.run(
         ctx.obj.scheduler.schedule_config_operation(
-            "create", {"user_id": user_id, "config_content": content}
-        )
+            "create", {"user_id": user_id, "config_content": content},
+        ),
     )
     data = unwrap(result)
     output.success(f"配置已创建, ID: {data.get('config_id')}")
@@ -53,8 +53,8 @@ def create_config(ctx, model, request_format, api_key, base_url, timeout, max_rp
 
 @config_group.command("list")
 @click.pass_context
-def list_configs(ctx):
-    """列出私有检测配置清单"""
+def list_configs(ctx) -> None:  # noqa: ANN001
+    """列出私有检测配置清单."""
     user_id = ctx.obj.require_login()
     result = asyncio.run(ctx.obj.scheduler.schedule_config_operation("list", {"user_id": user_id}))
     configs = result.get("configs", [])
@@ -75,13 +75,13 @@ def list_configs(ctx):
 @config_group.command("view")
 @click.option("--config-id", required=True, type=int, help="配置ID")
 @click.pass_context
-def view_config(ctx, config_id):
-    """读取私有检测配置"""
+def view_config(ctx, config_id) -> None:  # noqa: ANN001
+    """读取私有检测配置."""
     user_id = ctx.obj.require_login()
     result = asyncio.run(
         ctx.obj.scheduler.schedule_config_operation(
-            "read", {"user_id": user_id, "config_id": config_id}
-        )
+            "read", {"user_id": user_id, "config_id": config_id},
+        ),
     )
     data = unwrap(result, required="config")
     output.kv(data["config"])
@@ -97,10 +97,10 @@ def view_config(ctx, config_id):
 @click.option("--max-rps", required=True, type=float, help="每秒最大请求数")
 @click.option("--max-concurrency", required=True, type=int, help="最大并发数")
 @click.pass_context
-def update_config(
-    ctx, config_id, model, request_format, api_key, base_url, timeout, max_rps, max_concurrency
-):
-    """更新私有检测配置"""
+def update_config(  # noqa: PLR0913
+    ctx, config_id, model, request_format, api_key, base_url, timeout, max_rps, max_concurrency,  # noqa: ANN001
+) -> None:
+    """更新私有检测配置."""
     content = {
         "model": model,
         "model_id": model,
@@ -114,8 +114,8 @@ def update_config(
     user_id = ctx.obj.require_login()
     result = asyncio.run(
         ctx.obj.scheduler.schedule_config_operation(
-            "update", {"user_id": user_id, "config_id": config_id, "config_content": content}
-        )
+            "update", {"user_id": user_id, "config_id": config_id, "config_content": content},
+        ),
     )
     unwrap(result)
     output.success("配置已更新")
@@ -125,13 +125,13 @@ def update_config(
 @click.option("--config-id", required=True, type=int, help="配置ID")
 @click.confirmation_option(prompt="确认删除该配置?")
 @click.pass_context
-def delete_config(ctx, config_id):
-    """删除私有检测配置"""
+def delete_config(ctx, config_id) -> None:  # noqa: ANN001
+    """删除私有检测配置."""
     user_id = ctx.obj.require_login()
     result = asyncio.run(
         ctx.obj.scheduler.schedule_config_operation(
-            "delete", {"user_id": user_id, "config_id": config_id}
-        )
+            "delete", {"user_id": user_id, "config_id": config_id},
+        ),
     )
     unwrap(result)
     output.success("配置已删除")
@@ -143,18 +143,18 @@ def delete_config(ctx, config_id):
 @config_group.command("import")
 @click.argument("file_path", type=click.Path(exists=True))
 @click.pass_context
-def import_config(ctx, file_path):
-    """导入私有检测配置并自动注册适配器"""
-    import os
+def import_config(ctx, file_path) -> None:  # noqa: ANN001
+    """导入私有检测配置并自动注册适配器."""
+    import os  # noqa: PLC0415
 
     user_id = ctx.obj.require_login()
-    abs_path = os.path.abspath(file_path)
-    with open(abs_path, "r", encoding="utf-8") as f:
+    abs_path = os.path.abspath(file_path)  # noqa: PTH100
+    with open(abs_path, encoding="utf-8") as f:  # noqa: PTH123
         content = f.read()
     result = asyncio.run(
         ctx.obj.scheduler.schedule_config_operation(
-            "import", {"user_id": user_id, "file_content": content}
-        )
+            "import", {"user_id": user_id, "file_content": content},
+        ),
     )
     data = unwrap(result)
     output.success(f"配置已导入, ID: {data.get('config_id')}")
@@ -167,18 +167,18 @@ def import_config(ctx, file_path):
 @click.option("--format", "fmt", default="json", type=click.Choice(["json", "yaml"]))
 @click.option("--output", "output_path", default=None, help="输出文件路径")
 @click.pass_context
-def export_config(ctx, config_id, fmt, output_path):
-    """导出私有检测配置"""
+def export_config(ctx, config_id, fmt, output_path) -> None:  # noqa: ANN001
+    """导出私有检测配置."""
     user_id = ctx.obj.require_login()
     result = asyncio.run(
         ctx.obj.scheduler.schedule_config_operation(
-            "export", {"user_id": user_id, "config_id": config_id, "format": fmt}
-        )
+            "export", {"user_id": user_id, "config_id": config_id, "format": fmt},
+        ),
     )
     data = unwrap(result)
     content = data.get("content", "")
     if output_path:
-        with open(output_path, "w", encoding="utf-8") as f:
+        with open(output_path, "w", encoding="utf-8") as f:  # noqa: PTH123
             f.write(content)
         output.success(f"已导出至 {output_path}")
     else:
@@ -191,13 +191,13 @@ def export_config(ctx, config_id, fmt, output_path):
 @config_group.command("verify")
 @click.option("--config-id", required=True, type=int, help="配置ID")
 @click.pass_context
-def verify_config(ctx, config_id):
-    """测试私有检测配置的可用性"""
+def verify_config(ctx, config_id) -> None:  # noqa: ANN001
+    """测试私有检测配置的可用性."""
     user_id = ctx.obj.require_login()
     result = asyncio.run(
         ctx.obj.scheduler.schedule_config_operation(
-            "verify", {"user_id": user_id, "config_id": config_id}
-        )
+            "verify", {"user_id": user_id, "config_id": config_id},
+        ),
     )
     data = unwrap(result)
     status_info = data.get("result", {})
@@ -215,7 +215,7 @@ def verify_config(ctx, config_id):
 
     if status == "ok":
         output.success(
-            f"{label}  |  模型: {status_info.get('model', '-')}  |  延迟: {status_info.get('latency_ms', '-')}ms"
+            f"{label}  |  模型: {status_info.get('model', '-')}  |  延迟: {status_info.get('latency_ms', '-')}ms",  # noqa: E501
         )
         preview = status_info.get("response_preview", "")
         if preview:
@@ -230,15 +230,15 @@ def verify_config(ctx, config_id):
 @config_group.command("upload-dataset")
 @click.argument("dataset_file", type=click.Path(exists=True))
 @click.pass_context
-def upload_dataset(ctx, dataset_file):
-    """上传私有数据集"""
-    import json
-    import os
+def upload_dataset(ctx, dataset_file) -> None:  # noqa: ANN001
+    """上传私有数据集."""
+    import json  # noqa: PLC0415
+    import os  # noqa: PLC0415
 
     user_id = ctx.obj.require_login()
-    abs_path = os.path.abspath(dataset_file)
-    name = os.path.splitext(os.path.basename(abs_path))[0]
-    with open(abs_path, "r", encoding="utf-8") as f:
+    abs_path = os.path.abspath(dataset_file)  # noqa: PTH100
+    name = os.path.splitext(os.path.basename(abs_path))[0]  # noqa: PTH119, PTH122
+    with open(abs_path, encoding="utf-8") as f:  # noqa: PTH123
         raw = f.read()
     if abs_path.endswith(".jsonl"):
         samples = [json.loads(line) for line in raw.strip().splitlines() if line.strip()]
@@ -255,7 +255,7 @@ def upload_dataset(ctx, dataset_file):
                 "risk_type": risk_type,
                 "samples": samples,
             },
-        )
+        ),
     )
     data = unwrap(result)
     output.success("数据集已上传")
@@ -267,14 +267,14 @@ def upload_dataset(ctx, dataset_file):
 @click.option("--resource-id", type=int, default=None, help="资源ID")
 @click.confirmation_option(prompt="确认移除该数据集?")
 @click.pass_context
-def remove_dataset(ctx, dataset_id, resource_id):
-    """移除私有数据集"""
+def remove_dataset(ctx, dataset_id, resource_id) -> None:  # noqa: ANN001
+    """移除私有数据集."""
     user_id = ctx.obj.require_login()
     params = {"user_id": user_id, "dataset_id": dataset_id}
     if resource_id is not None:
         params["resource_id"] = resource_id
     result = asyncio.run(
-        ctx.obj.scheduler.schedule_private_resource_operation("remove_dataset", params)
+        ctx.obj.scheduler.schedule_private_resource_operation("remove_dataset", params),
     )
     unwrap(result)
     output.success("数据集已移除")
@@ -287,8 +287,8 @@ def remove_dataset(ctx, dataset_id, resource_id):
 @click.option("--id", "dataset_id", required=True, type=int, help="数据集ID")
 @click.option("--output", "output_path", default=None, help="输出文件路径")
 @click.pass_context
-def export_dataset(ctx, dataset_id, output_path):
-    """导出数据集文件"""
+def export_dataset(ctx, dataset_id, output_path) -> None:  # noqa: ANN001
+    """导出数据集文件."""
     user_id = ctx.obj.require_login()
     result = asyncio.run(ctx.obj.scheduler.export_dataset_file(dataset_id, user_id=user_id))
     if not result:
@@ -312,14 +312,14 @@ def export_dataset(ctx, dataset_id, output_path):
 
 
 @config_group.group("dataset", cls=OrderedGroup, no_args_is_help=True)
-def dataset_group():
-    """数据集管理"""
+def dataset_group() -> None:
+    """数据集管理."""
 
 
 @dataset_group.command("list")
 @click.pass_context
-def dataset_list(ctx):
-    """列出可用数据集"""
+def dataset_list(ctx) -> None:  # noqa: ANN001
+    """列出可用数据集."""
     user_id = ctx.obj.require_login()
     ds_list = asyncio.run(ctx.obj.scheduler.query_available_datasets(user_id=user_id))
     if not ds_list:
@@ -335,8 +335,8 @@ def dataset_list(ctx):
 @dataset_group.command("detail")
 @click.option("--id", required=True, type=int, help="数据集ID")
 @click.pass_context
-def dataset_detail(ctx, id):
-    """查看数据集详情"""
+def dataset_detail(ctx, id) -> None:  # noqa: A002, ANN001
+    """查看数据集详情."""
     user_id = ctx.obj.require_login()
     dataset = asyncio.run(ctx.obj.scheduler.query_dataset_detail(id, user_id=user_id))
     if not dataset:

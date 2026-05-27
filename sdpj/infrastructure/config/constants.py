@@ -1,4 +1,4 @@
-"""系统常量定义"""
+"""系统常量定义."""
 
 APP_NAME = "SDPJ-System"
 APP_VERSION = "1.0.0"
@@ -9,9 +9,9 @@ DEFAULT_EXPORT_DIR = "sdpj/infrastructure/database/reports/exports"
 DEFAULT_UPLOAD_DIR = "sdpj/infrastructure/database/uploads"
 
 USER_CONFIG_DIR_NAME = ".sdpj"
-SECRET_KEY_FILENAME = "secret.key"
+SECRET_KEY_FILENAME = "secret.key"  # noqa: S105
 RSA_KEY_FILENAME = "rsa_private.pem"
-TOKEN_FILENAME = "token"
+TOKEN_FILENAME = "token"  # noqa: S105
 USER_ADAPTERS_DIR = "adapters"
 
 SECRET_KEY_BYTES = 32

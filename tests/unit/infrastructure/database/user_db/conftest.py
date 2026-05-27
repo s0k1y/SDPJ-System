@@ -5,11 +5,12 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sdpj.infrastructure.database.user_db import UserDB, UserDBSessionManager
+from typing import Any
 
 
 @pytest_asyncio.fixture
-async def session_manager():
-    """创建测试用的会话管理器（使用内存数据库）"""
+async def session_manager() -> None:
+    """创建测试用的会话管理器(使用内存数据库)"""
     manager = UserDBSessionManager("sqlite+aiosqlite:///:memory:", echo=False)
     await manager.create_tables()
     yield manager
@@ -17,20 +18,20 @@ async def session_manager():
 
 
 @pytest_asyncio.fixture
-async def user_db(session_manager):
+async def user_db(session_manager: Any) -> None:
     """创建 UserDB 实例"""
     return UserDB(session_manager)
 
 
 @pytest_asyncio.fixture
-async def sample_user(user_db):
+async def sample_user(user_db: Any) -> None:
     """创建示例用户"""
     user_id = await user_db.create_user("testuser", "password123")
     return {"user_id": user_id, "username": "testuser", "password": "password123"}
 
 
 @pytest_asyncio.fixture
-async def sample_resource(user_db, sample_user):
+async def sample_resource(user_db: Any, sample_user: Any) -> None:
     """创建示例资源"""
     resource_id = await user_db.register_resource("private_config", sample_user["user_id"])
     return {

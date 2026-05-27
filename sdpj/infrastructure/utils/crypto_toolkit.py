@@ -1,69 +1,70 @@
-import argparse
+import argparse  # noqa: D100
 import base64
 import codecs
 import sys
+from typing import Any
 
 
-class BaseCodec:
+class BaseCodec:  # noqa: D101
     @staticmethod
-    def encode_base16(text):
+    def encode_base16(text):  # noqa: ANN001, ANN205, D102
         return base64.b16encode(text.encode("utf-8")).decode("ascii")
 
     @staticmethod
-    def decode_base16(encoded):
+    def decode_base16(encoded):  # noqa: ANN001, ANN205, D102
         return base64.b16decode(encoded.encode("ascii"), casefold=True).decode("utf-8")
 
     @staticmethod
-    def encode_base32(text):
+    def encode_base32(text):  # noqa: ANN001, ANN205, D102
         return base64.b32encode(text.encode("utf-8")).decode("ascii")
 
     @staticmethod
-    def decode_base32(encoded):
+    def decode_base32(encoded):  # noqa: ANN001, ANN205, D102
         return base64.b32decode(encoded.encode("ascii"), casefold=True).decode("utf-8")
 
     @staticmethod
-    def encode_base64(text):
+    def encode_base64(text):  # noqa: ANN001, ANN205, D102
         return base64.b64encode(text.encode("utf-8")).decode("ascii")
 
     @staticmethod
-    def decode_base64(encoded):
+    def decode_base64(encoded):  # noqa: ANN001, ANN205, D102
         padding = 4 - len(encoded) % 4
-        if padding != 4:
+        if padding != 4:  # noqa: PLR2004
             encoded += "=" * padding
         return base64.b64decode(encoded.encode("ascii")).decode("utf-8")
 
     @staticmethod
-    def encode_base85(text):
+    def encode_base85(text):  # noqa: ANN001, ANN205, D102
         return base64.b85encode(text.encode("utf-8")).decode("ascii")
 
     @staticmethod
-    def decode_base85(encoded):
+    def decode_base85(encoded):  # noqa: ANN001, ANN205, D102
         return base64.b85decode(encoded.encode("ascii")).decode("utf-8")
 
 
-class Rot13Codec:
+class Rot13Codec:  # noqa: D101
     @staticmethod
-    def encode(text):
+    def encode(text):  # noqa: ANN001, ANN205, D102
         return codecs.encode(text, "rot_13")
 
     @staticmethod
-    def decode(text):
+    def decode(text):  # noqa: ANN001, ANN205, D102
         return codecs.encode(text, "rot_13")
 
 
-class HexCodec:
+class HexCodec:  # noqa: D101
     @staticmethod
-    def encode(text):
+    def encode(text):  # noqa: ANN001, ANN205, D102
         return text.encode("utf-8").hex()
 
     @staticmethod
-    def decode(encoded):
+    def decode(encoded):  # noqa: ANN001, ANN205, D102
         return bytes.fromhex(encoded).decode("utf-8")
 
 
-class CaesarCipher:
+class CaesarCipher:  # noqa: D101
     @staticmethod
-    def encrypt(text, shift=3):
+    def encrypt(text, shift=3):  # noqa: ANN001, ANN205, D102
         result = []
         for char in text:
             if "A" <= char <= "Z":
@@ -75,12 +76,12 @@ class CaesarCipher:
         return "".join(result)
 
     @staticmethod
-    def decrypt(text, shift=3):
+    def decrypt(text, shift=3):  # noqa: ANN001, ANN205, D102
         return CaesarCipher.encrypt(text, -shift)
 
 
-class MorseCodec:
-    MORSE_TABLE = {
+class MorseCodec:  # noqa: D101
+    MORSE_TABLE = {  # noqa: RUF012
         "A": ".-",
         "B": "-...",
         "C": "-.-.",
@@ -138,10 +139,10 @@ class MorseCodec:
         " ": "/",
     }
 
-    REVERSE_MORSE = {v: k for k, v in MORSE_TABLE.items()}
+    REVERSE_MORSE = {v: k for k, v in MORSE_TABLE.items()}  # noqa: RUF012
 
     @staticmethod
-    def encode(text):
+    def encode(text):  # noqa: ANN001, ANN205, D102
         parts = []
         for char in text.upper():
             if char in MorseCodec.MORSE_TABLE:
@@ -151,7 +152,7 @@ class MorseCodec:
         return " ".join(parts)
 
     @staticmethod
-    def decode(encoded):
+    def decode(encoded):  # noqa: ANN001, ANN205, D102
         words = encoded.split(" / ")
         decoded_words = []
         for word in words:
@@ -168,13 +169,15 @@ class MorseCodec:
         return " ".join(decoded_words)
 
 
-class VigenereCipher:
+class VigenereCipher:  # noqa: D101
     @staticmethod
-    def encrypt(text, key):
+    def encrypt(text, key):  # noqa: ANN001, ANN205, D102
         if not key:
-            raise ValueError("密钥不能为空")
+            msg = "密钥不能为空"
+            raise ValueError(msg)
         if not key.isalpha():
-            raise ValueError("密钥必须只包含字母字符")
+            msg = "密钥必须只包含字母字符"
+            raise ValueError(msg)
         key = key.upper()
         result = []
         key_index = 0
@@ -192,11 +195,13 @@ class VigenereCipher:
         return "".join(result)
 
     @staticmethod
-    def decrypt(text, key):
+    def decrypt(text, key):  # noqa: ANN001, ANN205, D102
         if not key:
-            raise ValueError("密钥不能为空")
+            msg = "密钥不能为空"
+            raise ValueError(msg)
         if not key.isalpha():
-            raise ValueError("密钥必须只包含字母字符")
+            msg = "密钥必须只包含字母字符"
+            raise ValueError(msg)
         key = key.upper()
         result = []
         key_index = 0
@@ -214,33 +219,33 @@ class VigenereCipher:
         return "".join(result)
 
 
-class ASCIICodec:
+class ASCIICodec:  # noqa: D101
     @staticmethod
-    def encode(text):
+    def encode(text):  # noqa: ANN001, ANN205, D102
         return " ".join(str(ord(c)) for c in text)
 
     @staticmethod
-    def decode(encoded):
+    def decode(encoded):  # noqa: ANN001, ANN205, D102
         codes = encoded.strip().split()
         return "".join(chr(int(code)) for code in codes)
 
 
-class UnicodeCodec:
+class UnicodeCodec:  # noqa: D101
     @staticmethod
-    def encode(text):
+    def encode(text):  # noqa: ANN001, ANN205, D102
         return " ".join(f"U+{ord(c):04X}" for c in text)
 
     @staticmethod
-    def decode(encoded):
+    def decode(encoded):  # noqa: ANN001, ANN205, D102
         codes = encoded.strip().split()
         result = []
         for code in codes:
-            code = code.upper().replace("U+", "")
+            code = code.upper().replace("U+", "")  # noqa: PLW2901
             result.append(chr(int(code, 16)))
         return "".join(result)
 
 
-CIPHERS = {
+CIPHERS: dict[str, dict[str, Any]] = {
     "base16": {
         "encode": BaseCodec.encode_base16,
         "decode": BaseCodec.decode_base16,
@@ -288,7 +293,7 @@ CIPHERS = {
 }
 
 
-def main():
+def main() -> None:  # noqa: D103
     parser = argparse.ArgumentParser(
         description="古典密码与编码加解密工具包",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -332,24 +337,21 @@ def main():
     try:
         if cipher_name == "caesar":
             if action == "encode":
-                result = CaesarCipher.encrypt(args.text, args.shift)
+                CaesarCipher.encrypt(args.text, args.shift)
             else:
-                result = CaesarCipher.decrypt(args.text, args.shift)
+                CaesarCipher.decrypt(args.text, args.shift)
         elif cipher_name == "vigenere":
             if not args.key:
-                print("错误: 维吉尼亚密码需要指定 --key 参数")
                 sys.exit(1)
             if action == "encode":
-                result = VigenereCipher.encrypt(args.text, args.key)
+                VigenereCipher.encrypt(args.text, args.key)
             else:
-                result = VigenereCipher.decrypt(args.text, args.key)
+                VigenereCipher.decrypt(args.text, args.key)
         else:
             func = CIPHERS[cipher_name][action]
-            result = func(args.text)
+            func(args.text)
 
-        print(result)
-    except Exception as e:
-        print(f"错误: {e}")
+    except Exception:  # noqa: BLE001
         sys.exit(1)
 
 

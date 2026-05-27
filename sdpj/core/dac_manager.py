@@ -1,4 +1,4 @@
-"""DACManager 自主访问控制管理模块
+"""DACManager 自主访问控制管理模块.
 
 依赖模块: UserCenter (via interface)
 被依赖模块: StateScheduler
@@ -12,9 +12,9 @@ from .dac_manager_interface import DACManagerInterface
 
 
 class DACManager(DACManagerInterface):
-    """自主访问控制管理"""
+    """自主访问控制管理."""
 
-    def __init__(self, user_center: UserCenterInterface):
+    def __init__(self, user_center: UserCenterInterface) -> None:  # noqa: D107
         self._user_center = user_center
 
     async def _get_resource_owner(self, resource_id: int) -> int | None:
@@ -23,8 +23,8 @@ class DACManager(DACManagerInterface):
             return None
         return resource.get("owner_user_id")
 
-    async def grant_access(
-        self, resource_id: int, target_username: str, caller_user_id: int
+    async def grant_access(  # noqa: D102
+        self, resource_id: int, target_username: str, caller_user_id: int,
     ) -> tuple[bool, str]:
         owner_id = await self._get_resource_owner(resource_id)
         if owner_id is None:
@@ -44,7 +44,7 @@ class DACManager(DACManagerInterface):
         except ValueError as e:
             return False, str(e)
 
-    async def revoke_access(self, acl_id: int, caller_user_id: int) -> tuple[bool, str]:
+    async def revoke_access(self, acl_id: int, caller_user_id: int) -> tuple[bool, str]:  # noqa: D102
         target_acl = await self._user_center.get_acl_by_id(acl_id)
         if target_acl is None:
             return False, "访问控制项不存在"
@@ -59,7 +59,7 @@ class DACManager(DACManagerInterface):
         success = await self._user_center.revoke_access(acl_id)
         return (True, "") if success else (False, "移除失败")
 
-    async def check_access(self, resource_id: int, user_id: int) -> bool:
+    async def check_access(self, resource_id: int, user_id: int) -> bool:  # noqa: D102
         owner_id = await self._get_resource_owner(resource_id)
         if owner_id is None:
             return False
@@ -68,15 +68,15 @@ class DACManager(DACManagerInterface):
         return await self._user_center.check_access(resource_id, user_id)
 
     async def batch_check_accessible_resource_ids(
-        self, user_id: int, resource_ids: list[int]
+        self, user_id: int, resource_ids: list[int],
     ) -> set[int]:
-        """批量查询用户在指定资源中有访问权限的资源 ID 集合"""
+        """批量查询用户在指定资源中有访问权限的资源 ID 集合."""
         if not resource_ids:
             return set()
-        return cast(set[int], await self._user_center.get_accessible_resource_ids(user_id, resource_ids))
+        return cast("set[int]", await self._user_center.get_accessible_resource_ids(user_id, resource_ids))  # noqa: E501
 
-    async def get_access_list(
-        self, resource_id: int, caller_user_id: int
+    async def get_access_list(  # noqa: D102
+        self, resource_id: int, caller_user_id: int,
     ) -> tuple[bool, list[dict]]:
         owner_id = await self._get_resource_owner(resource_id)
         if owner_id is None:

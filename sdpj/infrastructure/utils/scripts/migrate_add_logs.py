@@ -1,13 +1,13 @@
-"""数据库迁移脚本 - 添加系统日志表"""
+"""数据库迁移脚本 - 添加系统日志表."""
 
 import asyncio
 from pathlib import Path
 
 
-async def migrate():
-    from sdpj.infrastructure.database.result_db import SessionManager
+async def migrate() -> None:  # noqa: D103
+    from sdpj.infrastructure.database.result_db import SessionManager  # noqa: PLC0415
 
-    data_dir = Path(__file__).resolve().parents[2] / "database"
+    data_dir = Path(__file__).resolve().parents[2] / "database"  # noqa: ASYNC240
     data_dir.mkdir(parents=True, exist_ok=True)
 
     db_url = f"sqlite+aiosqlite:///{data_dir / 'sdpj.db'}"
@@ -16,7 +16,6 @@ async def migrate():
     # 创建日志表
     await session_manager.create_tables()
 
-    print("System log table created successfully")
 
 
 if __name__ == "__main__":

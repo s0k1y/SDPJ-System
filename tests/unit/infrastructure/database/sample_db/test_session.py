@@ -6,10 +6,11 @@ from sdpj.infrastructure.database.sample_db.session import (
     get_session_manager,
 )
 from sdpj.infrastructure.database.sample_db.models import Base, Dataset
+from typing import Any
 
 
 @pytest.mark.asyncio
-async def test_session_manager_initialization():
+async def test_session_manager_initialization() -> None:
     """测试会话管理器初始化"""
     manager = SampleDBSessionManager("sqlite+aiosqlite:///:memory:")
     await manager.initialize()
@@ -21,13 +22,13 @@ async def test_session_manager_initialization():
 
 
 @pytest.mark.asyncio
-async def test_session_manager_create_tables():
+async def test_session_manager_create_tables() -> None:
     """测试创建数据表"""
     manager = SampleDBSessionManager("sqlite+aiosqlite:///:memory:")
     await manager.initialize()
     await manager.create_tables()
 
-    # 验证表已创建（通过插入数据测试）
+    # 验证表已创建(通过插入数据测试)
     async with manager.get_session() as session:
         dataset = Dataset(name="测试数据集", risk_type="越狱攻击")
         session.add(dataset)
@@ -38,7 +39,7 @@ async def test_session_manager_create_tables():
 
 
 @pytest.mark.asyncio
-async def test_session_manager_drop_tables():
+async def test_session_manager_drop_tables() -> None:
     """测试删除数据表"""
     manager = SampleDBSessionManager("sqlite+aiosqlite:///:memory:")
     await manager.initialize()
@@ -61,7 +62,7 @@ async def test_session_manager_drop_tables():
 
 
 @pytest.mark.asyncio
-async def test_session_manager_get_session():
+async def test_session_manager_get_session() -> None:
     """测试获取数据库会话"""
     manager = SampleDBSessionManager("sqlite+aiosqlite:///:memory:")
     await manager.initialize()
@@ -78,7 +79,7 @@ async def test_session_manager_get_session():
 
 
 @pytest.mark.asyncio
-async def test_session_manager_rollback_on_error():
+async def test_session_manager_rollback_on_error() -> None:
     """测试会话在异常时自动回滚"""
     manager = SampleDBSessionManager("sqlite+aiosqlite:///:memory:")
     await manager.initialize()
@@ -95,7 +96,7 @@ async def test_session_manager_rollback_on_error():
     except ValueError:
         pass
 
-    # 验证数据已提交（异常发生在提交之后）
+    # 验证数据已提交(异常发生在提交之后)
     async with manager.get_session() as session:
         from sqlalchemy import select
 
@@ -108,7 +109,7 @@ async def test_session_manager_rollback_on_error():
 
 
 @pytest.mark.asyncio
-async def test_get_session_manager_singleton():
+async def test_get_session_manager_singleton() -> None:
     """测试全局会话管理器单例模式"""
     manager1 = get_session_manager("sqlite+aiosqlite:///:memory:")
     manager2 = get_session_manager("sqlite+aiosqlite:///:memory:")
@@ -119,7 +120,7 @@ async def test_get_session_manager_singleton():
 
 
 @pytest.mark.asyncio
-async def test_session_manager_close():
+async def test_session_manager_close() -> None:
     """测试关闭会话管理器"""
     manager = SampleDBSessionManager("sqlite+aiosqlite:///:memory:")
     await manager.initialize()

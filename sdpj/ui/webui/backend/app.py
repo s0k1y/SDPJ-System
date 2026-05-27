@@ -1,4 +1,4 @@
-"""FastAPI 应用组装"""
+"""FastAPI 应用组装."""
 
 from contextlib import asynccontextmanager
 
@@ -16,14 +16,14 @@ from sdpj.ui.webui.backend.routers import auth, detection, reports, users, webso
 SYSTEM_USERNAME = "SDPJ-System"
 SYSTEM_USER_IDS = (None, "0", "system")
 
-# 安全通信管理器（单例）
+# 安全通信管理器(单例)
 _secure_comm = SecureCommManager()
 
 
 class _SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """安全响应头中间件，由 SecureCommManager 提供头部配置"""
+    """安全响应头中间件,由 SecureCommManager 提供头部配置."""
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next):  # noqa: ANN001, ANN202
         response = await call_next(request)
         for header_name, header_value in _secure_comm.get_security_headers().items():
             response.headers[header_name] = header_value
@@ -31,8 +31,8 @@ class _SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    from sdpj.ui.webui.backend.dependencies import get_scheduler
+async def lifespan(app: FastAPI):  # noqa: ANN201, ARG001, D103
+    from sdpj.ui.webui.backend.dependencies import get_scheduler  # noqa: PLC0415
 
     scheduler = get_scheduler()
     await scheduler.startup()
@@ -40,10 +40,10 @@ async def lifespan(app: FastAPI):
     await scheduler.shutdown()
 
 
-def create_app() -> FastAPI:
+def create_app() -> FastAPI:  # noqa: C901, D103
     app = FastAPI(title="SDPJ-System API", version="1.0.0", lifespan=lifespan)
 
-    from sdpj.infrastructure.config.settings import get_settings
+    from sdpj.infrastructure.config.settings import get_settings  # noqa: PLC0415
 
     setup_cors(app)
     app.add_middleware(_SecurityHeadersMiddleware)
@@ -56,7 +56,7 @@ def create_app() -> FastAPI:
     )
 
     @app.exception_handler(HTTPException)
-    async def http_exception_handler(request: Request, exc: HTTPException):
+    async def http_exception_handler(request: Request, exc: HTTPException):  # noqa: ANN202, ARG001
         return JSONResponse(
             status_code=exc.status_code,
             content={"success": False, "data": None, "message": exc.detail},
@@ -69,29 +69,29 @@ def create_app() -> FastAPI:
     app.include_router(websocket.router)
 
     @app.get("/")
-    async def root():
+    async def root():  # noqa: ANN202
         return success_response(data={"name": "SDPJ-System API", "version": "1.0.0"})
 
     @app.get("/health")
-    async def health():
+    async def health():  # noqa: ANN202
         return success_response(data={"status": "ok"})
 
     @app.get("/api/status")
-    async def status():
-        from sdpj.ui.webui.backend.dependencies import get_scheduler
+    async def status():  # noqa: ANN202
+        from sdpj.ui.webui.backend.dependencies import get_scheduler  # noqa: PLC0415
 
         return success_response(data={"status": get_scheduler().get_system_state()})
 
     @app.get("/api/logs")
-    async def logs(
-        request: Request,
+    async def logs(  # noqa: ANN202, PLR0913
+        request: Request,  # noqa: ARG001
         level: str | None = None,
         source_module: str | None = None,
         user_id: str | None = None,
         page: int = 1,
         page_size: int = 20,
     ):
-        from sdpj.ui.webui.backend.dependencies import get_scheduler
+        from sdpj.ui.webui.backend.dependencies import get_scheduler  # noqa: PLC0415
 
         scheduler = get_scheduler()
 
@@ -126,8 +126,8 @@ def create_app() -> FastAPI:
         return success_response(data={"logs": logs_data, "total": total})
 
     @app.get("/api/logs/users")
-    async def logs_users(request: Request):
-        from sdpj.ui.webui.backend.dependencies import get_scheduler
+    async def logs_users(request: Request):  # noqa: ANN202, ARG001
+        from sdpj.ui.webui.backend.dependencies import get_scheduler  # noqa: PLC0415
 
         result = await get_scheduler().query_logs({"category": "operation"})
         all_logs = result.get("logs", [])

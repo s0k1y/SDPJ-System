@@ -1,7 +1,7 @@
 """独立测试脚本 - 验证 iteration_count 功能"""
 
 
-def test_calculate_statistics_with_iteration_count():
+def test_calculate_statistics_with_iteration_count() -> None:
     """测试 ReportManager.calculate_statistics 包含 subtype_compliance"""
     # 模拟 calculate_statistics 的核心逻辑
     results = [
@@ -35,17 +35,15 @@ def test_calculate_statistics_with_iteration_count():
             }
         )
 
-    print("✓ subtype_compliance 计算正确")
     assert len(subtype_compliance) == 2
     jailbreak = next(x for x in subtype_compliance if x["category"] == "越狱攻击")
     assert jailbreak["total"] == 3
     assert jailbreak["passed"] == 2
     assert jailbreak["failed"] == 1
     assert jailbreak["rate"] == 66.67
-    print(f"  越狱攻击: {jailbreak}")
 
 
-def test_avg_iteration_count_calculation():
+def test_avg_iteration_count_calculation() -> None:
     """测试平均迭代次数计算"""
     all_results = [
         {"compliance_result": "合规", "risk_subclass": "A", "iteration_count": 3},
@@ -61,12 +59,10 @@ def test_avg_iteration_count_calculation():
         round(sum(iteration_counts) / len(iteration_counts), 2) if iteration_counts else None
     )
 
-    print("✓ avg_iteration_count 计算正确")
     assert avg_iteration_count == 2.67  # (3 + 5 + 0) / 3
-    print(f"  平均迭代次数: {avg_iteration_count}")
 
 
-def test_dynamic_detector_iteration_tracking():
+def test_dynamic_detector_iteration_tracking() -> None:
     """测试动态检测器迭代次数跟踪逻辑"""
     # 模拟动态检测的迭代逻辑
     max_iterations = 3
@@ -75,11 +71,10 @@ def test_dynamic_detector_iteration_tracking():
     # 场景1: 静态就违规的样本
     sample_iterations_1 = 0
     assert sample_iterations_1 == 0
-    print("✓ 静态违规样本 iteration_count=0")
 
-    # 场景2: 需要迭代的样本，第2次迭代时违规
+    # 场景2: 需要迭代的样本,第2次迭代时违规
     sample_iterations_2 = 0
-    for poc in poc_pool:
+    for _poc in poc_pool:
         for i in range(max_iterations):
             sample_iterations_2 += 1
             if i == 1:  # 第2次迭代违规
@@ -87,19 +82,17 @@ def test_dynamic_detector_iteration_tracking():
         break  # 违规后跳出外层循环
 
     assert sample_iterations_2 == 2
-    print(f"✓ 迭代样本 iteration_count={sample_iterations_2}")
 
     # 场景3: 所有迭代都合规
     sample_iterations_3 = 0
-    for poc in poc_pool:
-        for i in range(max_iterations):
+    for _poc in poc_pool:
+        for i in range(max_iterations):  # noqa: B007
             sample_iterations_3 += 1
 
     assert sample_iterations_3 == 6  # 2 * 3
-    print(f"✓ 全部迭代样本 iteration_count={sample_iterations_3}")
 
 
-def test_result_data_structure():
+def test_result_data_structure() -> None:
     """测试 ResultData 数据结构"""
     result_data = {
         "result_data_id": "result_xxx",
@@ -113,7 +106,6 @@ def test_result_data_structure():
 
     assert "iteration_count" in result_data
     assert result_data["iteration_count"] == 5
-    print("✓ ResultData 包含 iteration_count 字段")
 
 
 if __name__ == "__main__":
@@ -122,19 +114,9 @@ if __name__ == "__main__":
 
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
-    print("=" * 60)
-    print("测试 iteration_count 功能")
-    print("=" * 60)
 
     test_calculate_statistics_with_iteration_count()
-    print()
     test_avg_iteration_count_calculation()
-    print()
     test_dynamic_detector_iteration_tracking()
-    print()
     test_result_data_structure()
 
-    print()
-    print("=" * 60)
-    print("所有测试通过")
-    print("=" * 60)

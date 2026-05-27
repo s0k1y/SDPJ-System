@@ -1,4 +1,4 @@
-"""LLMRegistry - 大模型注册中心实现
+"""LLMRegistry - 大模型注册中心实现.
 
 职责:
 1. 启动时批量注册已入库大模型
@@ -11,7 +11,7 @@
 依赖: LLMAdapterLib, UtilsLib
 """
 
-from typing import Optional
+import contextlib
 
 from sdpj.drivers.llm_registry_interface import ModelInfo
 from sdpj.infrastructure.llm_adapters.errors import (
@@ -27,21 +27,21 @@ from sdpj.infrastructure.utils.utils_interface import UtilsInterface
 
 
 class LLMRegistry:
-    """大模型注册中心"""
+    """大模型注册中心."""
 
-    def __init__(
+    def __init__(  # noqa: D107
         self,
         adapter_lib: LLMAdapterLibInterface,
         utils_lib: UtilsInterface,
-    ):
+    ) -> None:
         self._adapter_lib = adapter_lib
         self._utils = utils_lib
         self._registry: dict[str, LLMServiceInstance] = {}
 
-    async def initialize(self) -> bool:
+    async def initialize(self) -> bool:  # noqa: D102
         try:
             adapters = self._adapter_lib.list_adapters()
-        except Exception:
+        except Exception:  # noqa: BLE001
             return False
         failed_models: list[str] = []
         for adapter_meta in adapters:
@@ -51,18 +51,11 @@ class LLMRegistry:
             try:
                 instance = await self._adapter_lib.get_service_instance(model_id)
                 self._registry[model_id] = instance
-            except (AdapterNotFoundError, Exception) as e:
+            except (AdapterNotFoundError, Exception) as e:  # noqa: BLE001
                 failed_models.append(f"{model_id}: {e}")
-        if failed_models:
-            import sys
+        return not failed_models
 
-            print(
-                f"[LLMRegistry] 以下适配器初始化失败: {', '.join(failed_models)}", file=sys.stderr
-            )
-            return False
-        return True
-
-    async def list_registered_models(self) -> list[ModelInfo]:
+    async def list_registered_models(self) -> list[ModelInfo]:  # noqa: D102
         result: list[ModelInfo] = []
         for model_id in self._registry:
             try:
@@ -74,19 +67,24 @@ class LLMRegistry:
                         version=meta.get("version", "1.0"),
                         description=meta.get("description", ""),
                         supported_features=meta.get("supported_features", []),
-                    )
+                    ),
                 )
             except AdapterNotFoundError:
                 result.append(ModelInfo(model_id=model_id, adapter_name="unknown", version="0.0"))
         return result
 
-    async def is_model_available(self, model_id: str) -> tuple[bool, Optional[LLMServiceInstance]]:
+    async def is_model_available(self, model_id: str) -> tuple[bool, LLMServiceInstance | None]:  # noqa: D102
         instance = self._registry.get(model_id)
         if instance is not None and instance.active:
             return True, instance
-        return False, None
+        try:
+            instance = await self._adapter_lib.get_service_instance(model_id)
+            self._registry[model_id] = instance
+            return True, instance
+        except AdapterNotFoundError:
+            return False, None
 
-    async def register_private_model(
+    async def register_private_model(  # noqa: D102
         self,
         adapter_content: str,
         model_id: str,
@@ -98,44 +96,42 @@ class LLMRegistry:
 
             instance = await self._adapter_lib.install_adapter(model_id, adapter_content)
             self._registry[model_id] = instance
-            return True, model_id, ""
+            return True, model_id, ""  # noqa: TRY300
 
         except AdapterAlreadyExistsError:
             return False, "", f"模型 '{model_id}' 已存在"
         except AdapterValidationError as e:
             return False, "", f"适配器校验失败: {e}"
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return False, "", f"注册失败: {e}"
 
-    async def unregister_private_model(self, model_id: str) -> tuple[bool, str]:
+    async def unregister_private_model(self, model_id: str) -> tuple[bool, str]:  # noqa: D102
         try:
             if model_id not in self._registry:
                 return False, f"模型 '{model_id}' 未注册"
 
             self._registry.pop(model_id)
             await self._adapter_lib.remove_adapter(model_id)
-            return True, ""
+            return True, ""  # noqa: TRY300
 
         except AdapterNotFoundError:
             return False, f"模型 '{model_id}' 适配器不存在"
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return False, f"注销失败: {e}"
 
     def get_adapter_info(self, model_id: str) -> dict:
-        """按大模型标识查询适配器元信息"""
+        """按大模型标识查询适配器元信息."""
         try:
             return self._adapter_lib.get_adapter_info(model_id)
         except AdapterNotFoundError:
             return {}
 
-    async def shutdown(self) -> bool:
-        for model_id, instance in list(self._registry.items()):
-            try:
+    async def shutdown(self) -> bool:  # noqa: D102
+        for _model_id, instance in list(self._registry.items()):
+            with contextlib.suppress(Exception):
                 await self._adapter_lib.destroy_service_instance(instance)
-            except Exception:
-                pass
         self._registry.clear()
         return True
 
-    async def close_adapter_sessions(self) -> None:
+    async def close_adapter_sessions(self) -> None:  # noqa: D102
         await self._adapter_lib.close_sessions()

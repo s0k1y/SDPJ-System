@@ -1,16 +1,18 @@
-"""StateScheduler 系统状态管理及调度控制
+"""StateScheduler 系统状态管理及调度控制.
 
 依赖模块: AccountManager, DACManager, PrivateConfigManager,
           ReportManager, SDPJDetector, EventLogger, TaskQueueManager
-          (仅依赖执行逻辑层7个模块，LLMRegistry 通过 PrivateConfigManager 间接调用)
+          (仅依赖执行逻辑层7个模块,LLMRegistry 通过 PrivateConfigManager 间接调用)
 被依赖模块: CLI, WebUI
 """
 
 import asyncio
+import contextlib
 import json
 import time
 import uuid
-from typing import Any, Callable, Optional, cast
+from collections.abc import Callable
+from typing import Any, cast
 
 from sdpj.control.state_scheduler_interface import StateSchedulerInterface
 from sdpj.control.system_states import SystemStateMachine
@@ -24,9 +26,9 @@ from sdpj.core.task_queue_manager_interface import TaskQueueManagerInterface, Ta
 
 
 class StateScheduler(StateSchedulerInterface):
-    """系统状态管理及调度控制"""
+    """系统状态管理及调度控制."""
 
-    def __init__(
+    def __init__(  # noqa: D107, PLR0913
         self,
         account_manager: AccountManagerInterface,
         dac_manager: DACManagerInterface,
@@ -35,9 +37,9 @@ class StateScheduler(StateSchedulerInterface):
         detector: SDPJDetectorInterface,
         event_logger: EventLoggerInterface,
         task_queue_manager: TaskQueueManagerInterface,
-        db_initializer=None,
-        engine=None,
-    ):
+        db_initializer=None,  # noqa: ANN001
+        engine=None,  # noqa: ANN001
+    ) -> None:
         self._account = account_manager
         self._dac = dac_manager
         self._config = config_manager
@@ -55,25 +57,27 @@ class StateScheduler(StateSchedulerInterface):
         self._consumer_task: asyncio.Task | None = None
         self._enqueue_in_progress: bool = False
         self._running_tasks: set[asyncio.Task] = set()
+        self._task_id_to_bg: dict[str, asyncio.Task] = {}
         self._initialized: bool = False
 
     # ── 内部日志辅助 ──
 
-    async def startup(
+    async def startup(  # noqa: D102
         self,
-        skip_builtin_datasets: bool = False,
-        skip_adapter_restore: bool = False,
+        skip_builtin_datasets: bool = False,  # noqa: FBT001, FBT002
+        skip_adapter_restore: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
         if self._db_initializer is not None:
             await self._db_initializer(skip_builtin_datasets=skip_builtin_datasets)
         await self.session_init(skip_adapter_restore=skip_adapter_restore)
         await self._cleanup_stale_cancelled_groups()
+        await self._recover_stale_tasks()
         self.start_task_consumer()
         await self._logger.start_db_writer()
         self._logger.subscribe_logs(self._on_new_log)
         await self._logger.cleanup_old_logs()
 
-    async def session_init(self, skip_adapter_restore: bool = False) -> None:
+    async def session_init(self, skip_adapter_restore: bool = False) -> None:  # noqa: D102, FBT001, FBT002
         if self._initialized:
             return
         await self._config.initialize_registry()
@@ -89,7 +93,7 @@ class StateScheduler(StateSchedulerInterface):
                     self._fsm.start_detection()
                     self._log_state_transition("idle", "detecting", "startup_recovery")
                     self._notify_state()
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     self._log_err("FSMError", f"启动时状态恢复失败: {e}")
 
     async def _restore_adapters_from_db(self) -> None:
@@ -104,7 +108,7 @@ class StateScheduler(StateSchedulerInterface):
                 configs = await self._config.list_configs(uid)
                 for cfg in configs:
                     content = cfg.get("content", {})
-                    model_id = content.get("model") or content.get("model_id")
+                    model_id = content.get("model_id") or content.get("model")
                     if not model_id or model_id in seen_model_ids:
                         continue
                     seen_model_ids.add(model_id)
@@ -113,7 +117,7 @@ class StateScheduler(StateSchedulerInterface):
                         continue
                     adapter_content = json.dumps(content, ensure_ascii=False)
                     success, _, error = await self._config.register_private_model(
-                        adapter_content, model_id
+                        adapter_content, model_id,
                     )
                     if success:
                         restored += 1
@@ -122,15 +126,15 @@ class StateScheduler(StateSchedulerInterface):
                         self._log_err("AdapterRestore", f"恢复适配器失败: {model_id}, error={error}")
             if restored > 0:
                 self._log_rt("adapters_restored", f"启动时共恢复 {restored} 个适配器")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self._log_err("AdapterRestore", f"恢复适配器异常: {e}")
 
     async def _cleanup_stale_cancelled_groups(self) -> None:
-        """启动时清理数据库中全部子任务均已取消且无关联报告的任务组"""
+        """启动时清理数据库中全部子任务均已取消且无关联报告的任务组."""
         if self._engine is None:
             return
         try:
-            from sqlalchemy import text
+            from sqlalchemy import text  # noqa: PLC0415
 
             stale_groups: list[str] = []
             async with self._engine.connect() as conn:
@@ -142,14 +146,13 @@ class StateScheduler(StateSchedulerInterface):
                             SELECT dt.task_group_id
                             FROM DetectionTask dt
                             GROUP BY dt.task_group_id
-                            HAVING COUNT(*) = SUM(CASE WHEN dt.task_status = 'cancelled' THEN 1 ELSE 0 END)
-                        )
+                            HAVING COUNT(*) = SUM(CASE WHEN dt.task_status = 'cancelled' THEN 1 ELSE 0 END)  # noqa: E501, E501                        )
                         AND tg.task_group_id NOT IN (
                             SELECT DISTINCT dt2.task_group_id
                             FROM DetectionReport dr
                             JOIN DetectionTask dt2 ON dr.task_id = dt2.task_id
                         )
-                    """)
+                    """),
                 )
                 stale_groups = [row[0] for row in result]
 
@@ -157,24 +160,99 @@ class StateScheduler(StateSchedulerInterface):
                 try:
                     await self._report.delete_report(task_group_id=tg_id)
                     self._log_rt("startup_cleanup", f"启动时清理已取消任务组: {tg_id}")
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     self._log_err("StartupCleanup", f"清理已取消任务组 {tg_id} 失败: {e}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self._log_err("StartupCleanup", f"启动清理异常: {e}")
 
-    async def _find_config_by_model_id(self, user_id: int, model_id: str) -> Optional[dict]:
+    async def _recover_stale_tasks(self) -> None:
+        """启动时将数据库中处于 running/pending 状态但实际已中断的任务标记为 failed.
+
+        系统重启后,数据库中可能残留 running/pending 状态的任务记录,
+        但内存队列已清空,这些任务实际已中断,需标记为 failed 以避免报告页永久显示'生成中'.
+
+        判定规则:
+        1. task_status = 'running' → 必定是中断的任务(运行中的任务不应在启动时存在)
+        2. task_status = 'pending' 且存在 report → 异常状态(不应有 report),标记 failed
+        3. task_status = 'pending' 且不在内存队列中 → 未被 initialize() 恢复的孤立任务,标记 failed
+
+        """
+        if self._engine is None:
+            return
+        try:
+            from sqlalchemy import text  # noqa: PLC0415
+
+            from datetime import datetime as _dt  # noqa: PLC0415
+            from datetime import timezone as _tz  # noqa: PLC0415
+
+            now = _dt.now(_tz.utc)
+            stale_ids: list[str] = []
+            async with self._engine.connect() as conn:
+                result = await conn.execute(
+                    text("""
+                        SELECT dt.task_id, dt.task_status
+                        FROM DetectionTask dt
+                        WHERE dt.task_status IN ('running', 'pending')
+                    """),
+                )
+                db_non_terminal = [(row[0], row[1]) for row in result]
+
+            if not db_non_terminal:
+                return
+
+            queue_view = await self._task_queue.get_queue_view()
+            in_memory_ids = {t.task_id for t in queue_view}
+
+            for task_id, task_status in db_non_terminal:
+                if task_status == "running":
+                    stale_ids.append(task_id)
+                elif task_status == "pending" and task_id not in in_memory_ids:
+                    stale_ids.append(task_id)
+                elif task_status == "pending" and task_id in in_memory_ids:
+                    async with self._engine.connect() as conn:
+                        report_check = await conn.execute(
+                            text(
+                                "SELECT 1 FROM DetectionReport dr WHERE dr.task_id = :task_id"
+                            ),
+                            {"task_id": task_id},
+                        )
+                        if report_check.first() is not None:
+                            stale_ids.append(task_id)
+
+            if not stale_ids:
+                return
+
+            async with self._engine.connect() as conn:
+                for task_id in stale_ids:
+                    await conn.execute(
+                        text("""
+                            UPDATE DetectionTask
+                            SET task_status = 'failed',
+                                end_time = :end_time,
+                                error_message = '系统启动时检测到任务中断,自动标记为失败'
+                            WHERE task_id = :task_id AND task_status IN ('running', 'pending')
+                        """),
+                        {"task_id": task_id, "end_time": now},
+                    )
+                await conn.commit()
+
+            self._log_rt("stale_recovery", f"启动时恢复 {len(stale_ids)} 个中断任务,已标记为 failed")
+        except Exception as e:  # noqa: BLE001
+            self._log_err("StaleRecovery", f"启动时恢复中断任务异常: {e}")
+
+    async def _find_config_by_model_id(self, user_id: int, model_id: str) -> dict | None:
         try:
             configs = await self._config.list_configs(user_id)
             for cfg in configs:
                 content = cfg.get("content", {})
                 cfg_model = content.get("model") or content.get("model_id")
                 if cfg_model == model_id:
-                    return cast(Optional[dict], content)
-        except Exception:
+                    return cast("dict | None", content)
+        except Exception:  # noqa: BLE001, S110
             pass
         return None
 
-    async def shutdown(self) -> None:
+    async def shutdown(self) -> None:  # noqa: D102
         await self._logger.flush()
         self._logger.unsubscribe_logs(self._on_new_log)
         await self.stop_task_consumer()
@@ -182,7 +260,7 @@ class StateScheduler(StateSchedulerInterface):
 
     # ── 后台任务消费者 ──
 
-    def start_task_consumer(self, interval: float = 2.0, max_concurrency: int = 3) -> None:
+    def start_task_consumer(self, interval: float = 1.0, max_concurrency: int = 3) -> None:  # noqa: D102
         if self._consumer_task is None or self._consumer_task.done():
             self._consumer_task = asyncio.create_task(self._consume_loop(interval, max_concurrency))
             self._log_rt(
@@ -190,13 +268,11 @@ class StateScheduler(StateSchedulerInterface):
                 f"后台任务消费者已启动 (间隔={interval}s, 并发={max_concurrency})",
             )
 
-    async def stop_task_consumer(self) -> None:
+    async def stop_task_consumer(self) -> None:  # noqa: D102
         if self._consumer_task is not None and not self._consumer_task.done():
             self._consumer_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._consumer_task
-            except asyncio.CancelledError:
-                pass
             self._log_rt("consumer_stopped", "后台任务消费者已停止")
         self._consumer_task = None
 
@@ -207,7 +283,7 @@ class StateScheduler(StateSchedulerInterface):
                     await self.execute_concurrent_tasks(max_concurrency)
             except asyncio.CancelledError:
                 raise
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 self._log_err("ConsumerError", f"后台消费者异常: {e}")
             await asyncio.sleep(interval)
 
@@ -218,7 +294,7 @@ class StateScheduler(StateSchedulerInterface):
         self._logger.log_runtime("StateScheduler", event, desc)
 
     def _log_state_transition(self, from_state: str, to_state: str, trigger: str) -> None:
-        """记录状态转移日志"""
+        """记录状态转移日志."""
         self._logger.log_runtime(
             "StateScheduler",
             "state_transition",
@@ -229,10 +305,10 @@ class StateScheduler(StateSchedulerInterface):
         self._logger.log_error("StateScheduler", err_type, desc)
 
     def _transition_detection_done(self, trigger: str) -> bool:
-        """尝试执行 detection_done 状态转换 (detecting → idle)。
+        """尝试执行 detection_done 状态转换 (detecting → idle)..
 
-        当前状态为 detecting 时调用 _fsm.detection_done()，记录日志并通知回调。
-        返回是否成功转换。
+        当前状态为 detecting 时调用 _fsm.detection_done(),记录日志并通知回调.
+        返回是否成功转换.
         """
         if self.get_system_state() != "detecting":
             return False
@@ -242,14 +318,14 @@ class StateScheduler(StateSchedulerInterface):
             new_state = self.get_system_state()
             self._log_state_transition(old_state, new_state, trigger)
             self._notify_state()
-            return True
-        except Exception as e:
+            return True  # noqa: TRY300
+        except Exception as e:  # noqa: BLE001
             self._log_err("FSMError", f"detection_done 状态转换失败 (trigger={trigger}): {e}")
             return False
 
     # ── 检测调度 (职责 1-4) ──
 
-    async def start_detection(self, user_id: int, config_data: dict) -> dict:
+    async def start_detection(self, user_id: int, config_data: dict) -> dict:  # noqa: C901, D102, PLR0911, PLR0912, PLR0915
         model_id: str = config_data["model_id"]
         detection_type: str = config_data.get("detection_type", "static")
         dataset_ids: list = config_data.get("dataset_ids", [])
@@ -257,12 +333,14 @@ class StateScheduler(StateSchedulerInterface):
         max_iterations: int = config_data.get("max_iterations", 3)
         force_refresh: bool = config_data.get("force_refresh", False)
         config_id: int | None = config_data.get("config_id")
+        encoding_types: list[str] | None = config_data.get("encoding_types")
+        has_direct: bool = config_data.get("has_direct", True)
 
         loaded_config = None
         if config_id is not None:
             has_access = await self._dac.check_access(config_id, user_id)
             if not has_access:
-                return {"success": False, "error": "无访问权限：无法使用该私有配置"}
+                return {"success": False, "error": "无访问权限:无法使用该私有配置"}
             loaded = await self._config.read_config(config_id)
             if loaded:
                 dataset_ids = loaded.get("dataset_ids", dataset_ids)
@@ -282,12 +360,12 @@ class StateScheduler(StateSchedulerInterface):
                 if found is not None:
                     adapter_content = json.dumps(found, ensure_ascii=False)
                     ok, _, err = await self._config.register_private_model(
-                        adapter_content, model_id
+                        adapter_content, model_id,
                     )
                     if not ok:
                         return {"success": False, "error": f"模型适配器注册失败: {err}"}
                     self._log_rt(
-                        "adapter_auto_registered", f"适配器 '{model_id}' 已自动注册(回退查找)"
+                        "adapter_auto_registered", f"适配器 '{model_id}' 已自动注册(回退查找)",
                     )
                 else:
                     return {
@@ -305,40 +383,58 @@ class StateScheduler(StateSchedulerInterface):
                 self._fsm.start_detection()
                 self._log_state_transition("idle", "detecting", "start_detection")
                 self._notify_state()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 self._enqueue_in_progress = False
                 self._log_err("FSMError", f"start_detection 状态转换失败: {e}")
                 return {"success": False, "error": "系统状态不允许启动检测"}
         elif current_state != "detecting":
-            return {"success": False, "error": f"系统当前状态为'{current_state}'，不允许启动检测"}
+            return {"success": False, "error": f"系统当前状态为'{current_state}',不允许启动检测"}
+
+        from sdpj.infrastructure.utils.encoding import get_attack_path_label  # noqa: PLC0415
 
         task_group_id = str(uuid.uuid4())
-        print(
-            f"\n[DEBUG StateScheduler.start_detection] 生成 task_group_id={task_group_id} (仅在内存，未持久化)",
-            flush=True,
-        )
-        print(
-            f"[DEBUG StateScheduler.start_detection] user_id={user_id}, model_id={model_id}, type={detection_type}, dataset_ids={dataset_ids}, force_refresh={force_refresh}",
-            flush=True,
-        )
         task_ids: list[str] = []
         try:
             for ds_id in dataset_ids:
-                tid = await self._task_queue.enqueue_task(
-                    {
-                        "user_id": str(user_id),
-                        "model_id": model_id,
-                        "algorithm_type": detection_type,
-                        "dataset_id": str(ds_id),
-                        "metadata": {
-                            "task_group_id": task_group_id,
-                            "max_iterations": max_iterations,
-                            "jailbreak_dataset_ids": jailbreak_dataset_ids,
-                            "force_refresh": force_refresh,
+                # 直接注入子任务
+                if has_direct:
+                    tid = await self._task_queue.enqueue_task(
+                        {
+                            "user_id": str(user_id),
+                            "model_id": model_id,
+                            "algorithm_type": detection_type,
+                            "dataset_id": str(ds_id),
+                            "metadata": {
+                                "task_group_id": task_group_id,
+                                "max_iterations": max_iterations,
+                                "jailbreak_dataset_ids": jailbreak_dataset_ids,
+                                "force_refresh": force_refresh,
+                                "encoding_type": None,
+                                "attack_path": get_attack_path_label(None),
+                            },
                         },
-                    }
-                )
-                task_ids.append(tid)
+                    )
+                    task_ids.append(tid)
+                # 间接注入子任务(每种编码各一个)
+                if encoding_types:
+                    for enc_type in encoding_types:
+                        tid = await self._task_queue.enqueue_task(
+                            {
+                                "user_id": str(user_id),
+                                "model_id": model_id,
+                                "algorithm_type": detection_type,
+                                "dataset_id": str(ds_id),
+                                "metadata": {
+                                    "task_group_id": task_group_id,
+                                    "max_iterations": max_iterations,
+                                    "jailbreak_dataset_ids": jailbreak_dataset_ids,
+                                    "force_refresh": force_refresh,
+                                    "encoding_type": enc_type,
+                                    "attack_path": get_attack_path_label(enc_type),
+                                },
+                            },
+                        )
+                        task_ids.append(tid)
         finally:
             self._enqueue_in_progress = False
 
@@ -351,15 +447,15 @@ class StateScheduler(StateSchedulerInterface):
             },
         )
         self._log_rt(
-            "detection_queued", f"任务组 {task_group_id} 已入队, 共 {len(task_ids)} 个子任务"
+            "detection_queued", f"任务组 {task_group_id} 已入队, 共 {len(task_ids)} 个子任务",
         )
 
         return {"success": True, "task_group_id": task_group_id, "task_ids": task_ids}
 
-    async def execute_detection_task(self, task_id: str, task_params: dict) -> dict:
+    async def execute_detection_task(self, task_id: str, task_params: dict) -> dict:  # noqa: C901, D102, PLR0912, PLR0915
         current_status = await self._task_queue.get_task_status(task_id)
         if current_status == TaskStatus.CANCELLED:
-            self._log_rt("task_skipped", f"子任务 {task_id} 已取消，跳过执行")
+            self._log_rt("task_skipped", f"子任务 {task_id} 已取消,跳过执行")
             return {"success": False, "task_id": task_id, "error": "任务已取消"}
 
         await self._task_queue.update_task_status(task_id, TaskStatus.RUNNING)
@@ -373,20 +469,8 @@ class StateScheduler(StateSchedulerInterface):
         task_group_id = task_params.get("task_group_id")
         jailbreak_dataset_ids = task_params.get("jailbreak_dataset_ids")
         force_refresh = task_params.get("force_refresh", False)
+        encoding_type = task_params.get("encoding_type")
 
-        print("\n[DEBUG StateScheduler.execute_detection_task] === 开始执行 ===", flush=True)
-        print(
-            f"[DEBUG StateScheduler.execute_detection_task] task_id={task_id}, detection_type={detection_type}",
-            flush=True,
-        )
-        print(
-            f"[DEBUG StateScheduler.execute_detection_task] task_group_id={task_group_id}, model_id={model_id}, user_id={user_id}",
-            flush=True,
-        )
-        print(
-            f"[DEBUG StateScheduler.execute_detection_task] dataset_id={raw_ds_id}, jailbreak_ids={jailbreak_dataset_ids}, force_refresh={force_refresh}",
-            flush=True,
-        )
 
         actual_model_name = model_id
         try:
@@ -404,7 +488,7 @@ class StateScheduler(StateSchedulerInterface):
             adapter_info = self._config.get_adapter_info(actual_model_name)
             suggested_max_rps = float(adapter_info.get("max_rps", 5.0))
             suggested_max_concurrency = int(adapter_info.get("max_concurrency", 10))
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
         _poc_started = False
@@ -437,25 +521,28 @@ class StateScheduler(StateSchedulerInterface):
             if not _poc_started:
                 _poc_started = True
                 progress["start_time"] = time.monotonic()
-            asyncio.ensure_future(self._task_queue.update_poc_progress(task_group_id, progress))  # type: ignore[arg-type]
+            asyncio.ensure_future(self._task_queue.update_poc_progress(task_group_id, progress))  # type: ignore[arg-type]  # noqa: RUF006
 
-        def _task_progress_cb(task_id: str, processed: int, total: int) -> None:
-            asyncio.ensure_future(self._task_queue.update_task_progress(task_id, processed, total))
+        def _task_progress_cb(_db_task_id: str, processed: int, total: int) -> None:
+            asyncio.ensure_future(self._task_queue.update_task_progress(task_id, processed, total))  # noqa: RUF006
 
         def _llm_call_cb(request_info: dict, response_info: dict) -> None:
             self._notify_llm_call(request_info, response_info)
 
-        def _dynamic_progress_cb(processed: int, total: int, avg_iterations: float) -> None:
-            asyncio.ensure_future(
+        def _dynamic_progress_cb(processed: int, total: int, avg_iterations: float, breakdown: dict | None = None) -> None:
+            progress: dict = {"processed": processed, "total": total, "avg_iterations": avg_iterations}
+            if breakdown:
+                progress["breakdown"] = breakdown
+            asyncio.ensure_future(  # noqa: RUF006
                 self._task_queue.update_dynamic_progress(
                     task_group_id,  # type: ignore[arg-type]
-                    {"processed": processed, "total": total, "avg_iterations": avg_iterations},
-                )
+                    progress,
+                ),
             )
 
         cancel_event = asyncio.Event()
 
-        async def _check_cancelled():
+        async def _check_cancelled() -> None:
             while not cancel_event.is_set():
                 await asyncio.sleep(2)
                 st = await self._task_queue.get_task_status(task_id)
@@ -468,7 +555,7 @@ class StateScheduler(StateSchedulerInterface):
         try:
             dataset_ids = [int(raw_ds_id)] if raw_ds_id is not None else None
             if cancel_event.is_set():
-                raise asyncio.CancelledError()
+                raise asyncio.CancelledError  # noqa: TRY301
             self._log_rt(
                 "detection_exec",
                 f"开始执行检测: type={detection_type}, model={actual_model_name}, "
@@ -499,6 +586,7 @@ class StateScheduler(StateSchedulerInterface):
                     task_progress_callback=_task_progress_cb,
                     force_refresh=force_refresh,
                     llm_callback=_llm_call_cb,
+                    encoding_type=encoding_type,
                 )
             elif detection_type == "dynamic":
                 static_result = await self._detector.run_static_detection(
@@ -513,6 +601,7 @@ class StateScheduler(StateSchedulerInterface):
                     task_progress_callback=_task_progress_cb,
                     force_refresh=force_refresh,
                     llm_callback=_llm_call_cb,
+                    encoding_type=encoding_type,
                 )
                 if static_result["status"] != "completed":
                     result = static_result
@@ -526,11 +615,12 @@ class StateScheduler(StateSchedulerInterface):
                         max_concurrency=suggested_max_concurrency,
                         llm_callback=_llm_call_cb,
                         dynamic_progress_callback=_dynamic_progress_cb,
+                        encoding_type=encoding_type,
                     )
                     result = {
                         "status": "completed",
-                        "static_task_group_id": static_result["task_group_id"],
-                        "dynamic_task_group_id": dynamic_result.get("task_group_id"),
+                        "task_group_id": static_result["task_group_id"],
+                        "avg_iteration_count": dynamic_result.get("avg_iteration_count"),
                     }
             else:
                 static_result = await self._detector.run_static_detection(
@@ -545,6 +635,7 @@ class StateScheduler(StateSchedulerInterface):
                     task_progress_callback=_task_progress_cb,
                     force_refresh=force_refresh,
                     llm_callback=_llm_call_cb,
+                    encoding_type=encoding_type,
                 )
                 if static_result["status"] != "completed":
                     result = static_result
@@ -558,41 +649,40 @@ class StateScheduler(StateSchedulerInterface):
                         max_concurrency=suggested_max_concurrency,
                         llm_callback=_llm_call_cb,
                         dynamic_progress_callback=_dynamic_progress_cb,
+                        encoding_type=encoding_type,
                     )
                     result = {
                         "status": "completed",
-                        "static_task_group_id": static_result["task_group_id"],
-                        "dynamic_task_group_id": dynamic_result.get("task_group_id"),
+                        "task_group_id": static_result["task_group_id"],
+                        "avg_iteration_count": dynamic_result.get("avg_iteration_count"),
                     }
             current_status = await self._task_queue.get_task_status(task_id)
             if current_status == TaskStatus.CANCELLED:
                 self._log_rt(
-                    "task_cancelled_during_execution", f"子任务 {task_id} 在执行期间被取消"
+                    "task_cancelled_during_execution", f"子任务 {task_id} 在执行期间被取消",
                 )
                 return {"success": False, "task_id": task_id, "error": "任务已取消"}
             await self._task_queue.update_task_status(task_id, TaskStatus.COMPLETED)
             self._log_rt("task_completed", f"子任务 {task_id} 执行完成")
-            return {"success": True, "task_id": task_id, "result": result}
+            return {"success": True, "task_id": task_id, "result": result}  # noqa: TRY300
         except asyncio.CancelledError:
             await self._task_queue.update_task_status(task_id, TaskStatus.CANCELLED)
             self._log_rt("task_cancelled_during_execution", f"子任务 {task_id} 被取消")
             return {"success": False, "task_id": task_id, "error": "任务已取消"}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             await self._task_queue.update_task_status(task_id, TaskStatus.FAILED, str(e))
             self._log_err("DetectionError", f"子任务 {task_id} 异常: {e}")
             return {"success": False, "task_id": task_id, "error": str(e)}
         finally:
             cancel_event.set()
             checker.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await checker
-            except asyncio.CancelledError:
-                pass
             if task_group_id:
                 await self._task_queue.clear_poc_progress(task_group_id)
                 await self._task_queue.clear_dynamic_progress(task_group_id)
 
-    async def execute_concurrent_tasks(self, max_concurrency: int = 3) -> dict:
+    async def execute_concurrent_tasks(self, max_concurrency: int = 3) -> dict:  # noqa: D102
         self._cleanup_running_tasks()
 
         batch = await self._task_queue.dequeue_tasks(max_concurrency)
@@ -612,10 +702,16 @@ class StateScheduler(StateSchedulerInterface):
                 "task_group_id": task.metadata.get("task_group_id"),
                 "jailbreak_dataset_ids": task.metadata.get("jailbreak_dataset_ids"),
                 "force_refresh": task.metadata.get("force_refresh", False),
+                "encoding_type": task.metadata.get("encoding_type"),
             }
+            def _on_done(t: asyncio.Task, tid: str = task.task_id) -> None:  # noqa: ARG001
+                self._task_id_to_bg.pop(tid, None)
+
             bg_task = asyncio.create_task(self._run_task_bg(task.task_id, params))
             self._running_tasks.add(bg_task)
+            self._task_id_to_bg[task.task_id] = bg_task
             bg_task.add_done_callback(self._running_tasks.discard)
+            bg_task.add_done_callback(_on_done)
             spawned.append(bg_task)
 
         await asyncio.gather(*spawned, return_exceptions=True)
@@ -629,10 +725,8 @@ class StateScheduler(StateSchedulerInterface):
                 "success": final_status == TaskStatus.COMPLETED,
             })
 
-        try:
+        with contextlib.suppress(Exception):
             await self._config.close_adapter_sessions()
-        except Exception:
-            pass
 
         return {
             "success": True,
@@ -646,23 +740,21 @@ class StateScheduler(StateSchedulerInterface):
         try:
             await self.execute_detection_task(task_id, params)
         except asyncio.CancelledError:
-            # Python 3.9+ CancelledError 不继承 Exception，需要单独捕获
+            # Python 3.9+ CancelledError 不继承 Exception,需要单独捕获
             self._log_rt("task_bg_cancelled", f"后台任务 {task_id} 被取消 (CancelledError)")
-            try:
+            with contextlib.suppress(Exception):
                 await self._task_queue.update_task_status(task_id, TaskStatus.CANCELLED)
-            except Exception:
-                pass
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self._log_err("BackgroundTaskError", f"后台任务 {task_id} 异常: {e}")
         finally:
             queue_view = await self._task_queue.get_queue_view()
             has_active = any(
                 t.status in (TaskStatus.PENDING, TaskStatus.RUNNING) for t in queue_view
             )
-            if not has_active:
+            if not has_active and not self._enqueue_in_progress:
                 self._transition_detection_done("task_finished")
 
-    async def query_detection_progress(self, task_id: Optional[str] = None) -> dict:
+    async def query_detection_progress(self, task_id: str | None = None) -> dict:  # noqa: C901, D102, PLR0912, PLR0915
         if task_id is not None:
             status = await self._task_queue.get_task_status(task_id)
             if status is None:
@@ -673,7 +765,7 @@ class StateScheduler(StateSchedulerInterface):
 
         if not queue_view and self.get_system_state() == "detecting":
             self._cleanup_running_tasks()
-            if not self._running_tasks:
+            if not self._running_tasks and not self._enqueue_in_progress:
                 self._transition_detection_done("recovery_empty_queue")
 
         all_datasets = await self._config.query_datasets()
@@ -703,7 +795,7 @@ class StateScheduler(StateSchedulerInterface):
             try:
                 reports = await self._report.list_reports()
                 existing_group_ids = {r["task_group_id"] for r in reports}
-            except Exception:
+            except Exception:  # noqa: BLE001
                 existing_group_ids = None
 
         orphan_group_ids: set[str] = set()
@@ -714,31 +806,27 @@ class StateScheduler(StateSchedulerInterface):
             orphan_tasks = task_group_map.pop(orphan_id, [])
             all_cancelled = all(t.status == TaskStatus.CANCELLED for t in orphan_tasks)
             for t in orphan_tasks:
-                try:
+                with contextlib.suppress(Exception):
                     await self._task_queue.remove_task(t.task_id)
-                except Exception:
-                    pass
             if orphan_tasks:
                 self._log_rt(
-                    "orphan_cleanup", f"清理孤儿任务组 {orphan_id}, 移除 {len(orphan_tasks)} 个任务"
+                    "orphan_cleanup", f"清理孤儿任务组 {orphan_id}, 移除 {len(orphan_tasks)} 个任务",
                 )
                 if all_cancelled:
                     try:
                         await self._report.delete_report(task_group_id=orphan_id)
                         self._log_rt(
-                            "orphan_cleanup", f"孤儿任务组 {orphan_id} (全部已取消) 数据库记录已删除"
+                            "orphan_cleanup", f"孤儿任务组 {orphan_id} (全部已取消) 数据库记录已删除",
                         )
-                    except Exception:
+                    except Exception:  # noqa: BLE001, S110
                         pass
 
         groups = []
         config_ids_to_read = []
-        for group_id, tasks in task_group_map.items():
+        for group_id, tasks in task_group_map.items():  # noqa: B007
             first = tasks[0]
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 config_ids_to_read.append(int(first.model_id))
-            except (ValueError, TypeError):
-                pass
 
         configs_map = {}
         if config_ids_to_read:
@@ -795,7 +883,7 @@ class StateScheduler(StateSchedulerInterface):
                             "task_id": f"poc_{group_id}",
                             "status": "running",
                             "dataset_id": "poc_selecting",
-                            "dataset_name": "构建PoC池（初始化中...[预计时间:5-10min]）",
+                            "dataset_name": "构建PoC池(初始化中...[预计时间:5-10min])",
                             "error_message": "",
                             "progress": None,
                         }
@@ -807,7 +895,7 @@ class StateScheduler(StateSchedulerInterface):
                             if cnt > 0:
                                 score_parts.append(f"{s}分{cnt}条")
                         found_info = (
-                            "、".join(score_parts)
+                            ",".join(score_parts)
                             if score_parts
                             else f"有效 {poc_progress['found']} 条"
                         )
@@ -815,7 +903,7 @@ class StateScheduler(StateSchedulerInterface):
                             "task_id": f"poc_{group_id}",
                             "status": "running",
                             "dataset_id": "poc_selecting",
-                            "dataset_name": f"构建PoC池 ({poc_progress['processed']}/{poc_progress['total']}，{found_info})",
+                            "dataset_name": f"构建PoC池 ({poc_progress['processed']}/{poc_progress['total']},{found_info})",
                             "error_message": "",
                             "progress": {
                                 "processed": poc_progress["processed"],
@@ -852,14 +940,14 @@ class StateScheduler(StateSchedulerInterface):
                             if remaining > 0 and current > 0:
                                 st_elapsed = elapsed
                                 st_speed = current / st_elapsed if st_elapsed > 0 else 0
-                                if st_speed < 0.01:
+                                if st_speed < 0.01:  # noqa: PLR2004
                                     subtype_etas.append((st, float("inf")))
                                 else:
                                     subtype_etas.append((st, remaining / st_speed))
                             elif remaining > 0:
                                 subtype_etas.append((st, float("inf")))
                         if subtype_etas:
-                            max_eta_st, max_eta_val = max(subtype_etas, key=lambda x: x[1])
+                            _max_eta_st, max_eta_val = max(subtype_etas, key=lambda x: x[1])
                             poc_eta = max_eta_val if max_eta_val != float("inf") else -1.0
                         else:
                             poc_eta = 0.0
@@ -964,27 +1052,20 @@ class StateScheduler(StateSchedulerInterface):
                 dyn_processed = dynamic_prog.get("processed", 0)
                 dyn_total = dynamic_prog.get("total", 0)
                 dyn_avg_iter = dynamic_prog.get("avg_iterations", 0.0)
-                dyn_name = (
-                    f"动态检测 ({dyn_processed}/{dyn_total}，平均 {dyn_avg_iter} 轮)"
-                    if dyn_total > 0
-                    else "动态检测（初始化中...）"
-                )
-                dyn_child = {
-                    "task_id": f"dyn_{group_id}",
-                    "status": "running",
-                    "dataset_id": "dynamic_detecting",
-                    "dataset_name": dyn_name,
-                    "error_message": "",
-                    "progress": {
-                        "processed": dyn_processed,
-                        "total": dyn_total,
-                        "avg_iterations": dyn_avg_iter,
-                    }
-                    if dyn_total > 0
-                    else None,
-                }
-                children.append(dyn_child)  # type: ignore[arg-type]
-                status_counts["running"] += 1
+                dyn_breakdown = dynamic_prog.get("breakdown")
+                for child in children:
+                    if child.get("status") in ("completed", "running"):
+                        child["status"] = "running"
+                        child["progress"] = (
+                            {
+                                "processed": dyn_processed,
+                                "total": dyn_total,
+                                "avg_iterations": dyn_avg_iter,
+                                "breakdown": dyn_breakdown,
+                            }
+                            if dyn_total > 0
+                            else None
+                        )
 
             if group_status == "completed":
                 eta_seconds = 0.0
@@ -1000,25 +1081,30 @@ class StateScheduler(StateSchedulerInterface):
                     "children": children,
                     "eta_seconds": eta_seconds,
                     "stage_info": stage_info,
-                }
+                },
             )
 
         return {"success": True, "groups": [g for g in groups if g["status"] != "cancelled"]}
 
-    async def cancel_task(self, task_id: str) -> dict:
+    async def cancel_task(self, task_id: str) -> dict:  # noqa: D102
         ok = await self._task_queue.cancel_task(task_id)
         if not ok:
             return {"success": False, "error": "任务不存在或已处于终态"}
+
+        bg = self._task_id_to_bg.pop(task_id, None)
+        if bg is not None and not bg.done():
+            bg.cancel()
+
         self._log_rt("task_cancelled", f"任务 {task_id} 已取消")
 
         remaining = await self._task_queue.get_queue_view()
         has_active = any(t.status in (TaskStatus.PENDING, TaskStatus.RUNNING) for t in remaining)
-        if not has_active:
+        if not has_active and not self._enqueue_in_progress:
             self._transition_detection_done("cancel_task")
 
         return {"success": True}
 
-    async def cancel_task_group(self, task_group_id: str) -> dict:
+    async def cancel_task_group(self, task_group_id: str) -> dict:  # noqa: D102
         queue_view = await self._task_queue.get_queue_view()
         group_tasks = [t for t in queue_view if t.metadata.get("task_group_id") == task_group_id]
 
@@ -1029,20 +1115,21 @@ class StateScheduler(StateSchedulerInterface):
                 ok = await self._task_queue.cancel_task(t.task_id)
                 if ok:
                     cancelled_count += 1
+                    bg = self._task_id_to_bg.pop(t.task_id, None)
+                    if bg is not None and not bg.done():
+                        bg.cancel()
             else:
                 task_ids_to_remove.append(t.task_id)
 
         for tid in task_ids_to_remove:
             await self._task_queue.remove_task(tid)
 
-        try:
+        with contextlib.suppress(Exception):
             await self._report.delete_report(task_group_id=task_group_id)
-        except Exception:
-            pass
 
         remaining = await self._task_queue.get_queue_view()
         has_active = any(t.status in (TaskStatus.PENDING, TaskStatus.RUNNING) for t in remaining)
-        if not has_active:
+        if not has_active and not self._enqueue_in_progress:
             self._transition_detection_done("cancel_task_group")
 
         self._log_rt(
@@ -1057,8 +1144,8 @@ class StateScheduler(StateSchedulerInterface):
 
     # ── 报告管理调度 (职责 5-8) ──
 
-    async def generate_report(
-        self, task_group_id: str, *, user_id: int | None = None
+    async def generate_report(  # noqa: D102
+        self, task_group_id: str, *, user_id: int | None = None,  # noqa: ARG002
     ) -> dict:
         try:
             old_state = self.get_system_state()
@@ -1066,7 +1153,7 @@ class StateScheduler(StateSchedulerInterface):
             new_state = self.get_system_state()
             self._log_state_transition(old_state, new_state, "start_report")
             self._notify_state()
-        except Exception:
+        except Exception:  # noqa: BLE001
             return {"success": False, "error": "系统状态不允许生成报告"}
 
         try:
@@ -1081,8 +1168,8 @@ class StateScheduler(StateSchedulerInterface):
             self._log_state_transition(old_state, new_state, "report_done")
             self._notify_state()
             self._log_rt("report_generated", f"报告已生成: {task_group_id}")
-            return {"success": True, "report": report}
-        except Exception as e:
+            return {"success": True, "report": report}  # noqa: TRY300
+        except Exception as e:  # noqa: BLE001
             self._handle_error(e, "ReportError")
             return {"success": False, "error": str(e)}
 
@@ -1093,21 +1180,21 @@ class StateScheduler(StateSchedulerInterface):
                 return t.algorithm_type
         return "static"
 
-    async def view_report(self, task_group_id: str, *, user_id: int | None = None) -> dict:
+    async def view_report(self, task_group_id: str, *, user_id: int | None = None) -> dict:  # noqa: D102
         report = await self._report.view_report(task_group_id, user_id=user_id)
         if isinstance(report, dict) and "error" in report:
             return {"success": False, "error": report["error"]}
         return {"success": True, "report": report}
 
-    async def list_reports(self, filters: Optional[dict] = None) -> list:
+    async def list_reports(self, filters: dict | None = None) -> list:  # noqa: D102
         f = filters or {}
         return await self._report.list_reports(
             user_id=f.get("user_id"),
             model_id=f.get("model_id"),
         )
 
-    async def delete_report(
-        self, target_id: str, caller_user_id: int, granularity: str = "task_group"
+    async def delete_report(  # noqa: D102
+        self, target_id: str, caller_user_id: int, granularity: str = "task_group",
     ) -> dict:
         kwargs: dict = {}
         if granularity == "task_group":
@@ -1121,19 +1208,19 @@ class StateScheduler(StateSchedulerInterface):
 
         ok, msg = await self._report.delete_report(user_id=caller_user_id, **kwargs)
         self._log_op(
-            caller_user_id, "delete_report", {"target_id": target_id, "granularity": granularity}
+            caller_user_id, "delete_report", {"target_id": target_id, "granularity": granularity},
         )
 
         if ok:
             try:
                 await self._cleanup_task_queue_after_report_delete(target_id, granularity)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 self._log_err("queue_cleanup", f"删除报告后清理任务队列失败: {e}")
 
         return {"success": ok, "message": msg}
 
     async def _cleanup_task_queue_after_report_delete(
-        self, target_id: str, granularity: str
+        self, target_id: str, granularity: str,
     ) -> None:
         queue_view = await self._task_queue.get_queue_view()
 
@@ -1159,10 +1246,10 @@ class StateScheduler(StateSchedulerInterface):
                     await self._task_queue.cancel_task(task.task_id)
                 await self._task_queue.remove_task(task.task_id)
                 self._log_rt(
-                    "queue_cleaned_after_report_delete", f"删除报告后清理任务队列: 任务 {target_id}"
+                    "queue_cleaned_after_report_delete", f"删除报告后清理任务队列: 任务 {target_id}",
                 )
 
-    async def export_report(
+    async def export_report(  # noqa: D102
         self,
         task_group_id: str,
         target_format: str,
@@ -1171,100 +1258,96 @@ class StateScheduler(StateSchedulerInterface):
         task_id: str | None = None,
     ) -> dict:
         filename, content = await self._report.export_report(
-            task_group_id, target_format, user_id=user_id, task_id=task_id
+            task_group_id, target_format, user_id=user_id, task_id=task_id,
         )
         self._log_rt("report_exported", f"报告 {task_group_id} 已导出为 {target_format}")
         return {"success": True, "filename": filename, "content": content}
 
-    async def prepare_visualization_data(
-        self, task_group_id: str, *, user_id: int | None = None
+    async def prepare_visualization_data(  # noqa: D102
+        self, task_group_id: str, *, user_id: int | None = None,
     ) -> dict:
         data = await self._report.prepare_visualization_data(task_group_id, user_id=user_id)
         if isinstance(data, dict) and "error" in data and "risk_distribution" not in data:
             return {"success": False, "error": data["error"]}
         return {"success": True, "data": data}
 
-    async def prepare_task_visualization_data(
-        self, task_id: str, *, user_id: int | None = None
+    async def prepare_task_visualization_data(  # noqa: D102
+        self, task_id: str, *, user_id: int | None = None,
     ) -> dict:
         data = await self._report.prepare_task_visualization_data(task_id, user_id=user_id)
         if isinstance(data, dict) and "error" in data and "risk_distribution" not in data:
             return {"success": False, "error": data["error"]}
         return {"success": True, "data": data}
 
-    async def query_compliance_statistics(self) -> dict:
+    async def query_compliance_statistics(self) -> dict:  # noqa: D102
         stats = await self._report.get_compliance_statistics()
         return {"success": True, **stats}
 
     # ── 系统状态与日志 (职责 9-12) ──
 
-    def get_system_state(self) -> str:
-        return cast(str, next(iter(self._fsm.configuration)).id)
+    def get_system_state(self) -> str:  # noqa: D102
+        return cast("str", next(iter(self._fsm.configuration)).id)
 
-    def subscribe_state_changes(self, callback: Callable[[str], None]) -> None:
+    def subscribe_state_changes(self, callback: Callable[[str], None]) -> None:  # noqa: D102
         if callback not in self._state_callbacks:
             self._state_callbacks.append(callback)
 
-    def unsubscribe_state_changes(self, callback: Callable[[str], None]) -> None:
+    def unsubscribe_state_changes(self, callback: Callable[[str], None]) -> None:  # noqa: D102
         if callback in self._state_callbacks:
             self._state_callbacks.remove(callback)
 
-    def subscribe_errors(self, callback: Callable[[str, str], None]) -> None:
+    def subscribe_errors(self, callback: Callable[[str, str], None]) -> None:  # noqa: D102
         if callback not in self._error_callbacks:
             self._error_callbacks.append(callback)
 
-    def unsubscribe_errors(self, callback: Callable[[str, str], None]) -> None:
+    def unsubscribe_errors(self, callback: Callable[[str, str], None]) -> None:  # noqa: D102
         if callback in self._error_callbacks:
             self._error_callbacks.remove(callback)
 
-    def subscribe_logs(self, callback: Callable[[dict], None]) -> None:
+    def subscribe_logs(self, callback: Callable[[dict], None]) -> None:  # noqa: D102
         if callback not in self._log_callbacks:
             self._log_callbacks.append(callback)
 
-    def unsubscribe_logs(self, callback: Callable[[dict], None]) -> None:
+    def unsubscribe_logs(self, callback: Callable[[dict], None]) -> None:  # noqa: D102
         if callback in self._log_callbacks:
             self._log_callbacks.remove(callback)
 
     def subscribe_llm_calls(self, callback: Callable[[dict, dict], None]) -> None:
-        """订阅 LLM 调用事件，callback 接收 (request_info, response_info)"""
+        """订阅 LLM 调用事件,callback 接收 (request_info, response_info)."""
         if callback not in self._llm_call_callbacks:
             self._llm_call_callbacks.append(callback)
 
     def unsubscribe_llm_calls(self, callback: Callable[[dict, dict], None]) -> None:
-        """取消 LLM 调用订阅"""
+        """取消 LLM 调用订阅."""
         if callback in self._llm_call_callbacks:
             self._llm_call_callbacks.remove(callback)
 
     def _notify_llm_call(self, request_info: dict, response_info: dict) -> None:
         for cb in list(self._llm_call_callbacks):
-            try:
+            with contextlib.suppress(Exception):
                 cb(request_info, response_info)
-            except Exception:
-                pass
 
     def _notify_state(self) -> None:
         state = self.get_system_state()
         for cb in list(self._state_callbacks):
             try:
                 cb(state)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 self._logger.log_error("StateScheduler", "CallbackError", f"状态回调异常: {e}")
 
     def _notify_error(self, err_type: str, desc: str) -> None:
         for cb in list(self._error_callbacks):
             try:
                 cb(err_type, desc)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 self._logger.log_error("StateScheduler", "CallbackError", f"错误回调异常: {e}")
 
     def _on_new_log(self, log_data: dict) -> None:
         for cb in list(self._log_callbacks):
-            try:
+            with contextlib.suppress(Exception):
                 cb(log_data)
-            except Exception:
-                pass
 
-    async def query_logs(self, filters: Optional[dict] = None) -> dict:
+    async def query_logs(self, filters: dict | None = None) -> dict:  # noqa: D102
         f = filters or {}
         category = None
         cat_str = f.get("category")
@@ -1273,7 +1356,7 @@ class StateScheduler(StateSchedulerInterface):
         level = None
         level_str = f.get("level")
         if level_str:
-            from sdpj.core.event_logger_interface import LogLevel
+            from sdpj.core.event_logger_interface import LogLevel  # noqa: PLC0415
 
             level = LogLevel(level_str.lower())
         entries, total = await self._logger.query_logs(
@@ -1312,7 +1395,7 @@ class StateScheduler(StateSchedulerInterface):
             new_state = self.get_system_state()
             self._log_state_transition(old_state, new_state, "to_error")
             self._notify_state()
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
         try:
             old_state = self.get_system_state()
@@ -1320,12 +1403,12 @@ class StateScheduler(StateSchedulerInterface):
             new_state = self.get_system_state()
             self._log_state_transition(old_state, new_state, "recover")
             self._notify_state()
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
     # ── 用户账号调度 (职责 13-14) ──
 
-    async def schedule_user_auth(self, username: str, password: str, action: str) -> dict:
+    async def schedule_user_auth(self, username: str, password: str, action: str) -> dict:  # noqa: D102
         pwd = password
 
         if action == "register":
@@ -1344,7 +1427,7 @@ class StateScheduler(StateSchedulerInterface):
         return {"success": False, "error": f"未知操作: {action}"}
 
     async def list_all_users(self) -> list[dict]:
-        """获取所有用户列表"""
+        """获取所有用户列表."""
         users = await self._account.list_all_users()
         return [
             {
@@ -1355,7 +1438,7 @@ class StateScheduler(StateSchedulerInterface):
             for u in users
         ]
 
-    async def schedule_account_operation(self, operation: str, params: dict) -> dict:
+    async def schedule_account_operation(self, operation: str, params: dict) -> dict:  # noqa: D102
         dispatch = {
             "change_password": self._op_change_password,
             "switch_account": self._op_switch_account,
@@ -1444,7 +1527,7 @@ class StateScheduler(StateSchedulerInterface):
         return {"success": ok, "message": msg}
 
     async def _cleanup_user_datasets(self, user_id: int) -> None:
-        """删除用户前清理其私有数据集（SampleDB 记录 + 磁盘文件）"""
+        """删除用户前清理其私有数据集(SampleDB 记录 + 磁盘文件)."""
         try:
             resources = await self._account.list_resources_for_user(user_id)
             all_datasets = await self._config.query_datasets()
@@ -1467,12 +1550,12 @@ class StateScheduler(StateSchedulerInterface):
                             "dataset_cleaned",
                             f"用户 {user_id} 删除前清理数据集: id={ds_id}, name={ds_name}",
                         )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self._log_err("UserCleanup", f"清理用户 {user_id} 数据集失败: {e}")
 
     # ── 权限授权调度 (职责 15-16) ──
 
-    async def schedule_dac_operation(self, operation: str, params: dict) -> dict:
+    async def schedule_dac_operation(self, operation: str, params: dict) -> dict:  # noqa: D102
         caller = params["caller_user_id"]
 
         if operation == "grant":
@@ -1495,12 +1578,12 @@ class StateScheduler(StateSchedulerInterface):
 
         return {"success": False, "error": f"未知权限操作: {operation}"}
 
-    async def check_resource_access(self, resource_id: int, user_id: int) -> bool:
+    async def check_resource_access(self, resource_id: int, user_id: int) -> bool:  # noqa: D102
         return await self._dac.check_access(resource_id, user_id)
 
     # ── 私有资源调度 (职责 17, 17-1, 18) ──
 
-    async def schedule_config_operation(self, operation: str, params: dict) -> dict:
+    async def schedule_config_operation(self, operation: str, params: dict) -> dict:  # noqa: C901, D102, PLR0911, PLR0912, PLR0915
         user_id: int = params.get("user_id", 0)
         is_write = operation in {"create", "update", "delete", "import"}
 
@@ -1511,7 +1594,7 @@ class StateScheduler(StateSchedulerInterface):
                 new_state = self.get_system_state()
                 self._log_state_transition(old_state, new_state, "start_configuring")
                 self._notify_state()
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return {"success": False, "error": "系统状态不允许修改配置"}
 
         try:
@@ -1558,7 +1641,7 @@ class StateScheduler(StateSchedulerInterface):
 
             if operation == "export":
                 content = await self._config.export_config(
-                    params["config_id"], params.get("format", "json")
+                    params["config_id"], params.get("format", "json"),
                 )
                 self._log_op(user_id, "export_config", {"config_id": params["config_id"]})
                 return {"success": True, "content": content}
@@ -1578,11 +1661,11 @@ class StateScheduler(StateSchedulerInterface):
                     new_state = self.get_system_state()
                     self._log_state_transition(old_state, new_state, "configuring_done")
                     self._notify_state()
-                except Exception:
+                except Exception:  # noqa: BLE001, S110
                     pass
 
     async def _verify_config_availability(self, config_id: int, user_id: int, config: dict) -> dict:
-        import uuid
+        import uuid  # noqa: PLC0415
 
         adapter_content = json.dumps(config)
         temp_model_id = f"__verify_{uuid.uuid4().hex[:8]}"
@@ -1604,16 +1687,14 @@ class StateScheduler(StateSchedulerInterface):
 
             result = await self._detector.verify_connectivity(instance, timeout=30.0)
             self._log_op(
-                user_id, "verify_config", {"config_id": config_id, "status": result["status"]}
+                user_id, "verify_config", {"config_id": config_id, "status": result["status"]},
             )
             return {"success": result["success"], "result": result}
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 await self._config.unregister_private_model(temp_model_id)
-            except Exception:
-                pass
 
-    async def query_available_datasets(self, user_id: int) -> list:
+    async def query_available_datasets(self, user_id: int) -> list:  # noqa: D102
         datasets = await self._config.query_datasets()
 
         private_datasets = [ds for ds in datasets if ds.get("resource_id") is not None]
@@ -1628,9 +1709,7 @@ class StateScheduler(StateSchedulerInterface):
         filtered = []
         for ds in datasets:
             resource_id = ds.get("resource_id")
-            if resource_id is None:
-                filtered.append(ds)
-            elif resource_id in accessible_ids:
+            if resource_id is None or resource_id in accessible_ids:
                 filtered.append(ds)
 
         if user_id > 0:
@@ -1638,9 +1717,9 @@ class StateScheduler(StateSchedulerInterface):
         return filtered
 
     async def query_dataset_detail(
-        self, dataset_id: int, user_id: int | None = None
+        self, dataset_id: int, user_id: int | None = None,
     ) -> dict | None:
-        """查询数据集详情"""
+        """查询数据集详情."""
         datasets = await self._config.query_datasets()
         for ds in datasets:
             if ds.get("dataset_id") == dataset_id:
@@ -1653,7 +1732,7 @@ class StateScheduler(StateSchedulerInterface):
         return None
 
     async def delete_user_dataset(self, dataset_id: int, user_id: int) -> dict:
-        """删除用户数据集（仅允许删除有 resource_id 的用户私有数据集）"""
+        """删除用户数据集(仅允许删除有 resource_id 的用户私有数据集)."""
         dataset = await self.query_dataset_detail(dataset_id)
         if not dataset:
             return {"success": False, "error": "数据集不存在"}
@@ -1672,7 +1751,7 @@ class StateScheduler(StateSchedulerInterface):
         return {"success": ok}
 
     async def export_dataset_file(self, dataset_id: int, user_id: int | None = None) -> dict | None:
-        """导出数据集文件 -- 编排角色"""
+        """导出数据集文件 -- 编排角色."""
         datasets = await self._config.query_datasets()
         dataset = None
         for ds in datasets:
@@ -1696,7 +1775,7 @@ class StateScheduler(StateSchedulerInterface):
         return await self._config.export_dataset_file(dataset_id, username)
 
     async def import_dataset_file(self, user_id: int, filename: str, content: bytes) -> dict:
-        """导入数据集文件 -- 编排角色"""
+        """导入数据集文件 -- 编排角色."""
         profile = await self._account.get_profile_for_user(user_id)
         username = profile["username"] if profile else str(user_id)
         result = await self._config.import_dataset_file(user_id, filename, content, username)
@@ -1706,16 +1785,16 @@ class StateScheduler(StateSchedulerInterface):
                 "import_dataset",
                 {"filename": filename, "dataset_id": result.get("dataset_id")},
             )
-        return cast(dict, result)
+        return cast("dict", result)
 
-    async def schedule_private_resource_operation(self, operation: str, params: dict) -> dict:
+    async def schedule_private_resource_operation(self, operation: str, params: dict) -> dict:  # noqa: C901, D102, PLR0911
         try:
             old_state = self.get_system_state()
             self._fsm.start_configuring()
             new_state = self.get_system_state()
             self._log_state_transition(old_state, new_state, "start_configuring")
             self._notify_state()
-        except Exception:
+        except Exception:  # noqa: BLE001
             return {"success": False, "error": "系统状态不允许修改配置"}
 
         user_id: int = params.get("user_id", 0)
@@ -1769,5 +1848,5 @@ class StateScheduler(StateSchedulerInterface):
                 new_state = self.get_system_state()
                 self._log_state_transition(old_state, new_state, "configuring_done")
                 self._notify_state()
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass

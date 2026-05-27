@@ -1,4 +1,6 @@
-"""检测路由 (职责 1-3)"""
+"""检测路由 (职责 1-3)."""
+
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 
@@ -17,14 +19,21 @@ from sdpj.ui.webui.backend.schemas.detection import (
     PrivateResourceRequest,
 )
 
+from sdpj.infrastructure.utils import encoding as encoding_utils
+
 router = APIRouter(prefix="/api/detection", tags=["detection"])
 
 
+@router.get("/encoding-types")
+async def get_encoding_types():  # noqa: ANN201, D103
+    return success_response(data=encoding_utils.get_encoding_types())
+
+
 @router.post("/start")
-async def start_detection(
+async def start_detection(  # noqa: ANN201, D103
     req: DetectionStartRequest,
     request: Request,
-    scheduler: StateSchedulerInterface = Depends(get_scheduler),
+    scheduler: Annotated[StateSchedulerInterface, Depends(get_scheduler)],
 ):
     user_id: int = request.state.user_id
     config_data = req.model_dump()  # type: ignore[attr-defined]
@@ -32,32 +41,32 @@ async def start_detection(
 
 
 @router.post("/run")
-async def run_concurrent(
+async def run_concurrent(  # noqa: ANN201, D103
     req: ConcurrentRunRequest,
-    scheduler: StateSchedulerInterface = Depends(get_scheduler),
+    scheduler: Annotated[StateSchedulerInterface, Depends(get_scheduler)],
 ):
     return wrap_scheduler_result(await scheduler.execute_concurrent_tasks(req.max_concurrency))
 
 
 @router.get("/progress")
-async def progress_all(
-    scheduler: StateSchedulerInterface = Depends(get_scheduler),
+async def progress_all(  # noqa: ANN201, D103
+    scheduler: Annotated[StateSchedulerInterface, Depends(get_scheduler)],
 ):
     return wrap_scheduler_result(await scheduler.query_detection_progress())
 
 
 @router.get("/progress/{task_id}")
-async def progress_single(
+async def progress_single(  # noqa: ANN201, D103
     task_id: str,
-    scheduler: StateSchedulerInterface = Depends(get_scheduler),
+    scheduler: Annotated[StateSchedulerInterface, Depends(get_scheduler)],
 ):
     return wrap_scheduler_result(await scheduler.query_detection_progress(task_id))
 
 
 @router.post("/cancel")
-async def cancel_task(
+async def cancel_task(  # noqa: ANN201, D103
     req: CancelTaskRequest,
-    scheduler: StateSchedulerInterface = Depends(get_scheduler),
+    scheduler: Annotated[StateSchedulerInterface, Depends(get_scheduler)],
 ):
     if req.task_group_id:
         return wrap_scheduler_result(await scheduler.cancel_task_group(req.task_group_id))
@@ -67,9 +76,9 @@ async def cancel_task(
 
 
 @router.get("/datasets")
-async def datasets(
+async def datasets(  # noqa: ANN201, D103
     request: Request,
-    scheduler: StateSchedulerInterface = Depends(get_scheduler),
+    scheduler: Annotated[StateSchedulerInterface, Depends(get_scheduler)],
 ):
     user_id = request.state.user_id
     result = await scheduler.query_available_datasets(user_id)
@@ -77,10 +86,10 @@ async def datasets(
 
 
 @router.get("/datasets/{dataset_id}")
-async def dataset_detail(
+async def dataset_detail(  # noqa: ANN201, D103
     dataset_id: int,
     request: Request,
-    scheduler: StateSchedulerInterface = Depends(get_scheduler),
+    scheduler: Annotated[StateSchedulerInterface, Depends(get_scheduler)],
 ):
     user_id = request.state.user_id
     dataset = await scheduler.query_dataset_detail(dataset_id, user_id)
@@ -90,12 +99,12 @@ async def dataset_detail(
 
 
 @router.get("/datasets/{dataset_id}/export")
-async def export_dataset(
+async def export_dataset(  # noqa: ANN201, D103
     dataset_id: int,
     request: Request,
-    scheduler: StateSchedulerInterface = Depends(get_scheduler),
+    scheduler: Annotated[StateSchedulerInterface, Depends(get_scheduler)],
 ):
-    from fastapi.responses import Response
+    from fastapi.responses import Response  # noqa: PLC0415
 
     try:
         user_id = request.state.user_id
@@ -115,19 +124,16 @@ async def export_dataset(
             media_type="application/octet-stream",
             headers={"Content-Disposition": f'attachment; filename="{dataset_file["filename"]}"'},
         )
-    except Exception as e:
-        import traceback
+    except Exception as e:  # noqa: BLE001
 
-        print(f"导出数据集错误: {e}")
-        print(traceback.format_exc())
         return error_response(message=str(e))
 
 
 @router.delete("/datasets/{dataset_id}")
-async def delete_dataset(
+async def delete_dataset(  # noqa: ANN201, D103
     dataset_id: int,
     request: Request,
-    scheduler: StateSchedulerInterface = Depends(get_scheduler),
+    scheduler: Annotated[StateSchedulerInterface, Depends(get_scheduler)],
 ):
     user_id = request.state.user_id
     result = await scheduler.delete_user_dataset(dataset_id, user_id)
@@ -137,10 +143,10 @@ async def delete_dataset(
 
 
 @router.post("/datasets/import")
-async def import_dataset(
+async def import_dataset(  # noqa: ANN201, D103
     request: Request,
-    file: UploadFile = File(...),
-    scheduler: StateSchedulerInterface = Depends(get_scheduler),
+    file: Annotated[UploadFile, File()],
+    scheduler: Annotated[StateSchedulerInterface, Depends(get_scheduler)],
 ):
     user_id = request.state.user_id
 
@@ -148,40 +154,36 @@ async def import_dataset(
         content = await file.read()
 
         result = await scheduler.import_dataset_file(
-            user_id=user_id, filename=file.filename or "", content=content
+            user_id=user_id, filename=file.filename or "", content=content,
         )
 
         if result.get("success"):
             return success_response(
-                data={"dataset_id": result.get("dataset_id")}, message="导入成功"
+                data={"dataset_id": result.get("dataset_id")}, message="导入成功",
             )
-        else:
-            return error_response(message=result.get("error", "导入失败"))
-    except Exception as e:
-        import traceback
+        return error_response(message=result.get("error", "导入失败"))
+    except Exception as e:  # noqa: BLE001
 
-        print(f"导入数据集错误: {e}")
-        print(traceback.format_exc())
         return error_response(message=str(e))
 
 
 @router.post("/config")
-async def config_operation(
+async def config_operation(  # noqa: ANN201, D103
     req: ConfigOperationRequest,
     request: Request,
-    scheduler: StateSchedulerInterface = Depends(get_scheduler),
+    scheduler: Annotated[StateSchedulerInterface, Depends(get_scheduler)],
 ):
     params = {**req.params, "user_id": request.state.user_id}
     return wrap_scheduler_result(await scheduler.schedule_config_operation(req.operation, params))
 
 
 @router.post("/resource")
-async def resource_operation(
+async def resource_operation(  # noqa: ANN201, D103
     req: PrivateResourceRequest,
     request: Request,
-    scheduler: StateSchedulerInterface = Depends(get_scheduler),
+    scheduler: Annotated[StateSchedulerInterface, Depends(get_scheduler)],
 ):
     params = {**req.params, "user_id": request.state.user_id}
     return wrap_scheduler_result(
-        await scheduler.schedule_private_resource_operation(req.operation, params)
+        await scheduler.schedule_private_resource_operation(req.operation, params),
     )

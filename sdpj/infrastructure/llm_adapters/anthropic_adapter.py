@@ -1,4 +1,4 @@
-"""Anthropic 格式适配器 — 支持 Anthropic Messages API"""
+"""Anthropic 格式适配器 — 支持 Anthropic Messages API."""
 
 import aiohttp
 
@@ -10,15 +10,15 @@ from sdpj.infrastructure.llm_adapters.errors import (
 
 
 class AnthropicAdapter(LLMAdapter):
-    """Anthropic Messages API 格式适配器
+    """Anthropic Messages API 格式适配器.
 
-    向上抽象职责：
-    - 将 Anthropic 格式的配置参数（api_url、api_key、model）转换为统一的调用接口
-    - 屏蔽 Anthropic API 的请求/响应格式细节（如 x-api-key header、messages 结构）
+    向上抽象职责:
+    - 将 Anthropic 格式的配置参数(api_url,api_key,model)转换为统一的调用接口
+    - 屏蔽 Anthropic API 的请求/响应格式细节(如 x-api-key header,messages 结构)
     - 提供统一的错误处理和超时控制
     """
 
-    def __init__(
+    def __init__(  # noqa: D107, PLR0913
         self,
         model_id: str,
         api_url: str,
@@ -27,7 +27,7 @@ class AnthropicAdapter(LLMAdapter):
         timeout: int = 60,
         max_rps: float = 0.5,
         max_concurrency: int = 3,
-    ):
+    ) -> None:
         super().__init__(model_id=model_id, max_rps=max_rps, max_concurrency=max_concurrency)
         self._api_url = api_url.rstrip("/")
         self._api_key = api_key
@@ -40,7 +40,7 @@ class AnthropicAdapter(LLMAdapter):
             self._session = aiohttp.ClientSession()
         return self._session
 
-    async def close(self) -> None:
+    async def close(self) -> None:  # noqa: D102
         if self._session and not self._session.closed:
             await self._session.close()
 
@@ -50,12 +50,12 @@ class AnthropicAdapter(LLMAdapter):
         system_prompt: str = "",
         max_tokens: int = 2048,
         temperature: float = 0.0,
-        timeout: int = 60,
+        timeout: int = 60,  # noqa: ASYNC109
     ) -> dict:
-        """调用 Anthropic Messages API（统一接口）
+        """调用 Anthropic Messages API(统一接口).
 
-        使用构造时配置的 api_url、api_key、model_name，
-        不允许运行时覆盖配置参数。
+        使用构造时配置的 api_url,api_key,model_name,
+        不允许运行时覆盖配置参数.
         """
         if self._api_url.endswith("/messages"):
             url = self._api_url
@@ -88,7 +88,7 @@ class AnthropicAdapter(LLMAdapter):
                 timeout=aiohttp.ClientTimeout(total=timeout),
             ) as resp:
                 data = await resp.json()
-                if resp.status == 200:
+                if resp.status == 200:  # noqa: PLR2004
                     text_parts = [
                         block["text"]
                         for block in data.get("content", [])
@@ -107,17 +107,17 @@ class AnthropicAdapter(LLMAdapter):
         except StandardizedLLMError:
             raise
         except aiohttp.ServerTimeoutError as e:
-            raise StandardizedLLMError(
-                ErrorCategory.TIMEOUT, f"Request timed out ({timeout}s)", original_error=e
+            raise StandardizedLLMError(  # noqa: B904
+                ErrorCategory.TIMEOUT, f"Request timed out ({timeout}s)", original_error=e,
             )
         except aiohttp.ClientError as e:
-            raise StandardizedLLMError(ErrorCategory.NETWORK, str(e), original_error=e)
-        except Exception as e:
-            raise StandardizedLLMError(ErrorCategory.UNKNOWN, str(e), original_error=e)
+            raise StandardizedLLMError(ErrorCategory.NETWORK, str(e), original_error=e)  # noqa: B904
+        except Exception as e:  # noqa: BLE001
+            raise StandardizedLLMError(ErrorCategory.UNKNOWN, str(e), original_error=e)  # noqa: B904
 
         return {}
 
-    def get_metadata(self) -> dict:
+    def get_metadata(self) -> dict:  # noqa: D102
         return {
             **super().get_metadata(),
             "model_id": self._model_id,

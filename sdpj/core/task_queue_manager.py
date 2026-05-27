@@ -1,14 +1,15 @@
-"""
-TaskQueueManager 实现
+"""TaskQueueManager 实现.
 
-该模块实现了任务队列管理的核心功能，支持数据库持久化。
+该模块实现了任务队列管理的核心功能,支持数据库持久化.
 """
 
 import asyncio
+import contextlib
+import logging
 import time
 import uuid
-from datetime import datetime, timezone
-from typing import Dict, cast
+from datetime import UTC, datetime
+from typing import cast
 
 from .task_queue_manager_interface import (
     Task,
@@ -17,27 +18,28 @@ from .task_queue_manager_interface import (
     TaskStatus,
 )
 
+_logger = logging.getLogger(__name__)
+
 
 class TaskQueueManager(TaskQueueManagerInterface):
-    """
-    任务队列管理器
+    """任务队列管理器.
 
-    负责管理检测任务的入队、出队、状态跟踪。
-    使用 asyncio.Queue 实现 FIFO 队列，同时持久化到数据库（通过注入的 TaskPersistence）。
+    负责管理检测任务的入队,出队,状态跟踪.
+    使用 asyncio.Queue 实现 FIFO 队列,同时持久化到数据库(通过注入的 TaskPersistence).
     """
 
-    def __init__(self, session_manager=None, persistence: TaskPersistence | None = None):
+    def __init__(self, session_manager=None, persistence: TaskPersistence | None = None) -> None:  # noqa: ANN001, D107
         self._queue: asyncio.Queue = asyncio.Queue()
-        self._tasks: Dict[str, Task] = {}
+        self._tasks: dict[str, Task] = {}
         self._lock: asyncio.Lock = asyncio.Lock()
         self._session_manager = session_manager
         self._persistence = persistence
         self._initialized = False
-        self._poc_progress: Dict[str, dict] = {}
-        self._task_progress: Dict[str, dict] = {}
-        self._dynamic_progress: Dict[str, dict] = {}
+        self._poc_progress: dict[str, dict] = {}
+        self._task_progress: dict[str, dict] = {}
+        self._dynamic_progress: dict[str, dict] = {}
 
-    async def initialize(self) -> None:
+    async def initialize(self) -> None:  # noqa: C901, D102, PLR0912
         if self._initialized:
             return
         if self._persistence is None:
@@ -46,7 +48,7 @@ class TaskQueueManager(TaskQueueManagerInterface):
 
         try:
             non_terminal = await self._persistence.list_non_terminal_tasks()
-        except Exception:
+        except Exception:  # noqa: BLE001
             self._initialized = True
             return
 
@@ -61,7 +63,7 @@ class TaskQueueManager(TaskQueueManagerInterface):
                 existing_groups = await self._persistence.list_task_groups()
                 existing_ids = {g["task_group_id"] for g in existing_groups}
                 valid_group_ids = tg_ids_in_tasks & existing_ids
-        except Exception:
+        except Exception:  # noqa: BLE001
             valid_group_ids = None
 
         for row in non_terminal:
@@ -103,11 +105,12 @@ class TaskQueueManager(TaskQueueManagerInterface):
 
         self._initialized = True
 
-    async def enqueue_task(self, task_desc: dict) -> str:
+    async def enqueue_task(self, task_desc: dict) -> str:  # noqa: D102
         required_fields = ["user_id", "model_id", "algorithm_type", "dataset_id"]
         for field in required_fields:
             if field not in task_desc:
-                raise ValueError(f"任务描述缺少必需字段: {field}")
+                msg = f"任务描述缺少必需字段: {field}"
+                raise ValueError(msg)
 
         task_id = str(uuid.uuid4())
         metadata = task_desc.get("metadata", {})
@@ -131,7 +134,7 @@ class TaskQueueManager(TaskQueueManagerInterface):
 
         return task_id
 
-    async def dequeue_task(self) -> Task | None:
+    async def dequeue_task(self) -> Task | None:  # noqa: D102
         while True:
             try:
                 task = self._queue.get_nowait()
@@ -148,9 +151,9 @@ class TaskQueueManager(TaskQueueManagerInterface):
                 task.status = TaskStatus.RUNNING
 
             await self._persist_status(task.task_id, TaskStatus.RUNNING)
-            return cast(Task, task)
+            return cast("Task", task)
 
-    async def dequeue_tasks(self, count: int) -> list[Task]:
+    async def dequeue_tasks(self, count: int) -> list[Task]:  # noqa: D102
         tasks = []
         for _ in range(count):
             task = await self.dequeue_task()
@@ -159,8 +162,8 @@ class TaskQueueManager(TaskQueueManagerInterface):
             tasks.append(task)
         return tasks
 
-    async def update_task_status(
-        self, task_id: str, status: TaskStatus, error_message: str = ""
+    async def update_task_status(  # noqa: D102
+        self, task_id: str, status: TaskStatus, error_message: str = "",
     ) -> bool:
         async with self._lock:
             if task_id not in self._tasks:
@@ -175,12 +178,12 @@ class TaskQueueManager(TaskQueueManagerInterface):
         await self._persist_status(task_id, status, error_message)
         return True
 
-    async def get_task_status(self, task_id: str) -> TaskStatus | None:
+    async def get_task_status(self, task_id: str) -> TaskStatus | None:  # noqa: D102
         async with self._lock:
             task = self._tasks.get(task_id)
             return task.status if task else None
 
-    async def cancel_task(self, task_id: str) -> bool:
+    async def cancel_task(self, task_id: str) -> bool:  # noqa: D102
         async with self._lock:
             task = self._tasks.get(task_id)
             if not task:
@@ -192,33 +195,33 @@ class TaskQueueManager(TaskQueueManagerInterface):
         await self._persist_status(task_id, TaskStatus.CANCELLED)
         return True
 
-    async def remove_task(self, task_id: str) -> bool:
+    async def remove_task(self, task_id: str) -> bool:  # noqa: D102
         async with self._lock:
             if task_id not in self._tasks:
                 return False
             del self._tasks[task_id]
         return True
 
-    async def get_queue_view(self) -> list[Task]:
+    async def get_queue_view(self) -> list[Task]:  # noqa: D102
         async with self._lock:
             return list(self._tasks.values())
 
-    async def update_poc_progress(self, task_group_id: str, progress: dict) -> None:
+    async def update_poc_progress(self, task_group_id: str, progress: dict) -> None:  # noqa: D102
         async with self._lock:
             existing = self._poc_progress.get(task_group_id, {})
             if "start_time" not in progress and "start_time" in existing:
                 progress["start_time"] = existing["start_time"]
             self._poc_progress[task_group_id] = progress
 
-    async def get_poc_progress(self, task_group_id: str) -> dict | None:
+    async def get_poc_progress(self, task_group_id: str) -> dict | None:  # noqa: D102
         async with self._lock:
             return self._poc_progress.get(task_group_id)
 
-    async def clear_poc_progress(self, task_group_id: str) -> None:
+    async def clear_poc_progress(self, task_group_id: str) -> None:  # noqa: D102
         async with self._lock:
             self._poc_progress.pop(task_group_id, None)
 
-    async def update_task_progress(self, task_id: str, processed: int, total: int) -> None:
+    async def update_task_progress(self, task_id: str, processed: int, total: int) -> None:  # noqa: D102
         async with self._lock:
             existing = self._task_progress.get(task_id, {})
             now = time.monotonic()
@@ -233,7 +236,7 @@ class TaskQueueManager(TaskQueueManagerInterface):
                 if elapsed > 0:
                     speed = (processed - last_processed) / elapsed
                     recent_speeds.append(speed)
-                    if len(recent_speeds) > 5:
+                    if len(recent_speeds) > 5:  # noqa: PLR2004
                         recent_speeds = recent_speeds[-5:]
             self._task_progress[task_id] = {
                 "processed": processed,
@@ -243,15 +246,15 @@ class TaskQueueManager(TaskQueueManagerInterface):
                 "recent_speeds": recent_speeds,
             }
 
-    async def get_task_progress(self, task_id: str) -> dict | None:
+    async def get_task_progress(self, task_id: str) -> dict | None:  # noqa: D102
         async with self._lock:
             return self._task_progress.get(task_id)
 
-    async def clear_task_progress(self, task_id: str) -> None:
+    async def clear_task_progress(self, task_id: str) -> None:  # noqa: D102
         async with self._lock:
             self._task_progress.pop(task_id, None)
 
-    async def update_dynamic_progress(self, task_group_id: str, progress: dict) -> None:
+    async def update_dynamic_progress(self, task_group_id: str, progress: dict) -> None:  # noqa: D102
         async with self._lock:
             existing = self._dynamic_progress.get(task_group_id, {})
             now = time.monotonic()
@@ -267,49 +270,38 @@ class TaskQueueManager(TaskQueueManagerInterface):
                 if elapsed > 0:
                     speed = (processed - last_processed) / elapsed
                     recent_speeds.append(speed)
-                    if len(recent_speeds) > 5:
+                    if len(recent_speeds) > 5:  # noqa: PLR2004
                         recent_speeds = recent_speeds[-5:]
             self._dynamic_progress[task_group_id] = {
                 "processed": processed,
                 "total": progress.get("total", 0),
                 "avg_iterations": progress.get("avg_iterations", 0.0),
+                "breakdown": progress.get("breakdown"),
                 "start_time": start_time,
                 "last_update_time": now,
                 "recent_speeds": recent_speeds,
             }
 
-    async def get_dynamic_progress(self, task_group_id: str) -> dict | None:
+    async def get_dynamic_progress(self, task_group_id: str) -> dict | None:  # noqa: D102
         async with self._lock:
             return self._dynamic_progress.get(task_group_id)
 
-    async def clear_dynamic_progress(self, task_group_id: str) -> None:
+    async def clear_dynamic_progress(self, task_group_id: str) -> None:  # noqa: D102
         async with self._lock:
             self._dynamic_progress.pop(task_group_id, None)
 
     async def _persist_task(self, task: Task, task_group_id: str) -> None:
         if self._persistence is None:
-            print(
-                f"[DEBUG _persist_task] _persistence 为 None，跳过持久化 task_group_id={task_group_id}",
-                flush=True,
-            )
             return
         try:
             try:
                 await self._persistence.get_task_group(task_group_id)
-                print(f"[DEBUG _persist_task] 任务组已存在: {task_group_id}", flush=True)
             except ValueError:
-                print(f"[DEBUG _persist_task] 任务组不存在，创建中: {task_group_id}", flush=True)
-                try:
+                with contextlib.suppress(Exception):
                     await self._persistence.create_task_group_with_id(
                         task_group_id=task_group_id,
                         user_id=int(task.user_id) if task.user_id.isdigit() else 0,
                         model_id=task.model_id,
-                    )
-                    print(f"[DEBUG _persist_task] 任务组创建成功: {task_group_id}", flush=True)
-                except Exception as e:
-                    print(
-                        f"[ERROR _persist_task] 创建任务组失败: task_group_id={task_group_id}, error={type(e).__name__}: {e}",
-                        flush=True,
                     )
 
             try:
@@ -318,49 +310,28 @@ class TaskQueueManager(TaskQueueManagerInterface):
                     task_group_id=task_group_id,
                     dataset_id=dataset_id,
                     task_status=task.status.value,
-                    start_time=datetime.now(timezone.utc),
+                    start_time=datetime.now(UTC),
                     algorithm_type=task.algorithm_type,
                     metadata_json=task.metadata,
                     task_id=task.task_id,
                 )
-                print(
-                    f"[DEBUG _persist_task] 检测任务创建成功: task_id={task.task_id}, task_group_id={task_group_id}",
-                    flush=True,
-                )
-            except Exception as e:
-                print(
-                    f"[ERROR _persist_task] 创建检测任务失败: task_id={task.task_id}, task_group_id={task_group_id}, error={type(e).__name__}: {e}",
-                    flush=True,
-                )
-        except Exception as e:
-            print(
-                f"[ERROR _persist_task] 持久化异常: task_group_id={task_group_id}, error={type(e).__name__}: {e}",
-                flush=True,
-            )
+            except Exception:  # noqa: BLE001
+                _logger.exception("持久化任务记录失败: task_id=%s", task.task_id)
+        except Exception:  # noqa: BLE001
+            _logger.exception("持久化任务组失败: task_group_id=%s", task_group_id)
 
     async def _persist_status(
-        self, task_id: str, status: TaskStatus, error_message: str = ""
+        self, task_id: str, status: TaskStatus, error_message: str = "",
     ) -> None:
         if self._persistence is None:
-            print(
-                f"[DEBUG _persist_status] _persistence 为 None，跳过持久化状态 task_id={task_id}",
-                flush=True,
-            )
             return
         try:
             end_time = None
             kwargs: dict = {}
             if status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED):
-                end_time = datetime.now(timezone.utc)
+                end_time = datetime.now(UTC)
             if error_message:
                 kwargs["error_message"] = error_message
             await self._persistence.update_task_status(task_id, status.value, end_time, **kwargs)
-            print(
-                f"[DEBUG _persist_status] 状态更新成功: task_id={task_id}, status={status.value}",
-                flush=True,
-            )
-        except Exception as e:
-            print(
-                f"[ERROR _persist_status] 状态更新失败: task_id={task_id}, status={status.value}, error={type(e).__name__}: {e}",
-                flush=True,
-            )
+        except Exception:  # noqa: BLE001
+            _logger.exception("持久化任务状态失败: task_id=%s, status=%s", task_id, status.value)

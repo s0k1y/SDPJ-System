@@ -1,22 +1,22 @@
-"""系统状态头文件 — 预设定系统的全部状态与转移规则
+"""系统状态头文件 — 预设定系统的全部状态与转移规则.
 
 对应 StateScheduler.md 技术细节 1.1:
 "通过预设定好的系统状态头文件规定系统的状态"
 
-所有状态定义集中于此，StateScheduler 导入 SystemStateMachine 来跟踪系统当前状态。
+所有状态定义集中于此,StateScheduler 导入 SystemStateMachine 来跟踪系统当前状态.
 """
 
 from statemachine import State, StateMachine
 
 
 class SystemStateMachine(StateMachine):
-    """系统有限状态机
+    """系统有限状态机.
 
     状态:
-        idle            — 空闲，系统就绪
-        detecting       — 检测中，正在执行检测任务
+        idle            — 空闲,系统就绪
+        detecting       — 检测中,正在执行检测任务
         generating_report — 生成报告中
-        error           — 异常，需要恢复
+        error           — 异常,需要恢复
 
     转移:
         idle → detecting          (start_detection)

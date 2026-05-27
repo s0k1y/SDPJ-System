@@ -1,15 +1,16 @@
 """ResultDB 会话管理单元测试
 
-测试数据库会话管理器的功能。
+测试数据库会话管理器的功能.
 """
 
 import pytest
 from sdpj.infrastructure.database.result_db.session import SessionManager
 from sdpj.infrastructure.database.result_db.models import Base, TaskGroup, TargetModel
+from typing import Any
 
 
 @pytest.fixture
-async def session_manager():
+async def session_manager() -> None:
     """创建测试用的会话管理器"""
     manager = SessionManager("sqlite+aiosqlite:///:memory:", echo=False)
     await manager.create_tables()
@@ -23,7 +24,7 @@ async def session_manager():
 
 
 @pytest.mark.asyncio
-async def test_session_manager_initialization():
+async def test_session_manager_initialization() -> None:
     """测试会话管理器初始化"""
     manager = SessionManager("sqlite+aiosqlite:///:memory:")
     await manager.initialize()
@@ -33,7 +34,7 @@ async def test_session_manager_initialization():
 
 
 @pytest.mark.asyncio
-async def test_create_tables(session_manager):
+async def test_create_tables(session_manager: Any) -> None:
     """测试创建表"""
     async with session_manager.session() as session:
         tg = TaskGroup(task_group_id="test-tg", user_id=1, model_id="m1")
@@ -51,7 +52,7 @@ async def test_create_tables(session_manager):
 
 
 @pytest.mark.asyncio
-async def test_session_context_manager(session_manager):
+async def test_session_context_manager(session_manager: Any) -> None:
     """测试会话上下文管理器"""
     async with session_manager.session() as session:
         tg = TaskGroup(task_group_id="context-test", user_id=1, model_id="m1")
@@ -68,7 +69,7 @@ async def test_session_context_manager(session_manager):
 
 
 @pytest.mark.asyncio
-async def test_session_rollback_on_exception(session_manager):
+async def test_session_rollback_on_exception(session_manager: Any) -> None:
     """测试异常时自动回滚"""
     try:
         async with session_manager.session() as session:
@@ -90,7 +91,7 @@ async def test_session_rollback_on_exception(session_manager):
 
 
 @pytest.mark.asyncio
-async def test_drop_tables():
+async def test_drop_tables() -> None:
     """测试删除表"""
     from sdpj.infrastructure.database.user_db.models import User
 

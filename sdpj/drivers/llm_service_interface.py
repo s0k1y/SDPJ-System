@@ -1,51 +1,49 @@
-"""LLMServiceInterface — 大模型服务接口
+"""LLMServiceInterface — 大模型服务接口.
 
-SDPJDetector 为唯一调用方 (符合 4.模型依赖关系图.puml 中 SDPJDetector → LLMService 边)。
+SDPJDetector 为唯一调用方 (符合 4.模型依赖关系图.puml 中 SDPJDetector → LLMService 边).
 """
 
-from typing import Any, Dict, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from sdpj.infrastructure.llm_adapters.errors import LLMError
 
 
 @runtime_checkable
 class LLMServiceInstanceProtocol(Protocol):
-    """LLM 服务实例协议"""
+    """LLM 服务实例协议."""
 
     model_id: str
 
     @property
-    def active(self) -> bool: ...
+    def active(self) -> bool: ...  # noqa: D102
 
-    async def call(self, system_prompt: str, user_message: str, **kwargs: Any) -> dict: ...
+    async def call(self, system_prompt: str, user_message: str, **kwargs: Any) -> dict: ...  # noqa: ANN401, D102
 
-    def destroy(self) -> None: ...
+    def destroy(self) -> None: ...  # noqa: D102
 
 
 class LLMServiceInterface(Protocol):
-    """大模型服务接口"""
+    """大模型服务接口."""
 
-    async def get_service_instance(self, model_id: str) -> LLMServiceInstanceProtocol: ...
+    async def get_service_instance(self, model_id: str) -> LLMServiceInstanceProtocol: ...  # noqa: D102
 
-    def assemble_request(
+    def assemble_request(  # noqa: D102
         self,
         system_prompt: str,
         user_message: str,
-        call_params: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]: ...
+        call_params: dict[str, Any] | None = None,
+    ) -> dict[str, Any]: ...
 
-    async def invoke_llm(
+    async def invoke_llm(  # noqa: D102
         self,
         service_instance: LLMServiceInstanceProtocol,
-        request_data: Dict[str, Any],
-    ) -> Dict[str, Any]: ...
+        request_data: dict[str, Any],
+    ) -> dict[str, Any]: ...
 
-    def should_retry(self, error: LLMError, attempt: int) -> bool: ...
+    def should_retry(self, error: LLMError, attempt: int) -> bool: ...  # noqa: D102
 
-    def format_error_response(self, error: LLMError) -> Dict[str, Any]: ...
+    def format_error_response(self, error: LLMError) -> dict[str, Any]: ...  # noqa: D102
 
-    async def verify_connectivity(self, service_instance, timeout: float = 30.0) -> dict:
-        """验证模型连接性，发送健康检查消息并返回结构化结果
-        返回: {"success": bool, "status": str, "model": str, "latency_ms": int, "response_preview": str}
-        """
+    async def verify_connectivity(self, service_instance, timeout: float = 30.0) -> dict:  # noqa: ANN001, ASYNC109
+        """验证模型连接性,发送健康检查消息并返回结构化结果  # noqa: "latency_ms": int, "model": str, "response_preview": str}.  # noqa: E501, "status": str, D205        返回: {"success": bool, D210, E501, E501.        """
         ...

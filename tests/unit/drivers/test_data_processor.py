@@ -1,6 +1,6 @@
 """DataProcessor 单元测试
 
-测试检测数据处理模块的所有功能，包括：
+测试检测数据处理模块的所有功能,包括:
 - 检测样本与数据集的查询与维护
 - 检测结果的持久化
 - 检测报告数据的汇总与产出
@@ -14,36 +14,37 @@ from unittest.mock import AsyncMock, Mock
 from pathlib import Path
 
 from sdpj.drivers.data_processor import DataProcessor
+from typing import Any
 
 
 class TestDatasetOperations:
     """测试数据集相关操作"""
 
     @pytest.fixture
-    def mock_sample_db(self):
+    def mock_sample_db(self) -> None:
         """Mock SampleDB"""
         mock = AsyncMock()
         return mock
 
     @pytest.fixture
-    def mock_result_db(self):
+    def mock_result_db(self) -> None:
         """Mock ResultDB"""
         mock = AsyncMock()
         return mock
 
     @pytest.fixture
-    def mock_utils(self):
+    def mock_utils(self) -> None:
         """Mock UtilsLib"""
         mock = Mock()
         return mock
 
     @pytest.fixture
-    def data_processor(self, mock_sample_db, mock_result_db, mock_utils):
+    def data_processor(self, mock_sample_db: Any, mock_result_db: Any, mock_utils: Any) -> None:
         """创建 DataProcessor 实例"""
         return DataProcessor(mock_sample_db, mock_result_db, mock_utils)
 
     @pytest.mark.asyncio
-    async def test_get_all_datasets(self, data_processor, mock_sample_db):
+    async def test_get_all_datasets(self, data_processor: Any, mock_sample_db: Any) -> None:
         """测试查询所有数据集"""
         # 准备测试数据
         mock_sample_db.get_all_datasets.return_value = [
@@ -75,7 +76,7 @@ class TestDatasetOperations:
         mock_sample_db.get_all_datasets.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_load_dataset_by_risk_type(self, data_processor, mock_sample_db):
+    async def test_load_dataset_by_risk_type(self, data_processor: Any, mock_sample_db: Any) -> None:
         """测试按风险类型加载数据集"""
         mock_sample_db.get_datasets_by_risk_type.return_value = [
             {"dataset_id": 1, "name": "越狱攻击数据集", "risk_type": "越狱攻击"}
@@ -108,7 +109,7 @@ class TestDatasetOperations:
         mock_sample_db.get_samples_by_risk_type.assert_called_once_with("越狱攻击")
 
     @pytest.mark.asyncio
-    async def test_import_private_dataset(self, data_processor, mock_sample_db):
+    async def test_import_private_dataset(self, data_processor: Any, mock_sample_db: Any) -> None:
         """测试导入私有数据集"""
         # 准备测试数据
         mock_sample_db.create_dataset.return_value = 10
@@ -134,7 +135,7 @@ class TestDatasetOperations:
         assert mock_sample_db.add_sample.call_count == 3
 
     @pytest.mark.asyncio
-    async def test_remove_dataset(self, data_processor, mock_sample_db):
+    async def test_remove_dataset(self, data_processor: Any, mock_sample_db: Any) -> None:
         """测试删除数据集"""
         mock_sample_db.delete_dataset.return_value = True
 
@@ -148,23 +149,27 @@ class TestTaskAndReportOperations:
     """测试任务和报告相关操作"""
 
     @pytest.fixture
-    def mock_sample_db(self):
+    def mock_sample_db(self) -> None:
+        """测试 mock sample db."""
         return AsyncMock()
 
     @pytest.fixture
-    def mock_result_db(self):
+    def mock_result_db(self) -> None:
+        """测试 mock result db."""
         return AsyncMock()
 
     @pytest.fixture
-    def mock_utils(self):
+    def mock_utils(self) -> None:
+        """测试 mock utils."""
         return Mock()
 
     @pytest.fixture
-    def data_processor(self, mock_sample_db, mock_result_db, mock_utils):
+    def data_processor(self, mock_sample_db: Any, mock_result_db: Any, mock_utils: Any) -> None:
+        """测试 data processor."""
         return DataProcessor(mock_sample_db, mock_result_db, mock_utils)
 
     @pytest.mark.asyncio
-    async def test_create_task_group(self, data_processor, mock_result_db):
+    async def test_create_task_group(self, data_processor: Any, mock_result_db: Any) -> None:
         """测试创建任务组"""
         mock_result_db.create_task_group.return_value = "tg_001"
 
@@ -174,7 +179,7 @@ class TestTaskAndReportOperations:
         mock_result_db.create_task_group.assert_called_once_with(123, "gpt-4")
 
     @pytest.mark.asyncio
-    async def test_create_detection_task(self, data_processor, mock_result_db):
+    async def test_create_detection_task(self, data_processor: Any, mock_result_db: Any) -> None:
         """测试创建检测任务"""
         mock_result_db.create_detection_task.return_value = "task_001"
         start_time = datetime.now()
@@ -185,11 +190,12 @@ class TestTaskAndReportOperations:
 
         assert result == "task_001"
         mock_result_db.create_detection_task.assert_called_once_with(
-            task_group_id="tg_001", dataset_id=1, task_status="进行中", start_time=start_time
+            task_group_id="tg_001", dataset_id=1, task_status="进行中", start_time=start_time,
+            algorithm_type="static", metadata_json=None,
         )
 
     @pytest.mark.asyncio
-    async def test_update_task_status(self, data_processor, mock_result_db):
+    async def test_update_task_status(self, data_processor: Any, mock_result_db: Any) -> None:
         """测试更新任务状态"""
         mock_result_db.update_task_status.return_value = True
         end_time = datetime.now()
@@ -204,7 +210,7 @@ class TestTaskAndReportOperations:
         )
 
     @pytest.mark.asyncio
-    async def test_create_detection_report(self, data_processor, mock_result_db):
+    async def test_create_detection_report(self, data_processor: Any, mock_result_db: Any) -> None:
         """测试创建检测报告"""
         mock_result_db.create_detection_report.return_value = "report_001"
 
@@ -214,7 +220,7 @@ class TestTaskAndReportOperations:
         mock_result_db.create_detection_report.assert_called_once_with("task_001")
 
     @pytest.mark.asyncio
-    async def test_append_result_data(self, data_processor, mock_result_db):
+    async def test_append_result_data(self, data_processor: Any, mock_result_db: Any) -> None:
         """测试追加结果数据"""
         mock_result_db.append_result_data.return_value = "result_001"
 
@@ -230,7 +236,7 @@ class TestTaskAndReportOperations:
         mock_result_db.append_result_data.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_aggregate_task_group_results(self, data_processor, mock_result_db):
+    async def test_aggregate_task_group_results(self, data_processor: Any, mock_result_db: Any) -> None:
         """测试汇总任务组结果"""
         mock_result_db.get_task_group.return_value = {
             "task_group_id": "tg_001",
@@ -270,7 +276,7 @@ class TestTaskAndReportOperations:
         assert len(result["tasks"][0]["report"]["result_data"]) == 1
 
     @pytest.mark.asyncio
-    async def test_list_task_groups(self, data_processor, mock_result_db):
+    async def test_list_task_groups(self, data_processor: Any, mock_result_db: Any) -> None:
         """测试查询任务组列表"""
         mock_result_db.list_task_groups.return_value = [
             {"task_group_id": "tg_001", "user_id": "user_123", "model_id": "gpt-4"}
@@ -283,7 +289,7 @@ class TestTaskAndReportOperations:
         mock_result_db.list_task_groups.assert_called_once_with(user_id=123, model_id=None)
 
     @pytest.mark.asyncio
-    async def test_delete_task_group(self, data_processor, mock_result_db):
+    async def test_delete_task_group(self, data_processor: Any, mock_result_db: Any) -> None:
         """测试删除任务组"""
         mock_result_db.delete_task_group.return_value = True
 
@@ -297,22 +303,26 @@ class TestMultimodalAndEncoding:
     """测试多模态和编码相关操作"""
 
     @pytest.fixture
-    def mock_sample_db(self):
+    def mock_sample_db(self) -> None:
+        """测试 mock sample db."""
         return AsyncMock()
 
     @pytest.fixture
-    def mock_result_db(self):
+    def mock_result_db(self) -> None:
+        """测试 mock result db."""
         return AsyncMock()
 
     @pytest.fixture
-    def mock_utils(self):
+    def mock_utils(self) -> None:
+        """测试 mock utils."""
         return Mock()
 
     @pytest.fixture
-    def data_processor(self, mock_sample_db, mock_result_db, mock_utils):
+    def data_processor(self, mock_sample_db: Any, mock_result_db: Any, mock_utils: Any) -> None:
+        """测试 data processor."""
         return DataProcessor(mock_sample_db, mock_result_db, mock_utils)
 
-    def test_construct_encoded_sample(self, data_processor, mock_utils):
+    def test_construct_encoded_sample(self, data_processor: Any, mock_utils: Any) -> None:
         """测试构造编码样本"""
         mock_utils.encode_text.return_value = "dGVzdCBQb0M="
 
@@ -321,7 +331,7 @@ class TestMultimodalAndEncoding:
         assert result == "dGVzdCBQb0M="
         mock_utils.encode_text.assert_called_once_with("test PoC", "base64")
 
-    def test_decode_response_content(self, data_processor, mock_utils):
+    def test_decode_response_content(self, data_processor: Any, mock_utils: Any) -> None:
         """测试解码响应内容"""
         mock_utils.decode_text.return_value = "test PoC"
 
@@ -337,22 +347,26 @@ class TestFileAndSerialization:
     """测试文件和序列化相关操作"""
 
     @pytest.fixture
-    def mock_sample_db(self):
+    def mock_sample_db(self) -> None:
+        """测试 mock sample db."""
         return AsyncMock()
 
     @pytest.fixture
-    def mock_result_db(self):
+    def mock_result_db(self) -> None:
+        """测试 mock result db."""
         return AsyncMock()
 
     @pytest.fixture
-    def mock_utils(self):
+    def mock_utils(self) -> None:
+        """测试 mock utils."""
         return Mock()
 
     @pytest.fixture
-    def data_processor(self, mock_sample_db, mock_result_db, mock_utils):
+    def data_processor(self, mock_sample_db: Any, mock_result_db: Any, mock_utils: Any) -> None:
+        """测试 data processor."""
         return DataProcessor(mock_sample_db, mock_result_db, mock_utils)
 
-    def test_read_file(self, data_processor, mock_utils):
+    def test_read_file(self, data_processor: Any, mock_utils: Any) -> None:
         """测试读取文件"""
         mock_utils.read_file.return_value = "文件内容"
 
@@ -361,7 +375,7 @@ class TestFileAndSerialization:
         assert result == "文件内容"
         mock_utils.read_file.assert_called_once_with("/path/to/file.txt", "text")
 
-    def test_validate_file_format(self, data_processor, mock_utils):
+    def test_validate_file_format(self, data_processor: Any, mock_utils: Any) -> None:
         """测试验证文件格式"""
         mock_utils.validate_file_format.return_value = (True, "")
 
@@ -372,7 +386,7 @@ class TestFileAndSerialization:
         assert result == (True, "")
         mock_utils.validate_file_format.assert_called_once_with('{"key": "value"}', "json")
 
-    def test_serialize_data(self, data_processor, mock_utils):
+    def test_serialize_data(self, data_processor: Any, mock_utils: Any) -> None:
         """测试序列化数据"""
         mock_utils.serialize_json.return_value = '{"key": "value"}'
 
@@ -381,7 +395,7 @@ class TestFileAndSerialization:
         assert result == '{"key": "value"}'
         mock_utils.serialize_json.assert_called_once_with({"key": "value"})
 
-    def test_deserialize_data(self, data_processor, mock_utils):
+    def test_deserialize_data(self, data_processor: Any, mock_utils: Any) -> None:
         """测试反序列化数据"""
         mock_utils.deserialize_json.return_value = {"key": "value"}
 
@@ -391,7 +405,7 @@ class TestFileAndSerialization:
         mock_utils.deserialize_json.assert_called_once_with('{"key": "value"}')
 
     @pytest.mark.asyncio
-    async def test_export_report_file(self, data_processor, mock_utils):
+    async def test_export_report_file(self, data_processor: Any, mock_utils: Any) -> None:
         """测试导出报告文件"""
         report_data = {"task_group_id": "tg_001", "user_id": "user_123", "tasks": []}
         mock_utils.serialize_json.return_value = '{"task_group_id": "tg_001"}'
@@ -409,28 +423,32 @@ class TestAddDatasetRecord:
     """测试 add_dataset_record 方法"""
 
     @pytest.fixture
-    def mock_sample_db(self):
+    def mock_sample_db(self) -> None:
+        """测试 mock sample db."""
         mock = AsyncMock()
         mock.create_dataset.return_value = 1
         mock.add_sample.return_value = 1
         return mock
 
     @pytest.fixture
-    def mock_result_db(self):
+    def mock_result_db(self) -> None:
+        """测试 mock result db."""
         return AsyncMock()
 
     @pytest.fixture
-    def mock_utils(self):
+    def mock_utils(self) -> None:
+        """测试 mock utils."""
         return Mock()
 
     @pytest.fixture
-    def data_processor(self, mock_sample_db, mock_result_db, mock_utils):
+    def data_processor(self, mock_sample_db: Any, mock_result_db: Any, mock_utils: Any) -> None:
+        """测试 data processor."""
         return DataProcessor(mock_sample_db, mock_result_db, mock_utils)
 
     @pytest.mark.asyncio
     async def test_add_dataset_record_creates_samples_from_file(
-        self, data_processor, mock_sample_db, tmp_path
-    ):
+        self, data_processor: Any, mock_sample_db: Any, tmp_path: Any
+    ) -> None:
         """测试 add_dataset_record 从文件创建样本记录"""
         import tempfile
 
@@ -458,8 +476,8 @@ class TestAddDatasetRecord:
 
     @pytest.mark.asyncio
     async def test_add_dataset_record_with_empty_file(
-        self, data_processor, mock_sample_db, tmp_path
-    ):
+        self, data_processor: Any, mock_sample_db: Any, tmp_path: Any
+    ) -> None:
         """测试 add_dataset_record 处理空文件"""
         import tempfile
 
@@ -478,7 +496,7 @@ class TestAddDatasetRecord:
         mock_sample_db.add_sample.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_add_dataset_record_file_not_exists(self, data_processor, mock_sample_db):
+    async def test_add_dataset_record_file_not_exists(self, data_processor: Any, mock_sample_db: Any) -> None:
         """测试 add_dataset_record 处理文件不存在的情况"""
         dataset_id = await data_processor.add_dataset_record(
             name="不存在文件的数据集",
@@ -493,8 +511,8 @@ class TestAddDatasetRecord:
 
     @pytest.mark.asyncio
     async def test_add_dataset_record_skips_invalid_json_lines(
-        self, data_processor, mock_sample_db, tmp_path
-    ):
+        self, data_processor: Any, mock_sample_db: Any, tmp_path: Any
+    ) -> None:
         """测试 add_dataset_record 跳过无效的 JSON 行"""
         import tempfile
 

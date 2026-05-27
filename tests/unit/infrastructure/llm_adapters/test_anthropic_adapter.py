@@ -1,21 +1,27 @@
+"""test_anthropic_adapter 模块单元测试."""
+
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from sdpj.infrastructure.llm_adapters.anthropic_adapter import AnthropicAdapter
 from sdpj.infrastructure.llm_adapters.errors import StandardizedLLMError, ErrorCategory
+from typing import Any
 
 
-def make_adapter():
+def make_adapter() -> None:
+    """测试 make adapter."""
     return AnthropicAdapter("claude-3", "https://api.anthropic.com", "sk-ant-test")
 
 
-def test_metadata():
+def test_metadata() -> None:
+    """测试 test metadata."""
     m = make_adapter().get_metadata()
     assert m["model_id"] == "claude-3"
     assert m["request_format"] == "anthropic"
 
 
 @pytest.mark.asyncio
-async def test_call_success():
+async def test_call_success() -> None:
+    """测试 test call success."""
     a = make_adapter()
     mock_resp = MagicMock()
     mock_resp.status = 200
@@ -39,7 +45,8 @@ async def test_call_success():
 
 
 @pytest.mark.asyncio
-async def test_call_401_raises_auth_error():
+async def test_call_401_raises_auth_error() -> None:
+    """测试 test call 401 raises auth error."""
     a = make_adapter()
     mock_resp = MagicMock()
     mock_resp.status = 401

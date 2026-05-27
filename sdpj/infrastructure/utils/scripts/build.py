@@ -1,17 +1,16 @@
-"""构建脚本 — 打包项目"""
+"""构建脚本 — 打包项目."""
 
 import subprocess
 import sys
 from pathlib import Path
 
 
-def main() -> None:
+def main() -> None:  # noqa: D103
     root = Path(__file__).resolve().parents[4]
-    subprocess.check_call(
+    subprocess.check_call(  # noqa: S603
         [sys.executable, "-m", "build", "--wheel", "--outdir", str(root / "dist")],
         cwd=str(root),
     )
-    print("Build completed. Output in dist/")
 
 
 if __name__ == "__main__":

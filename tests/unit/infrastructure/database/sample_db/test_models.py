@@ -5,10 +5,11 @@ import pytest_asyncio
 from datetime import datetime
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sdpj.infrastructure.database.sample_db.models import Base, Dataset, DetectionSample
+from typing import Any
 
 
 @pytest_asyncio.fixture
-async def async_session():
+async def async_session() -> None:
     """创建测试用的异步数据库会话"""
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
 
@@ -24,7 +25,7 @@ async def async_session():
 
 
 @pytest.mark.asyncio
-async def test_dataset_creation(async_session):
+async def test_dataset_creation(async_session: Any) -> None:
     """测试数据集创建"""
     dataset = Dataset(name="测试数据集", risk_type="越狱攻击")
     async_session.add(dataset)
@@ -37,7 +38,7 @@ async def test_dataset_creation(async_session):
 
 
 @pytest.mark.asyncio
-async def test_detection_sample_creation(async_session):
+async def test_detection_sample_creation(async_session: Any) -> None:
     """测试检测样本创建"""
     # 先创建数据集
     dataset = Dataset(name="测试数据集", risk_type="提示词注入")
@@ -61,7 +62,7 @@ async def test_detection_sample_creation(async_session):
 
 
 @pytest.mark.asyncio
-async def test_dataset_sample_relationship(async_session):
+async def test_dataset_sample_relationship(async_session: Any) -> None:
     """测试数据集与样本的关系"""
     dataset = Dataset(name="关系测试数据集", risk_type="安全基准")
     async_session.add(dataset)
@@ -80,8 +81,8 @@ async def test_dataset_sample_relationship(async_session):
 
 
 @pytest.mark.asyncio
-async def test_cascade_delete(async_session):
-    """测试级联删除：删除数据集时应删除其所有样本"""
+async def test_cascade_delete(async_session: Any) -> None:
+    """测试级联删除:删除数据集时应删除其所有样本"""
     # 创建数据集和样本
     dataset = Dataset(name="级联删除测试", risk_type="越狱攻击")
     async_session.add(dataset)
@@ -109,7 +110,7 @@ async def test_cascade_delete(async_session):
 
 
 @pytest.mark.asyncio
-async def test_dataset_unique_name_constraint(async_session):
+async def test_dataset_unique_name_constraint(async_session: Any) -> None:
     """测试数据集名称唯一约束"""
     from sqlalchemy.exc import IntegrityError
 

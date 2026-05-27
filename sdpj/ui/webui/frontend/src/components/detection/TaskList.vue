@@ -8,7 +8,7 @@
       <table>
         <thead>
           <tr>
-            <th style="width: 35%">任务</th>
+            <th style="width: 35%">任务组/任务</th>
             <th style="width: 20%">状态</th>
             <th style="width: 25%">进度</th>
             <th style="width: 20%">操作</th>
@@ -58,7 +58,25 @@
                     <div class="progress-bar-bg">
                       <div class="progress-bar-fill" :style="{ width: taskPercent(row) + '%' }" :class="taskBarClass(row)"></div>
                     </div>
-                    <span class="progress-text">{{ row.taskProgress.processed }}/{{ row.taskProgress.total }}</span>
+                    <el-tooltip
+                      v-if="row.taskProgress.breakdown"
+                      placement="top"
+                      :show-after="300"
+                      effect="light"
+                    >
+                      <template #content>
+                        <div class="iter-tooltip">
+                          <div>总量上限 = {{ row.taskProgress.breakdown.compliant }}(合规样本数) x {{ row.taskProgress.breakdown.poc_count }}(PoC池条目数) x max_iterations={{ row.taskProgress.breakdown.max_iters }} = {{ row.taskProgress.total }}</div>
+                          <div class="iter-tooltip-hint">
+                            <div>合规样本数: 静态检测时未检测到安全问题的样本数;</div>
+                            <div>PoC池条目数: 针对该模型最有效的不同攻击手法PoC条目缓存前{{ row.taskProgress.breakdown.poc_count }}条;</div>
+                            <div>双层早停: 命中任一手法即停止后续尝试，实际迭代次数通常远低于上限</div>
+                          </div>
+                        </div>
+                      </template>
+                      <span class="progress-text progress-text-link">{{ row.taskProgress.processed }}/{{ row.taskProgress.total }}</span>
+                    </el-tooltip>
+                    <span v-else class="progress-text">{{ row.taskProgress.processed }}/{{ row.taskProgress.total }}</span>
                   </div>
                   <span v-else class="status-tag" :class="`tag-${row.status}`">{{ getStatusText(row.status) }}</span>
                 </template>
@@ -66,7 +84,7 @@
               <td>
                 <div class="action-btns">
                   <el-button
-                    v-if="canCancel(row.status) && row.dataset_id !== 'poc_selecting' && row.dataset_id !== 'dynamic_detecting'"
+                    v-if="canCancel(row.status) && row.dataset_id !== 'poc_selecting'"
                     class="action-btn action-btn-danger"
                     size="small"
                     @click="handleCancel(row)"
@@ -399,6 +417,26 @@ table tr:last-child td {
   font-size: 12px;
   color: #8b8b8b;
   white-space: nowrap;
+}
+
+.progress-text-link {
+  cursor: help;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+.iter-tooltip {
+  max-width: 420px;
+  line-height: 1.6;
+  font-size: 13px;
+}
+
+.iter-tooltip-hint {
+  color: #000;
+  font-size: 12px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #eee;
 }
 
 .eta-tag {

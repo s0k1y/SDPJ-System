@@ -1,6 +1,6 @@
 """ResultDB 仓储层单元测试
 
-测试所有仓储类的数据访问操作。
+测试所有仓储类的数据访问操作.
 """
 
 import pytest
@@ -13,10 +13,11 @@ from sdpj.infrastructure.database.result_db.repositories import (
     ReportRepository,
     ResultDataRepository,
 )
+from typing import Any
 
 
 @pytest.fixture
-async def async_session():
+async def async_session() -> None:
     """创建测试用的异步数据库会话"""
     from sdpj.infrastructure.database.user_db.models import User  # noqa
     from sdpj.infrastructure.database.sample_db.models import Dataset  # noqa
@@ -55,7 +56,7 @@ async def async_session():
 
 
 @pytest.mark.asyncio
-async def test_task_group_repo_create(async_session):
+async def test_task_group_repo_create(async_session: Any) -> None:
     """测试创建任务组"""
     repo = TaskGroupRepository(async_session)
     task_group = await repo.create(1, "gpt-4")
@@ -66,7 +67,7 @@ async def test_task_group_repo_create(async_session):
 
 
 @pytest.mark.asyncio
-async def test_task_group_repo_get_by_id(async_session):
+async def test_task_group_repo_get_by_id(async_session: Any) -> None:
     """测试按ID查询任务组"""
     repo = TaskGroupRepository(async_session)
     created = await repo.create(1, "gpt-4")
@@ -77,7 +78,7 @@ async def test_task_group_repo_get_by_id(async_session):
 
 
 @pytest.mark.asyncio
-async def test_task_group_repo_list_all(async_session):
+async def test_task_group_repo_list_all(async_session: Any) -> None:
     """测试查询任务组列表"""
     repo = TaskGroupRepository(async_session)
     tg1 = await repo.create(1, "gpt-4")
@@ -99,7 +100,7 @@ async def test_task_group_repo_list_all(async_session):
 
 
 @pytest.mark.asyncio
-async def test_task_group_repo_delete(async_session):
+async def test_task_group_repo_delete(async_session: Any) -> None:
     """测试删除任务组"""
     repo = TaskGroupRepository(async_session)
     created = await repo.create(1, "gpt-4")
@@ -119,7 +120,7 @@ async def test_task_group_repo_delete(async_session):
 
 
 @pytest.mark.asyncio
-async def test_task_repo_create(async_session):
+async def test_task_repo_create(async_session: Any) -> None:
     """测试创建检测任务"""
     group_repo = TaskGroupRepository(async_session)
     tg = await group_repo.create(1, "gpt-4")
@@ -134,7 +135,7 @@ async def test_task_repo_create(async_session):
 
 
 @pytest.mark.asyncio
-async def test_task_repo_get_by_id(async_session):
+async def test_task_repo_get_by_id(async_session: Any) -> None:
     """测试按ID查询任务"""
     group_repo = TaskGroupRepository(async_session)
     tg = await group_repo.create(1, "gpt-4")
@@ -148,7 +149,7 @@ async def test_task_repo_get_by_id(async_session):
 
 
 @pytest.mark.asyncio
-async def test_task_repo_list_by_group(async_session):
+async def test_task_repo_list_by_group(async_session: Any) -> None:
     """测试按任务组ID查询任务列表"""
     group_repo = TaskGroupRepository(async_session)
     tg1 = await group_repo.create(1, "gpt-4")
@@ -167,7 +168,7 @@ async def test_task_repo_list_by_group(async_session):
 
 
 @pytest.mark.asyncio
-async def test_task_repo_update_status(async_session):
+async def test_task_repo_update_status(async_session: Any) -> None:
     """测试更新任务状态"""
     group_repo = TaskGroupRepository(async_session)
     tg = await group_repo.create(1, "gpt-4")
@@ -188,7 +189,7 @@ async def test_task_repo_update_status(async_session):
 
 
 @pytest.mark.asyncio
-async def test_task_repo_delete(async_session):
+async def test_task_repo_delete(async_session: Any) -> None:
     """测试删除任务"""
     group_repo = TaskGroupRepository(async_session)
     tg = await group_repo.create(1, "gpt-4")
@@ -207,7 +208,7 @@ async def test_task_repo_delete(async_session):
 
 
 @pytest.mark.asyncio
-async def test_report_repo_create(async_session):
+async def test_report_repo_create(async_session: Any) -> None:
     """测试创建检测报告"""
     group_repo = TaskGroupRepository(async_session)
     tg = await group_repo.create(1, "gpt-4")
@@ -223,7 +224,7 @@ async def test_report_repo_create(async_session):
 
 
 @pytest.mark.asyncio
-async def test_report_repo_get_by_task_id(async_session):
+async def test_report_repo_get_by_task_id(async_session: Any) -> None:
     """测试按任务ID查询报告"""
     group_repo = TaskGroupRepository(async_session)
     tg = await group_repo.create(1, "gpt-4")
@@ -240,7 +241,7 @@ async def test_report_repo_get_by_task_id(async_session):
 
 
 @pytest.mark.asyncio
-async def test_report_repo_list_all(async_session):
+async def test_report_repo_list_all(async_session: Any) -> None:
     """测试查询报告列表"""
     group_repo = TaskGroupRepository(async_session)
     tg1 = await group_repo.create(1, "gpt-4")
@@ -267,7 +268,7 @@ async def test_report_repo_list_all(async_session):
 
 
 @pytest.mark.asyncio
-async def test_result_data_repo_create(async_session):
+async def test_result_data_repo_create(async_session: Any) -> None:
     """测试创建结果数据"""
     group_repo = TaskGroupRepository(async_session)
     tg = await group_repo.create(1, "gpt-4")
@@ -288,7 +289,7 @@ async def test_result_data_repo_create(async_session):
 
 
 @pytest.mark.asyncio
-async def test_result_data_repo_list_by_report(async_session):
+async def test_result_data_repo_list_by_report(async_session: Any) -> None:
     """测试按报告ID查询结果数据列表"""
     group_repo = TaskGroupRepository(async_session)
     tg = await group_repo.create(1, "gpt-4")
@@ -310,7 +311,7 @@ async def test_result_data_repo_list_by_report(async_session):
 
 
 @pytest.mark.asyncio
-async def test_result_data_repo_delete(async_session):
+async def test_result_data_repo_delete(async_session: Any) -> None:
     """测试删除结果数据"""
     group_repo = TaskGroupRepository(async_session)
     tg = await group_repo.create(1, "gpt-4")

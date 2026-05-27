@@ -1,11 +1,10 @@
-"""ResultDB 实现
+"""ResultDB 实现.
 
-整合所有仓储层，实现 ResultDBInterface 接口。
+整合所有仓储层,实现 ResultDBInterface 接口.
 """
 
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import and_, case, func, select
 
@@ -23,96 +22,88 @@ from .session import SessionManager
 
 
 class ResultDB:
-    """检测结果数据库实现
+    """检测结果数据库实现.
 
-    实现 ResultDBInterface 定义的所有能力。
+    实现 ResultDBInterface 定义的所有能力.
     """
 
-    def __init__(self, session_manager: SessionManager):
-        """初始化 ResultDB
+    def __init__(self, session_manager: SessionManager) -> None:
+        """初始化 ResultDB.
 
         Args:
             session_manager: 数据库会话管理器
+
         """
         self.session_manager = session_manager
 
     # ==================== 被测大模型级能力 ====================
 
-    async def register_target_model(self, model_id: str) -> dict:
+    async def register_target_model(self, model_id: str) -> dict:  # noqa: D102
         async with self.session_manager.session() as session:
             repo = TargetModelRepository(session)
             obj = await repo.register(model_id)
             return {"model_id": obj.model_id}
 
-    async def get_target_model(self, model_id: str) -> Optional[dict]:
+    async def get_target_model(self, model_id: str) -> dict | None:  # noqa: D102
         async with self.session_manager.session() as session:
             repo = TargetModelRepository(session)
             obj = await repo.get_by_id(model_id)
             return {"model_id": obj.model_id} if obj else None
 
-    async def list_target_models(self) -> list[dict]:
+    async def list_target_models(self) -> list[dict]:  # noqa: D102
         async with self.session_manager.session() as session:
             repo = TargetModelRepository(session)
             return [{"model_id": m.model_id} for m in await repo.list_all()]
 
     # ==================== 检测任务组级能力 ====================
 
-    async def create_task_group(self, user_id: int, model_id: str) -> str:
+    async def create_task_group(self, user_id: int, model_id: str) -> str:  # noqa: D102
         async with self.session_manager.session() as session:
             model = await TargetModelRepository(session).get_by_id(model_id)
             if model is None:
-                raise ValueError(f"被测大模型 '{model_id}' 不存在，请先注册模型")
+                msg = f"被测大模型 '{model_id}' 不存在,请先注册模型"
+                raise ValueError(msg)
             task_group = await TaskGroupRepository(session).create(user_id, model_id)
             return task_group.task_group_id
 
-    async def create_task_group_with_id(
-        self, task_group_id: str, user_id: int, model_id: str
+    async def create_task_group_with_id(  # noqa: D102
+        self, task_group_id: str, user_id: int, model_id: str,
     ) -> str:
-        print(
-            f"[DEBUG ResultDB] create_task_group_with_id: task_group_id={task_group_id}, user_id={user_id}, model_id={model_id}",
-            flush=True,
-        )
         async with self.session_manager.session() as session:
             await TargetModelRepository(session).register(model_id)
             tg_repo = TaskGroupRepository(session)
             existing = await tg_repo.get_by_id(task_group_id)
             if existing is not None:
-                print(
-                    f"[DEBUG ResultDB] create_task_group_with_id: 任务组已存在，跳过创建 (existing={existing.task_group_id})",
-                    flush=True,
-                )
                 return existing.task_group_id
             task_group = await tg_repo.create_with_id(task_group_id, user_id, model_id)
-            print(
-                f"[DEBUG ResultDB] create_task_group_with_id 写入完成: {task_group.task_group_id}",
-                flush=True,
-            )
             return task_group.task_group_id
 
     async def delete_task_group(self, task_group_id: str) -> bool:
-        """删除检测任务组
+        """删除检测任务组.
 
         Args:
             task_group_id: 任务组ID
 
         Returns:
             删除是否成功
+
         """
         async with self.session_manager.session() as session:
             task_group_repo = TaskGroupRepository(session)
             return await task_group_repo.delete(task_group_id)
 
     async def list_task_groups(
-        self, user_id: Optional[int] = None, model_id: Optional[str] = None
+        self, user_id: int | None = None, model_id: str | None = None,
     ) -> list[dict]:
-        """查询检测任务组列表
+        """查询检测任务组列表.
 
         Args:
-            user_id: 用户ID过滤条件（可选）
-            model_id: 模型ID过滤条件（可选）
+            user_id: 用户ID过滤条件(可选)
+            model_id: 模型ID过滤条件(可选)
 
         Returns:
             任务组元信息列表
+
         """
         async with self.session_manager.session() as session:
             task_group_repo = TaskGroupRepository(session)
@@ -128,7 +119,7 @@ class ResultDB:
             ]
 
     async def get_task_group(self, task_group_id: str) -> dict:
-        """按ID查询单个检测任务组
+        """按ID查询单个检测任务组.
 
         Args:
             task_group_id: 任务组ID
@@ -138,13 +129,15 @@ class ResultDB:
 
         Raises:
             ValueError: 任务组不存在
+
         """
         async with self.session_manager.session() as session:
             task_group_repo = TaskGroupRepository(session)
             task_group = await task_group_repo.get_by_id(task_group_id)
 
             if task_group is None:
-                raise ValueError(f"任务组 '{task_group_id}' 不存在")
+                msg = f"任务组 '{task_group_id}' 不存在"
+                raise ValueError(msg)
 
             return {
                 "task_group_id": task_group.task_group_id,
@@ -154,24 +147,23 @@ class ResultDB:
 
     # ==================== 检测任务级能力 ====================
 
-    async def create_detection_task(
+    async def create_detection_task(  # noqa: D102, PLR0913
         self,
         task_group_id: str,
         dataset_id: int,
         task_status: str,
         start_time: datetime,
         algorithm_type: str = "static",
-        metadata_json: Optional[dict] = None,
-        task_id: Optional[str] = None,
+        metadata_json: dict | None = None,
+        task_id: str | None = None,
     ) -> str:
-        print(
-            f"[DEBUG ResultDB] create_detection_task: task_group_id={task_group_id}, dataset_id={dataset_id}, task_status={task_status}",
-            flush=True,
-        )
         async with self.session_manager.session() as session:
             task_repo = TaskRepository(session)
 
-            existing = await task_repo.get_by_group_and_dataset(task_group_id, dataset_id)
+            _enc = (metadata_json or {}).get("encoding_type")
+            existing = await task_repo.get_by_group_and_dataset(
+                task_group_id, dataset_id, encoding_type=_enc,
+            )
             if existing is not None:
                 existing.task_status = task_status
                 existing.start_time = start_time
@@ -184,15 +176,12 @@ class ResultDB:
 
             task_group_repo = TaskGroupRepository(session)
             tg_check = await task_group_repo.get_by_id(task_group_id)
-            print(
-                f"[DEBUG ResultDB] create_detection_task: 检查任务组存在性 -> tg_check={'存在' if tg_check else '不存在'}",
-                flush=True,
-            )
             if tg_check is None:
-                raise ValueError(f"任务组ID '{task_group_id}' 不存在")
+                msg = f"任务组ID '{task_group_id}' 不存在"
+                raise ValueError(msg)
 
             if task_id is None:
-                import uuid
+                import uuid  # noqa: PLC0415
 
                 task_id = f"task_{uuid.uuid4().hex[:16]}"
 
@@ -212,45 +201,48 @@ class ResultDB:
         self,
         task_id: str,
         task_status: str,
-        end_time: Optional[datetime] = None,
-        error_message: Optional[str] = None,
+        end_time: datetime | None = None,
+        error_message: str | None = None,
     ) -> bool:
-        """更新检测任务状态
+        """更新检测任务状态.
 
         Args:
             task_id: 任务ID
             task_status: 任务状态
-            end_time: 结束时间（可选）
-            error_message: 错误信息（可选）
+            end_time: 结束时间(可选)
+            error_message: 错误信息(可选)
 
         Returns:
             更新是否成功
+
         """
         async with self.session_manager.session() as session:
             task_repo = TaskRepository(session)
             return await task_repo.update_status(task_id, task_status, end_time, error_message)
 
     async def delete_detection_task(self, task_id: str) -> bool:
-        """删除检测任务
+        """删除检测任务.
 
         Args:
             task_id: 任务ID
 
         Returns:
             删除是否成功
+
         """
         async with self.session_manager.session() as session:
             task_repo = TaskRepository(session)
             return await task_repo.delete(task_id)
 
     async def list_tasks_by_group(self, task_group_id: str) -> list[dict]:
-        """按任务组ID查询任务列表
+        """按任务组ID查询任务列表.
 
         Args:
             task_group_id: 任务组ID
 
         Returns:
             该任务组下全部检测任务
+
         """
         async with self.session_manager.session() as session:
             task_repo = TaskRepository(session)
@@ -263,12 +255,13 @@ class ResultDB:
                     "task_status": task.task_status,
                     "start_time": task.start_time,
                     "end_time": task.end_time,
+                    "metadata_json": task.metadata_json,
                 }
                 for task in tasks
             ]
 
     async def get_detection_task(self, task_id: str) -> dict:
-        """按ID查询单个检测任务
+        """按ID查询单个检测任务.
 
         Args:
             task_id: 任务ID
@@ -278,13 +271,15 @@ class ResultDB:
 
         Raises:
             ValueError: 任务不存在
+
         """
         async with self.session_manager.session() as session:
             task_repo = TaskRepository(session)
             task = await task_repo.get_by_id(task_id)
 
             if task is None:
-                raise ValueError(f"任务 '{task_id}' 不存在")
+                msg = f"任务 '{task_id}' 不存在"
+                raise ValueError(msg)
 
             return {
                 "task_id": task.task_id,
@@ -295,7 +290,7 @@ class ResultDB:
                 "end_time": task.end_time,
             }
 
-    async def list_non_terminal_tasks(self) -> list[dict]:
+    async def list_non_terminal_tasks(self) -> list[dict]:  # noqa: D102
         async with self.session_manager.session() as session:
             task_repo = TaskRepository(session)
             tasks = await task_repo.list_non_terminal()
@@ -316,14 +311,62 @@ class ResultDB:
                         "end_time": task.end_time.isoformat() if task.end_time else None,
                         "user_id": tg.user_id if tg else None,
                         "model_id": tg.model_id if tg else None,
-                    }
+                    },
                 )
             return result
+
+    async def mark_stale_tasks_failed(self) -> int:
+        """将数据库中处于 running/pending 状态但实际已中断的任务标记为 failed.
+
+        判定规则:
+        1. task_status 为 running 且存在 report 但无 result_data → 中断的任务,标记 failed
+        2. task_status 为 running 且无 report 且无 result_data → 中断的任务,标记 failed
+        3. task_status 为 pending 且存在 report → 异常状态(不应有 report),标记 failed
+
+        Returns:
+            被标记为 failed 的任务数量
+
+        """
+        from sqlalchemy import text  # noqa: PLC0415
+
+        now = datetime.now(UTC)
+        affected = 0
+        async with self.session_manager.session() as session:
+            result = await session.execute(
+                text("""
+                    SELECT dt.task_id
+                    FROM DetectionTask dt
+                    WHERE dt.task_status IN ('running', 'pending')
+                      AND (
+                        (dt.task_status = 'running')
+                        OR (dt.task_status = 'pending' AND EXISTS (
+                            SELECT 1 FROM DetectionReport dr WHERE dr.task_id = dt.task_id
+                        ))
+                      )
+                """),
+            )
+            stale_ids = [row[0] for row in result]
+
+            for task_id in stale_ids:
+                await session.execute(
+                    text("""
+                        UPDATE DetectionTask
+                        SET task_status = 'failed',
+                            end_time = :end_time,
+                            error_message = '系统启动时检测到任务中断,自动标记为失败'
+                        WHERE task_id = :task_id AND task_status IN ('running', 'pending')
+                    """),
+                    {"task_id": task_id, "end_time": now},
+                )
+            if stale_ids:
+                await session.commit()
+                affected = len(stale_ids)
+        return affected
 
     # ==================== 检测报告级能力 ====================
 
     async def create_detection_report(self, task_id: str) -> str:
-        """创建检测报告
+        """创建检测报告.
 
         Args:
             task_id: 所属任务ID
@@ -333,45 +376,53 @@ class ResultDB:
 
         Raises:
             ValueError: 任务ID不存在
+
         """
         async with self.session_manager.session() as session:
             # 检查任务是否存在
             task_repo = TaskRepository(session)
             if await task_repo.get_by_id(task_id) is None:
-                raise ValueError(f"任务ID '{task_id}' 不存在")
+                msg = f"任务ID '{task_id}' 不存在"
+                raise ValueError(msg)
+
+            # 幂等：若该任务已有报告，直接返回
+            report_repo = ReportRepository(session)
+            existing_report = await report_repo.get_by_task_id(task_id)
+            if existing_report is not None:
+                return existing_report.report_id
 
             # 生成报告ID
-            import uuid
+            import uuid  # noqa: PLC0415
 
             report_id = f"report_{uuid.uuid4().hex[:16]}"
 
-            # 创建报告
-            report_repo = ReportRepository(session)
             await report_repo.create(report_id, task_id)
 
             return report_id
 
     async def delete_detection_report(self, report_id: str) -> bool:
-        """删除检测报告
+        """删除检测报告.
 
         Args:
             report_id: 检测报告ID
 
         Returns:
             删除是否成功
+
         """
         async with self.session_manager.session() as session:
             report_repo = ReportRepository(session)
             return await report_repo.delete(report_id)
 
     async def list_reports_by_task_group(self, task_group_id: str) -> list[dict]:
-        """按任务组ID批量查询报告（单次 JOIN 查询，替代 N+1）
+        """按任务组ID批量查询报告(单次 JOIN 查询,替代 N+1).
 
         Args:
             task_group_id: 任务组ID
 
         Returns:
             该任务组下所有报告列表
+
         """
         async with self.session_manager.session() as session:
             report_repo = ReportRepository(session)
@@ -385,13 +436,14 @@ class ResultDB:
             ]
 
     async def list_result_data_by_reports(self, report_ids: list[str]) -> list[dict]:
-        """按多个报告ID批量查询结果数据（单次 IN 查询，替代 N+1）
+        """按多个报告ID批量查询结果数据(单次 IN 查询,替代 N+1).
 
         Args:
             report_ids: 报告ID列表
 
         Returns:
             匹配的所有结果数据列表
+
         """
         async with self.session_manager.session() as session:
             result_data_repo = ResultDataRepository(session)
@@ -409,14 +461,15 @@ class ResultDB:
                 for rd in result_data_list
             ]
 
-    async def get_report_by_task(self, task_id: str) -> Optional[dict]:
-        """按任务ID查询检测报告
+    async def get_report_by_task(self, task_id: str) -> dict | None:
+        """按任务ID查询检测报告.
 
         Args:
             task_id: 任务ID
 
         Returns:
-            该任务对应的报告，不存在时返回None
+            该任务对应的报告,不存在时返回None
+
         """
         async with self.session_manager.session() as session:
             report_repo = ReportRepository(session)
@@ -430,14 +483,15 @@ class ResultDB:
                 "task_id": report.task_id,
             }
 
-    async def list_detection_reports(self, task_group_id: Optional[str] = None) -> list[dict]:
-        """查询检测报告列表
+    async def list_detection_reports(self, task_group_id: str | None = None) -> list[dict]:
+        """查询检测报告列表.
 
         Args:
-            task_group_id: 任务组ID过滤条件（可选）
+            task_group_id: 任务组ID过滤条件(可选)
 
         Returns:
             报告元信息列表
+
         """
         async with self.session_manager.session() as session:
             report_repo = ReportRepository(session)
@@ -452,7 +506,7 @@ class ResultDB:
             ]
 
     async def get_detection_report(self, report_id: str) -> dict:
-        """按ID查询单份检测报告
+        """按ID查询单份检测报告.
 
         Args:
             report_id: 检测报告ID
@@ -462,13 +516,15 @@ class ResultDB:
 
         Raises:
             ValueError: 报告不存在
+
         """
         async with self.session_manager.session() as session:
             report_repo = ReportRepository(session)
             report = await report_repo.get_by_id(report_id)
 
             if report is None:
-                raise ValueError(f"报告 '{report_id}' 不存在")
+                msg = f"报告 '{report_id}' 不存在"
+                raise ValueError(msg)
 
             return {
                 "report_id": report.report_id,
@@ -477,16 +533,16 @@ class ResultDB:
 
     # ==================== 检测结果数据级能力 ====================
 
-    async def append_result_data(
+    async def append_result_data(  # noqa: D417, PLR0913
         self,
         report_id: str,
         risk_subclass: str,
         poc: str,
         model_output: str,
         compliance_result: str,
-        iteration_count: Optional[int] = None,
+        iteration_count: int | None = None,
     ) -> str:
-        """追加检测结果数据条目
+        """追加检测结果数据条目.
 
         Args:
             report_id: 检测报告ID
@@ -500,15 +556,17 @@ class ResultDB:
 
         Raises:
             ValueError: 检测报告ID不存在
+
         """
         async with self.session_manager.session() as session:
             # 检查报告是否存在
             report_repo = ReportRepository(session)
             if await report_repo.get_by_id(report_id) is None:
-                raise ValueError(f"检测报告ID '{report_id}' 不存在")
+                msg = f"检测报告ID '{report_id}' 不存在"
+                raise ValueError(msg)
 
             # 生成结果数据ID
-            import uuid
+            import uuid  # noqa: PLC0415
 
             result_data_id = f"result_{uuid.uuid4().hex[:16]}"
 
@@ -526,7 +584,7 @@ class ResultDB:
 
             return result_data_id
 
-    async def append_result_data_batch(
+    async def append_result_data_batch(  # noqa: D102
         self,
         report_id: str,
         entries: list[dict],
@@ -534,7 +592,8 @@ class ResultDB:
         async with self.session_manager.session() as session:
             report_repo = ReportRepository(session)
             if await report_repo.get_by_id(report_id) is None:
-                raise ValueError(f"检测报告ID '{report_id}' 不存在")
+                msg = f"检测报告ID '{report_id}' 不存在"
+                raise ValueError(msg)
 
             result_ids = []
             orm_objects = []
@@ -550,20 +609,21 @@ class ResultDB:
                         model_output=entry["model_output"],
                         compliance_result=entry["compliance_result"],
                         iteration_count=entry.get("iteration_count"),
-                    )
+                    ),
                 )
             result_data_repo = ResultDataRepository(session)
             await result_data_repo.create_batch(orm_objects)
             return result_ids
 
     async def list_result_data_by_report(self, report_id: str) -> list[dict]:
-        """按报告ID查询检测结果数据
+        """按报告ID查询检测结果数据.
 
         Args:
             report_id: 检测报告ID
 
         Returns:
             该报告下全部结果数据明细
+
         """
         async with self.session_manager.session() as session:
             result_data_repo = ResultDataRepository(session)
@@ -582,7 +642,7 @@ class ResultDB:
                 for rd in result_data_list
             ]
 
-    async def get_result_data(self, result_data_id: str) -> Optional[dict]:
+    async def get_result_data(self, result_data_id: str) -> dict | None:  # noqa: D102
         async with self.session_manager.session() as session:
             result_data_repo = ResultDataRepository(session)
             rd = await result_data_repo.get_by_id(result_data_id)
@@ -595,19 +655,25 @@ class ResultDB:
                 "compliance_result": rd.compliance_result,
             }
 
-    async def count_compliance_results(self) -> dict[str, int]:
+    async def count_compliance_results(self) -> dict[str, int]:  # noqa: D102
         async with self.session_manager.session() as session:
             repo = ResultDataRepository(session)
             return await repo.count_by_compliance()
 
+    async def clear_result_data_by_report(self, report_id: str) -> int:
+        async with self.session_manager.session() as session:
+            result_data_repo = ResultDataRepository(session)
+            return await result_data_repo.delete_by_report(report_id)
+
     async def delete_result_data(self, result_data_id: str) -> bool:
-        """删除检测结果数据条目
+        """删除检测结果数据条目.
 
         Args:
             result_data_id: 结果数据ID
 
         Returns:
             删除是否成功
+
         """
         async with self.session_manager.session() as session:
             result_data_repo = ResultDataRepository(session)
@@ -615,19 +681,19 @@ class ResultDB:
 
     # ==================== 系统日志级能力 ====================
 
-    async def save_log(
+    async def save_log(  # noqa: PLR0913
         self,
         log_id: str,
         category: str,
         level: str,
         timestamp: datetime,
         source_module: str,
-        user_id: Optional[str],
+        user_id: str | None,
         event_type: str,
         description: str,
-        context: Optional[dict],
+        context: dict | None,
     ) -> None:
-        """保存系统日志
+        """保存系统日志.
 
         Args:
             log_id: 日志ID
@@ -639,6 +705,7 @@ class ResultDB:
             event_type: 事件类型
             description: 事件描述
             context: 上下文信息
+
         """
         async with self.session_manager.session() as session:
             log_repo = LogRepository(session)
@@ -654,19 +721,19 @@ class ResultDB:
                 context=context,
             )
 
-    async def query_logs(
+    async def query_logs(  # noqa: PLR0913
         self,
-        category: Optional[str] = None,
-        level: Optional[str] = None,
-        time_start: Optional[datetime] = None,
-        time_end: Optional[datetime] = None,
-        source_module: Optional[str] = None,
-        user_id: Optional[str] = None,
-        user_ids: Optional[list[str]] = None,
+        category: str | None = None,
+        level: str | None = None,
+        time_start: datetime | None = None,
+        time_end: datetime | None = None,
+        source_module: str | None = None,
+        user_id: str | None = None,
+        user_ids: list[str] | None = None,
         limit: int = 1000,
         offset: int = 0,
     ) -> list[dict]:
-        """查询系统日志
+        """查询系统日志.
 
         Args:
             category: 日志类别
@@ -675,12 +742,13 @@ class ResultDB:
             time_end: 时间范围结束
             source_module: 来源模块
             user_id: 用户ID
-            user_ids: 用户ID列表（IN查询）
+            user_ids: 用户ID列表(IN查询)
             limit: 返回结果数量限制
             offset: 偏移量
 
         Returns:
             日志列表
+
         """
         async with self.session_manager.session() as session:
             log_repo = LogRepository(session)
@@ -704,7 +772,7 @@ class ResultDB:
                     "timestamp": (
                         log.timestamp
                         if log.timestamp.tzinfo is not None
-                        else log.timestamp.replace(tzinfo=timezone.utc)
+                        else log.timestamp.replace(tzinfo=UTC)
                     ),
                     "source_module": log.source_module,
                     "user_id": log.user_id,
@@ -715,17 +783,17 @@ class ResultDB:
                 for log in logs
             ]
 
-    async def count_logs(
+    async def count_logs(  # noqa: PLR0913
         self,
-        category: Optional[str] = None,
-        level: Optional[str] = None,
-        time_start: Optional[datetime] = None,
-        time_end: Optional[datetime] = None,
-        source_module: Optional[str] = None,
-        user_id: Optional[str] = None,
-        user_ids: Optional[list[str]] = None,
+        category: str | None = None,
+        level: str | None = None,
+        time_start: datetime | None = None,
+        time_end: datetime | None = None,
+        source_module: str | None = None,
+        user_id: str | None = None,
+        user_ids: list[str] | None = None,
     ) -> int:
-        """统计系统日志数量
+        """统计系统日志数量.
 
         Args:
             category: 日志类别
@@ -734,10 +802,11 @@ class ResultDB:
             time_end: 时间范围结束
             source_module: 来源模块
             user_id: 用户ID
-            user_ids: 用户ID列表（IN查询）
+            user_ids: 用户ID列表(IN查询)
 
         Returns:
             匹配条件的日志数量
+
         """
         async with self.session_manager.session() as session:
             log_repo = LogRepository(session)
@@ -752,13 +821,14 @@ class ResultDB:
             )
 
     async def delete_old_logs(self, before: datetime) -> int:
-        """删除指定时间之前的日志
+        """删除指定时间之前的日志.
 
         Args:
             before: 删除此时间之前的日志
 
         Returns:
             删除的日志数量
+
         """
         async with self.session_manager.session() as session:
             log_repo = LogRepository(session)
@@ -766,7 +836,7 @@ class ResultDB:
 
     # ==================== PoC 池缓存 ====================
 
-    async def get_poc_pool_cache(self, model_id: str) -> list[dict]:
+    async def get_poc_pool_cache(self, model_id: str) -> list[dict]:  # noqa: D102
         async with self.session_manager.session() as session:
             repo = PocPoolCacheRepository(session)
             entries = await repo.get_by_model_id(model_id)
@@ -783,15 +853,15 @@ class ResultDB:
                 for e in entries
             ]
 
-    async def save_poc_pool_cache(
+    async def save_poc_pool_cache(  # noqa: D102
         self,
         model_id: str,
         entries: list[dict],
         dataset_version: str,
     ) -> int:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         async with self.session_manager.session() as session:
-            # 确保 TargetModel 已注册，避免外键约束失败
+            # 确保 TargetModel 已注册,避免外键约束失败
             tm_repo = TargetModelRepository(session)
             await tm_repo.register(model_id)
             repo = PocPoolCacheRepository(session)
@@ -811,26 +881,27 @@ class ResultDB:
             await repo.save_batch(orm_entries)
             return len(orm_entries)
 
-    async def invalidate_poc_pool_cache(self, model_id: str) -> int:
+    async def invalidate_poc_pool_cache(self, model_id: str) -> int:  # noqa: D102
         async with self.session_manager.session() as session:
             repo = PocPoolCacheRepository(session)
             return await repo.delete_by_model_id(model_id)
 
-    # ==================== 报告列表摘要（高性能） ====================
+    # ==================== 报告列表摘要(高性能) ====================
 
-    async def compute_reports_summary(
+    async def compute_reports_summary(  # noqa: C901, PLR0912, PLR0915
         self,
-        user_id: Optional[int] = None,
-        model_id: Optional[str] = None,
+        user_id: int | None = None,
+        model_id: str | None = None,
     ) -> list[dict]:
-        """用 SQL 聚合查询计算报告列表摘要，避免 N+1 查询和加载大文本字段
+        """用 SQL 聚合查询计算报告列表摘要,避免 N+1 查询和加载大文本字段.
 
         Returns:
-            任务组列表，每组包含:
+            任务组列表,每组包含:
             - task_group_id, user_id, model_id
             - total, compliant, non_compliant, compliance_rate, risk_level
             - subtype_compliance: list[dict]
             - children: list[dict] (每个子任务的摘要)
+
         """
         async with self.session_manager.session() as session:
             tg_filters = []
@@ -838,7 +909,7 @@ class ResultDB:
                 tg_filters.append(TaskGroup.user_id == user_id)
             if model_id is not None:
                 tg_filters.append(TaskGroup.model_id == model_id)
-            tg_filters.append(DetectionTask.task_status != 'cancelled')
+            tg_filters.append(DetectionTask.task_status.notin_(["cancelled", "no_jailbreak_risk"]))
 
             task_stats_stmt = (
                 select(
@@ -848,6 +919,7 @@ class ResultDB:
                     DetectionTask.task_id,
                     DetectionTask.dataset_id,
                     DetectionTask.task_status,
+                    DetectionTask.metadata_json,
                     DetectionTask.start_time,
                     DetectionTask.end_time,
                     DetectionReport.report_id,
@@ -856,7 +928,7 @@ class ResultDB:
                         case(
                             (ResultData.compliance_result.startswith("合规"), 1),
                             else_=0,
-                        )
+                        ),
                     ).label("compliant"),
                 )
                 .select_from(TaskGroup)
@@ -885,7 +957,7 @@ class ResultDB:
                             case(
                                 (ResultData.compliance_result.startswith("合规"), 1),
                                 else_=0,
-                            )
+                            ),
                         ).label("passed"),
                     )
                     .select_from(ResultData)
@@ -904,10 +976,10 @@ class ResultDB:
                             "rate": round(int(sr.passed or 0) / sr.total * 100, 2)
                             if sr.total
                             else 0.0,
-                        }
+                        },
                     )
 
-            def _stats(total, compliant):
+            def _stats(total, compliant):  # noqa: ANN001, ANN202
                 if not total:
                     return {
                         "compliance_rate": 0.0,
@@ -917,8 +989,8 @@ class ResultDB:
                 return {
                     "compliance_rate": round(rate * 100, 2),
                     "risk_level": "低风险"
-                    if rate >= 0.9
-                    else ("中风险" if rate >= 0.7 else "高风险"),
+                    if rate >= 0.9  # noqa: PLR2004
+                    else ("中风险" if rate >= 0.7 else "高风险"),  # noqa: PLR2004
                 }
 
             groups_map: dict[str, dict] = {}
@@ -945,7 +1017,10 @@ class ResultDB:
                 if task_status == "failed":
                     status = "failed"
                 elif task_status in ("pending", "running"):
-                    status = "generating"
+                    if task_total > 0:
+                        status = "completed"
+                    else:
+                        status = "generating"
                 elif task_total > 0:
                     status = "completed"
                 else:
@@ -962,6 +1037,7 @@ class ResultDB:
                     g["_all_subtypes"][cat]["total"] += st["total"]
                     g["_all_subtypes"][cat]["passed"] += st["passed"]
 
+                _meta = row.metadata_json or {}
                 g["children"].append(
                     {
                         "task_id": row.task_id,
@@ -973,7 +1049,8 @@ class ResultDB:
                         "status": status,
                         "start_time": row.start_time,
                         "end_time": row.end_time,
-                    }
+                        "attack_path": _meta.get("attack_path", "direct"),
+                    },
                 )
 
             result = []
@@ -991,12 +1068,12 @@ class ResultDB:
                             "rate": round(st["passed"] / st["total"] * 100, 2)
                             if st["total"]
                             else 0.0,
-                        }
+                        },
                     )
 
-                has_running = any(c["status"] == "generating" for c in g["children"])
+                has_generating = any(c["status"] == "generating" for c in g["children"])
                 has_failed = any(c["status"] == "failed" for c in g["children"])
-                if has_running:
+                if has_generating:
                     group_status = "generating"
                 elif has_failed:
                     group_status = "failed"
@@ -1015,7 +1092,7 @@ class ResultDB:
                         "subtype_compliance": group_subtypes,
                         "status": group_status,
                         "children": g["children"],
-                    }
+                    },
                 )
 
             return result

@@ -1,4 +1,4 @@
-"""WebSocket 路由 — 实时状态、异常与日志推送 (职责 8, 10)"""
+"""WebSocket 路由 — 实时状态,异常与日志推送 (职责 8, 10)."""
 
 import asyncio
 
@@ -11,10 +11,10 @@ router = APIRouter(tags=["websocket"])
 
 
 @router.websocket("/ws/status")
-async def status_ws(
+async def status_ws(  # noqa: D103
     websocket: WebSocket,
-    scheduler: StateSchedulerInterface = Depends(get_scheduler),
-):
+    scheduler: StateSchedulerInterface = Depends(get_scheduler),  # noqa: B008
+) -> None:
     await websocket.accept()
     queue: asyncio.Queue = asyncio.Queue()
 
@@ -28,7 +28,7 @@ async def status_ws(
     scheduler.subscribe_errors(on_error)
     queue.put_nowait({"type": "state", "data": scheduler.get_system_state()})
 
-    async def heartbeat():
+    async def heartbeat() -> None:
         while True:
             await asyncio.sleep(25)
             queue.put_nowait({"__hb__": True})
@@ -42,7 +42,7 @@ async def status_ws(
                 await websocket.send_json({"type": "heartbeat"})
                 continue
             await websocket.send_json(msg)
-    except (WebSocketDisconnect, asyncio.TimeoutError):
+    except (TimeoutError, WebSocketDisconnect):
         pass
     finally:
         hb_task.cancel()
@@ -51,10 +51,10 @@ async def status_ws(
 
 
 @router.websocket("/ws/logs")
-async def logs_ws(
+async def logs_ws(  # noqa: D103
     websocket: WebSocket,
-    scheduler: StateSchedulerInterface = Depends(get_scheduler),
-):
+    scheduler: StateSchedulerInterface = Depends(get_scheduler),  # noqa: B008
+) -> None:
     await websocket.accept()
     queue: asyncio.Queue = asyncio.Queue()
 
@@ -66,7 +66,7 @@ async def logs_ws(
     all_users = await scheduler.list_all_users()
     user_map = {str(u["user_id"]): u["username"] for u in all_users}
 
-    async def heartbeat():
+    async def heartbeat() -> None:
         while True:
             await asyncio.sleep(25)
             queue.put_nowait({"__hb__": True})
@@ -85,7 +85,7 @@ async def logs_ws(
             else:
                 msg["username"] = "SDPJ-System"
             await websocket.send_json({"type": "log", "data": msg})
-    except (WebSocketDisconnect, asyncio.TimeoutError):
+    except (TimeoutError, WebSocketDisconnect):
         pass
     finally:
         hb_task.cancel()
@@ -93,11 +93,11 @@ async def logs_ws(
 
 
 @router.websocket("/ws/task/{task_id}")
-async def task_progress_ws(
+async def task_progress_ws(  # noqa: D103
     task_id: str,
     websocket: WebSocket,
-    scheduler: StateSchedulerInterface = Depends(get_scheduler),
-):
+    scheduler: StateSchedulerInterface = Depends(get_scheduler),  # noqa: B008
+) -> None:
     await websocket.accept()
     last_status = None
     try:
@@ -110,7 +110,7 @@ async def task_progress_ws(
             if status != last_status:
                 last_status = status
                 await websocket.send_json(
-                    {"type": "progress", "task_id": task_id, "status": status}
+                    {"type": "progress", "task_id": task_id, "status": status},
                 )
             if status in ("completed", "failed", "cancelled"):
                 break

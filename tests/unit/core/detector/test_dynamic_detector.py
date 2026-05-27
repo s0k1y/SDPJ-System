@@ -1,10 +1,14 @@
+"""test_dynamic_detector 模块单元测试."""
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 from sdpj.core.sdpj_detector.dynamic_detector import run_dynamic_detection
+from typing import Any
 
 
 @pytest.fixture
-def mock_llm():
+def mock_llm() -> None:
+    """测试 mock llm."""
     llm = AsyncMock()
     instance = MagicMock()
     llm.get_service_instance = AsyncMock(return_value=instance)
@@ -14,7 +18,8 @@ def mock_llm():
 
 
 @pytest.fixture
-def mock_data_processor():
+def mock_data_processor() -> None:
+    """测试 mock data processor."""
     dp = AsyncMock()
     dp.create_task_group = AsyncMock(return_value="dyn_tg_1")
     dp.create_detection_task = AsyncMock(return_value="dyn_task_1")
@@ -27,13 +32,13 @@ def mock_data_processor():
 
 @pytest.mark.asyncio
 async def test_dynamic_detection_static_violation_gets_zero_iterations(
-    mock_llm, mock_data_processor
-):
-    """静态就违规的样本，迭代次数应为 0"""
+    mock_llm: Any, mock_data_processor: Any
+) -> None:
+    """静态就违规的样本,迭代次数应为 0"""
     llm, instance = mock_llm
     dp = mock_data_processor
 
-    # 静态检测结果：一条违规样本
+    # 静态检测结果:一条违规样本
     static_result = {
         "status": "completed",
         "task_group_id": "static_tg_1",
@@ -66,7 +71,7 @@ async def test_dynamic_detection_static_violation_gets_zero_iterations(
     )
 
     assert result["status"] == "completed"
-    assert result["task_group_id"] == "dyn_tg_1"
+    assert result["task_group_id"] == "static_tg_1"
 
     # 检查 append_result_data_batch 被调用
     dp.append_result_data_batch.assert_called_once()
@@ -76,17 +81,18 @@ async def test_dynamic_detection_static_violation_gets_zero_iterations(
 
 
 @pytest.mark.asyncio
-async def test_dynamic_detection_tracks_iterations(mock_llm, mock_data_processor):
+async def test_dynamic_detection_tracks_iterations(mock_llm: Any, mock_data_processor: Any) -> None:
     """动态检测应跟踪每个样本的迭代次数"""
     llm, instance = mock_llm
     dp = mock_data_processor
 
-    # 模拟 LLM 调用：第一次返回合规，第二次返回违规
+    # 模拟 LLM 调用:第一次返回合规,第二次返回违规
     call_count = [0]
 
-    async def mock_invoke(inst, req):
+    async def mock_invoke(inst: Any, req: Any) -> None:
+        """测试 mock invoke."""
         call_count[0] += 1
-        if call_count[0] % 4 == 0:  # 每4次调用中的第4次是判断，返回违规
+        if call_count[0] % 4 == 0:  # 每4次调用中的第4次是判断,返回违规
             return {"content": "违规"}
         return {"content": "test output"}
 
@@ -134,7 +140,7 @@ async def test_dynamic_detection_tracks_iterations(mock_llm, mock_data_processor
 
 
 @pytest.mark.asyncio
-async def test_dynamic_detection_avg_iteration_count(mock_llm, mock_data_processor):
+async def test_dynamic_detection_avg_iteration_count(mock_llm: Any, mock_data_processor: Any) -> None:
     """动态检测应返回平均迭代次数"""
     llm, instance = mock_llm
     dp = mock_data_processor
@@ -146,7 +152,7 @@ async def test_dynamic_detection_avg_iteration_count(mock_llm, mock_data_process
         "judge_template": "template",
     }
 
-    # 两个样本：一个静态违规（0次），一个需要迭代
+    # 两个样本:一个静态违规(0次),一个需要迭代
     dp.aggregate_task_group_results = AsyncMock(
         return_value={
             "tasks": [
@@ -182,7 +188,7 @@ async def test_dynamic_detection_avg_iteration_count(mock_llm, mock_data_process
 
 
 @pytest.mark.asyncio
-async def test_dynamic_detection_no_static_base():
+async def test_dynamic_detection_no_static_base() -> None:
     """没有静态检测基础时应返回错误状态"""
     llm = AsyncMock()
     dp = AsyncMock()

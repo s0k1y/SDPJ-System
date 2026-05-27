@@ -73,6 +73,76 @@ filterwarnings = [
 line-length = 100
 target-version = "py311"
 
+[tool.ruff.lint.per-file-ignores]
+"sdpj/**/__init__.py" = ["D104"]
+"sdpj/**/models.py" = ["ERA001"]
+"sdpj/core/secure_comm_manager.py" = ["ERA001"]
+"sdpj/drivers/user_center.py" = ["ERA001"]
+"sdpj/infrastructure/llm_adapters/errors.py" = ["ERA001"]
+"sdpj/ui/webui/backend/app.py" = ["ERA001"]
+"sdpj/__main__.py" = ["D200", "D400", "D415", "E501"]
+"sdpj/control/state_scheduler.py" = ["E501"]
+"sdpj/core/private_config_manager_interface.py" = ["D200", "D400", "D415", "E501"]
+"sdpj/core/sdpj_detector_interface.py" = ["D210", "E501"]
+"sdpj/drivers/llm_service_interface.py" = ["D210", "E501"]
+"sdpj/infrastructure/database/sample_db/session.py" = ["ERA001"]
+"sdpj/infrastructure/database/sample_db/user_datasets/__init__.py" = ["ERA001"]
+"sdpj/infrastructure/utils/multimodal.py" = ["D100"]
+"tests/**/*.py" = [
+    "ANN401",   # Any type is acceptable in tests
+    "S101",     # assert is standard in tests
+    "PLR2004",  # magic values are normal in test assertions
+    "SLF001",   # private member access is common in tests
+    "DTZ005",   # datetime.timezone not required in tests
+    "DTZ001",   # datetime.datetime() without timezone is OK in tests
+    "INP001",   # implicit namespace package (tests are not packages)
+    "ARG001",   # unused function argument (fixtures)
+    "ARG002",   # unused method argument (fixtures)
+    "ARG005",   # unused lambda argument
+    "FBT001",   # boolean positional arg
+    "FBT002",   # boolean default value
+    "FBT003",   # boolean positional value in call
+    "F401",     # unused import (fixtures/patches)
+    "F841",     # unused variable
+    "RUF059",   # unused variable
+    "PT018",    # assertion should be broken down
+    "PT011",    # too broad pytest.raises
+    "EM101",    # string literal in exception
+    "ERA001",   # commented-out code
+    "SIM105",   # contextlib.suppress
+    "SIM117",   # nested with
+    "TRY003",   # long exception message
+    "TRY301",   # raise in body of try
+    "PGH004",   # noqa should be specific
+    "RET504",   # unnecessary assignment before return
+    "PLC0415",  # import outside top-level
+    "UP017",    # datetime.UTC
+    "PTH123",   # open() should be Path.open()
+    "PTH110",   # os.path.exists() should be Path.exists()
+    "C401",     # unnecessary generator
+    "Q000",     # single vs double quotes
+    "RSE102",   # unnecessary parens on raised exception
+    "S105",     # possible hardcoded password
+    "S106",     # possible hardcoded password
+    "B017",     # pytest.raises should not be a no-op
+    "D212",     # multi-line summary first line
+    "D213",     # multi-line summary second line
+    "D211",     # no blank line before class
+    "D203",     # one blank line before class
+    "E401",     # multiple imports on one line
+    "E402",     # module-level import not at top
+    "E501",     # line too long
+    "D200",     # one-line docstring should fit on one line
+    "COM812",   # trailing comma
+    "I001",     # import block unsorted
+    "D400",     # first line should end with period
+    "D403",     # first word of first line should be capitalized
+    "D415",     # first line should end with punctuation
+    "D413",     # missing blank line after last section
+    "D205",     # blank line after summary
+    "RUF100",   # unused noqa
+]
+
 [tool.mypy]
 python_version = "3.11"
 warn_return_any = true

@@ -1,6 +1,6 @@
 """ResultDB 模型单元测试
 
-测试 ORM 模型的基本功能和关系。
+测试 ORM 模型的基本功能和关系.
 """
 
 import pytest
@@ -13,10 +13,11 @@ from sdpj.infrastructure.database.result_db.models import (
     DetectionReport,
     ResultData,
 )
+from typing import Any
 
 
 @pytest.fixture
-async def async_session():
+async def async_session() -> None:
     """创建测试用的异步数据库会话"""
     from sdpj.infrastructure.database.user_db.models import User  # noqa
     from sdpj.infrastructure.database.sample_db.models import Dataset  # noqa
@@ -44,7 +45,7 @@ async def async_session():
 
 
 @pytest.mark.asyncio
-async def test_task_group_creation(async_session):
+async def test_task_group_creation(async_session: Any) -> None:
     """测试任务组创建"""
     task_group = TaskGroup(task_group_id="tg_001", user_id=1, model_id="gpt-4")
     async_session.add(task_group)
@@ -56,7 +57,7 @@ async def test_task_group_creation(async_session):
 
 
 @pytest.mark.asyncio
-async def test_detection_task_creation(async_session):
+async def test_detection_task_creation(async_session: Any) -> None:
     """测试检测任务创建"""
     task_group = TaskGroup(task_group_id="tg_001", user_id=1, model_id="gpt-4")
     async_session.add(task_group)
@@ -79,7 +80,7 @@ async def test_detection_task_creation(async_session):
 
 
 @pytest.mark.asyncio
-async def test_detection_report_creation(async_session):
+async def test_detection_report_creation(async_session: Any) -> None:
     """测试检测报告创建"""
     task_group = TaskGroup(task_group_id="tg_001", user_id=1, model_id="gpt-4")
     async_session.add(task_group)
@@ -104,7 +105,7 @@ async def test_detection_report_creation(async_session):
 
 
 @pytest.mark.asyncio
-async def test_result_data_creation(async_session):
+async def test_result_data_creation(async_session: Any) -> None:
     """测试结果数据创建"""
     task_group = TaskGroup(task_group_id="tg_001", user_id=1, model_id="gpt-4")
     async_session.add(task_group)
@@ -140,7 +141,7 @@ async def test_result_data_creation(async_session):
 
 
 @pytest.mark.asyncio
-async def test_cascade_delete_task_group(async_session):
+async def test_cascade_delete_task_group(async_session: Any) -> None:
     """测试任务组级联删除"""
     task_group = TaskGroup(task_group_id="tg_001", user_id=1, model_id="gpt-4")
     async_session.add(task_group)

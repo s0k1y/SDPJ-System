@@ -12,14 +12,14 @@ from sdpj.core.report_manager import ReportManager
 
 
 @pytest.fixture
-def mock_data_processor():
+def mock_data_processor():  # noqa: ANN201
     """Mock DataProcessor"""
     dp = AsyncMock()
     return dp
 
 
 @pytest.fixture
-def mock_user_center():
+def mock_user_center():  # noqa: ANN201
     """Mock UserCenter"""
     uc = AsyncMock()
     uc.get_user_by_id = AsyncMock(return_value={"user_id": 1, "username": "testuser"})
@@ -27,7 +27,7 @@ def mock_user_center():
 
 
 @pytest.fixture
-def report_manager(mock_data_processor, mock_user_center):
+def report_manager(mock_data_processor, mock_user_center):  # noqa: ANN001, ANN201
     """创建 ReportManager 实例"""
     return ReportManager(mock_data_processor, mock_user_center)
 
@@ -37,8 +37,8 @@ class TestSubtypeComplianceIntegration:
 
     @pytest.mark.asyncio
     async def test_prepare_visualization_includes_subtype_compliance(
-        self, report_manager, mock_data_processor
-    ):
+        self, report_manager, mock_data_processor  # noqa: ANN001
+    ) -> None:
         """测试可视化数据包含子类型合规率"""
         # Mock 聚合数据
         mock_data_processor.aggregate_task_group_results = AsyncMock(
@@ -104,7 +104,7 @@ class TestSubtypeComplianceIntegration:
         assert injection["rate"] == 50.0
 
     @pytest.mark.asyncio
-    async def test_subtype_compliance_with_empty_results(self, report_manager, mock_data_processor):
+    async def test_subtype_compliance_with_empty_results(self, report_manager, mock_data_processor) -> None:  # noqa: ANN001
         """测试空结果时的子类型合规率"""
         mock_data_processor.aggregate_task_group_results = AsyncMock(
             return_value={
@@ -125,10 +125,10 @@ class TestIterationCountIntegration:
 
     @pytest.mark.asyncio
     async def test_prepare_visualization_with_iteration_counts(
-        self, report_manager, mock_data_processor
-    ):
+        self, report_manager, mock_data_processor  # noqa: ANN001
+    ) -> None:
         """测试可视化数据包含平均迭代次数"""
-        # Mock 动态检测数据（包含迭代次数）
+        # Mock 动态检测数据(包含迭代次数)
         mock_data_processor.aggregate_task_group_results = AsyncMock(
             return_value={
                 "user_id": "1",
@@ -173,9 +173,9 @@ class TestIterationCountIntegration:
 
     @pytest.mark.asyncio
     async def test_avg_iteration_count_ignores_null_values(
-        self, report_manager, mock_data_processor
-    ):
-        """测试平均迭代次数忽略 NULL 值（静态检测）"""
+        self, report_manager, mock_data_processor  # noqa: ANN001
+    ) -> None:
+        """测试平均迭代次数忽略 NULL 值(静态检测)"""  # noqa: RUF002
         # 混合静态和动态检测结果
         mock_data_processor.aggregate_task_group_results = AsyncMock(
             return_value={
@@ -220,10 +220,10 @@ class TestIterationCountIntegration:
 
     @pytest.mark.asyncio
     async def test_avg_iteration_count_none_when_no_dynamic_data(
-        self, report_manager, mock_data_processor
-    ):
+        self, report_manager, mock_data_processor  # noqa: ANN001
+    ) -> None:
         """测试纯静态检测时平均迭代次数为 None"""
-        # 纯静态检测结果（所有 iteration_count 为 None）
+        # 纯静态检测结果(所有 iteration_count 为 None)
         mock_data_processor.aggregate_task_group_results = AsyncMock(
             return_value={
                 "user_id": "1",
@@ -256,10 +256,10 @@ class TestIterationCountIntegration:
 
 
 class TestReportFeaturesEndToEnd:
-    """端到端测试：完整报告生成流程"""
+    """端到端测试:完整报告生成流程"""  # noqa: RUF002
 
     @pytest.mark.asyncio
-    async def test_complete_report_with_all_features(self, report_manager, mock_data_processor):
+    async def test_complete_report_with_all_features(self, report_manager, mock_data_processor) -> None:  # noqa: ANN001
         """测试完整报告包含所有新功能"""
         # Mock 完整的检测结果
         mock_data_processor.aggregate_task_group_results = AsyncMock(
@@ -338,7 +338,7 @@ class TestReportFeaturesEndToEnd:
         assert hijacking["total"] == 2
         assert hijacking["rate"] == 50.0  # 1/2
 
-        # 验证平均迭代次数（只计算动态检测的 5 条）
+        # 验证平均迭代次数(只计算动态检测的 5 条)
         assert viz_data["avg_iteration_count"] == 2.2  # (0 + 3 + 1 + 5 + 2) / 5
 
         # 验证其他可视化数据
@@ -350,7 +350,7 @@ class TestReportFeaturesEndToEnd:
 class TestReportManagerCalculateStatistics:
     """测试 ReportManager.calculate_statistics 方法"""
 
-    def test_calculate_statistics_with_subtype_compliance(self, report_manager):
+    def test_calculate_statistics_with_subtype_compliance(self, report_manager) -> None:  # noqa: ANN001
         """测试统计计算包含子类型合规率"""
         results = [
             {"compliance_result": "合规", "risk_subclass": "越狱攻击"},
@@ -385,7 +385,7 @@ class TestReportManagerCalculateStatistics:
         assert injection["failed"] == 2
         assert injection["rate"] == 33.33
 
-    def test_calculate_statistics_empty_results(self, report_manager):
+    def test_calculate_statistics_empty_results(self, report_manager) -> None:  # noqa: ANN001
         """测试空结果的统计计算"""
         stats = report_manager.calculate_statistics([])
 

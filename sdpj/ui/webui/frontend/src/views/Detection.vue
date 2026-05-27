@@ -28,7 +28,7 @@
 import { ref, computed } from 'vue'
 import DetectionForm from '../components/detection/DetectionForm.vue'
 
-const crumbItems = ['配置被测大模型', '配置被测数据集与检测参数', '确认启动']
+const crumbItems = ['选择检测算法与被测大模型', '选择攻击意图', '选择攻击路径', '确认启动']
 
 const formRef = ref(null)
 const step = computed(() => formRef.value?.currentStep ?? 0)

@@ -52,3 +52,10 @@ export function detectionConfig(operation, params = {}) {
 export function detectionResource(operation, params = {}) {
   return api.post('/detection/resource', { operation, params })
 }
+
+/**
+ * 获取编码类型列表
+ */
+export function getEncodingTypes() {
+  return api.get('/detection/encoding-types')
+}

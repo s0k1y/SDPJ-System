@@ -1,4 +1,4 @@
-"""UtilsLib 文件处理工具"""
+"""UtilsLib 文件处理工具."""
 
 import csv
 import io
@@ -9,7 +9,7 @@ from sdpj.infrastructure.utils.exceptions import FileError
 
 
 def read_file(file_path: str, mode: str = "text") -> str | bytes:
-    """读取文件"""
+    """读取文件."""
     try:
         path = Path(file_path)
         if mode == "text":
@@ -20,7 +20,7 @@ def read_file(file_path: str, mode: str = "text") -> str | bytes:
 
 
 def write_file(file_path: str, content: str | bytes, mode: str = "text") -> bool:
-    """写入文件"""
+    """写入文件."""
     try:
         path = Path(file_path)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -30,21 +30,21 @@ def write_file(file_path: str, content: str | bytes, mode: str = "text") -> bool
             path.write_text(content, encoding="utf-8")
         else:
             path.write_bytes(content if isinstance(content, bytes) else content.encode("utf-8"))
-        return True
+        return True  # noqa: TRY300
     except OSError as e:
         raise FileError(str(e)) from e
 
 
-def validate_file_format(content: str, format_type: str) -> tuple[bool, str]:
-    """文件格式校验，支持 json / csv / jsonl"""
+def validate_file_format(content: str, format_type: str) -> tuple[bool, str]:  # noqa: C901, PLR0911
+    """文件格式校验,支持 json / csv / jsonl."""
     fmt = format_type.lower()
 
     if fmt == "json":
         try:
             obj = json.loads(content)
             if not isinstance(obj, (dict, list)):
-                return False, f"JSON 顶层类型应为 object 或 array，实际为 {type(obj).__name__}"
-            return True, ""
+                return False, f"JSON 顶层类型应为 object 或 array,实际为 {type(obj).__name__}"
+            return True, ""  # noqa: TRY300
         except json.JSONDecodeError as e:
             return False, f"JSON 解析失败: {e}"
 
@@ -58,7 +58,7 @@ def validate_file_format(content: str, format_type: str) -> tuple[bool, str]:
             for i, row in enumerate(rows[1:], start=2):
                 if len(row) != header_len:
                     return False, f"CSV 第 {i} 行列数 ({len(row)}) 与表头列数 ({header_len}) 不一致"
-            return True, ""
+            return True, ""  # noqa: TRY300
         except csv.Error as e:
             return False, f"CSV 解析失败: {e}"
 

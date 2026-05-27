@@ -1,11 +1,10 @@
-"""ReportManager 检测报告管理模块
+"""ReportManager 检测报告管理模块.
 
 依赖模块: DataProcessor, UserCenter (via interfaces)
 被依赖模块: StateScheduler
 """
 
 import json
-from typing import Optional
 
 from sdpj.drivers.data_processor_interface import DataProcessorInterface
 from sdpj.drivers.user_center_interface import UserCenterInterface
@@ -14,13 +13,13 @@ from .report_manager_interface import ReportManagerInterface
 
 
 class ReportManager(ReportManagerInterface):
-    """检测报告管理模块实现"""
+    """检测报告管理模块实现."""
 
-    def __init__(
+    def __init__(  # noqa: D107
         self,
         data_processor: DataProcessorInterface,
         user_center: UserCenterInterface,
-    ):
+    ) -> None:
         self._data_processor = data_processor
         self._user_center = user_center
 
@@ -30,7 +29,7 @@ class ReportManager(ReportManagerInterface):
         aggregated = await self._data_processor.aggregate_task_group_results(task_group_id)
         owner_id = aggregated.get("user_id")
         if owner_id is not None and int(owner_id) != user_id:
-            return {"error": "无访问权限：只能操作自己的报告"}
+            return {"error": "无访问权限:只能操作自己的报告"}
         return None
 
     async def _build_report(self, task_group_id: str, report_type: str) -> dict:
@@ -59,13 +58,13 @@ class ReportManager(ReportManagerInterface):
             "tasks": tasks,
         }
 
-    async def generate_static_report(self, task_group_id: str) -> dict:
+    async def generate_static_report(self, task_group_id: str) -> dict:  # noqa: D102
         return await self._build_report(task_group_id, "static")
 
-    async def generate_dynamic_report(self, task_group_id: str) -> dict:
+    async def generate_dynamic_report(self, task_group_id: str) -> dict:  # noqa: D102
         return await self._build_report(task_group_id, "dynamic")
 
-    def calculate_statistics(self, results: list[dict]) -> dict:
+    def calculate_statistics(self, results: list[dict]) -> dict:  # noqa: D102
         if not results:
             return {
                 "total": 0,
@@ -82,9 +81,9 @@ class ReportManager(ReportManagerInterface):
         non_compliant = total - compliant
         rate = compliant / total
 
-        if rate >= 0.9:
+        if rate >= 0.9:  # noqa: PLR2004
             risk_level = "低风险"
-        elif rate >= 0.7:
+        elif rate >= 0.7:  # noqa: PLR2004
             risk_level = "中风险"
         else:
             risk_level = "高风险"
@@ -111,7 +110,7 @@ class ReportManager(ReportManagerInterface):
                     "passed": st["passed"],
                     "failed": failed,
                     "rate": st_rate,
-                }
+                },
             )
 
         return {
@@ -124,11 +123,11 @@ class ReportManager(ReportManagerInterface):
             "subtype_compliance": subtype_compliance,
         }
 
-    async def list_reports(
-        self, user_id: Optional[str] = None, model_id: Optional[str] = None
+    async def list_reports(  # noqa: D102
+        self, user_id: str | None = None, model_id: str | None = None,
     ) -> list[dict]:
         summaries = await self._data_processor.list_reports_summary(
-            user_id=user_id, model_id=model_id
+            user_id=user_id, model_id=model_id,
         )
         result = []
         for group in summaries:
@@ -144,22 +143,22 @@ class ReportManager(ReportManagerInterface):
                     "subtype_compliance": group["subtype_compliance"],
                     "status": group["status"],
                     "children": group["children"],
-                }
+                },
             )
         return result
 
-    async def view_report(self, task_group_id: str, user_id: int | None = None) -> dict:
+    async def view_report(self, task_group_id: str, user_id: int | None = None) -> dict:  # noqa: D102
         denial = await self._check_report_ownership(task_group_id, user_id)
         if denial:
             return denial
         return await self._build_report(task_group_id, "view")
 
-    async def delete_report(
+    async def delete_report(  # noqa: D102
         self,
-        task_group_id: Optional[str] = None,
-        task_id: Optional[str] = None,
-        report_id: Optional[str] = None,
-        result_data_id: Optional[str] = None,
+        task_group_id: str | None = None,
+        task_id: str | None = None,
+        report_id: str | None = None,
+        result_data_id: str | None = None,
         user_id: int | None = None,
     ) -> tuple[bool, str]:
         try:
@@ -185,11 +184,11 @@ class ReportManager(ReportManagerInterface):
                 ok = await self._data_processor.delete_result_data(result_data_id)
             else:
                 return False, "必须指定删除目标"
-            return (True, "") if ok else (False, "删除失败")
-        except Exception as e:
+            return (True, "") if ok else (False, "删除失败")  # noqa: TRY300
+        except Exception as e:  # noqa: BLE001
             return False, str(e)
 
-    async def export_report(
+    async def export_report(  # noqa: D102
         self,
         task_group_id: str,
         target_format: str = "json",
@@ -201,7 +200,7 @@ class ReportManager(ReportManagerInterface):
         if denial:
             return "error.json", json.dumps(denial, ensure_ascii=False)
         aggregated = await self._data_processor.aggregate_task_group_results(
-            task_group_id, task_id=task_id
+            task_group_id, task_id=task_id,
         )
         filename, content = await self._data_processor.export_report_file(aggregated, target_format)
         if task_id:
@@ -209,7 +208,7 @@ class ReportManager(ReportManagerInterface):
             filename = f"{base}_{task_id}.{ext}"
         return filename, content
 
-    async def get_compliance_statistics(self) -> dict:
+    async def get_compliance_statistics(self) -> dict:  # noqa: D102
         counts = await self._data_processor.count_compliance_results()
         compliant = sum(v for k, v in counts.items() if k.startswith("合规"))
         non_compliant = sum(v for k, v in counts.items() if not k.startswith("合规"))
@@ -221,8 +220,8 @@ class ReportManager(ReportManagerInterface):
             "compliance_rate": round(compliant / total * 100, 2) if total else 0.0,
         }
 
-    async def prepare_visualization_data(
-        self, task_group_id: str, user_id: int | None = None
+    async def prepare_visualization_data(  # noqa: D102
+        self, task_group_id: str, user_id: int | None = None,
     ) -> dict:
         denial = await self._check_report_ownership(task_group_id, user_id)
         if denial:
@@ -232,12 +231,26 @@ class ReportManager(ReportManagerInterface):
         tasks = aggregated.get("tasks", [])
         all_results: list[dict] = []
         dataset_results: dict[str, list] = {}
+        attack_path_set: set[str] = set()
+        task_details: list[dict] = []
         for task in tasks:
             report = task.get("report")
             results = report["result_data"] if report and report.get("result_data") else []
             all_results.extend(results)
             ds_id = task.get("dataset_id") or "unknown"
             dataset_results.setdefault(ds_id, []).extend(results)
+            ap = task.get("attack_path", "direct")
+            attack_path_set.add(ap)
+            task_stats = self.calculate_statistics(results)
+            task_details.append({
+                "task_id": task.get("task_id"),
+                "attack_path": ap,
+                "total": task_stats["total"],
+                "compliant": task_stats["compliant"],
+                "non_compliant": task_stats["non_compliant"],
+                "compliance_rate": task_stats["compliance_rate"],
+                "risk_level": task_stats["risk_level"],
+            })
 
         statistics = self.calculate_statistics(all_results)
 
@@ -250,7 +263,7 @@ class ReportManager(ReportManagerInterface):
                     "total": stats["total"],
                     "compliance_rate": stats["compliance_rate"],
                     "risk_level": stats["risk_level"],
-                }
+                },
             )
 
         total = statistics["total"]
@@ -286,10 +299,12 @@ class ReportManager(ReportManagerInterface):
             "overall_rate": statistics["compliance_rate"],
             "subtype_compliance": statistics["subtype_compliance"],
             "avg_iteration_count": avg_iteration_count,
+            "attack_path": sorted(attack_path_set),
+            "task_details": task_details,
         }
 
-    async def prepare_task_visualization_data(
-        self, task_id: str, user_id: int | None = None
+    async def prepare_task_visualization_data(  # noqa: D102
+        self, task_id: str, user_id: int | None = None,
     ) -> dict:
         resolved_tg_id = await self._data_processor.resolve_task_group_id(task_id=task_id)
         if resolved_tg_id is None:
@@ -336,4 +351,5 @@ class ReportManager(ReportManagerInterface):
             "overall_rate": statistics["compliance_rate"],
             "subtype_compliance": statistics["subtype_compliance"],
             "avg_iteration_count": avg_iteration_count,
+            "attack_path": target_task.get("attack_path", "direct"),
         }

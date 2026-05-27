@@ -1,22 +1,22 @@
-from typing import Optional
+"""Module docstring."""
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import TargetModel
+from sdpj.infrastructure.database.result_db.models import TargetModel
 
 
-class TargetModelRepository:
-    def __init__(self, session: AsyncSession):
+class TargetModelRepository:  # noqa: D101
+    def __init__(self, session: AsyncSession) -> None:  # noqa: D107
         self.session = session
 
-    async def get_by_id(self, model_id: str) -> Optional[TargetModel]:
+    async def get_by_id(self, model_id: str) -> TargetModel | None:  # noqa: D102
         result = await self.session.execute(
-            select(TargetModel).where(TargetModel.model_id == model_id)
+            select(TargetModel).where(TargetModel.model_id == model_id),
         )
         return result.scalar_one_or_none()
 
-    async def register(self, model_id: str) -> TargetModel:
+    async def register(self, model_id: str) -> TargetModel:  # noqa: D102
         existing = await self.get_by_id(model_id)
         if existing:
             return existing
@@ -25,6 +25,6 @@ class TargetModelRepository:
         await self.session.flush()
         return obj
 
-    async def list_all(self) -> list[TargetModel]:
+    async def list_all(self) -> list[TargetModel]:  # noqa: D102
         result = await self.session.execute(select(TargetModel))
         return list(result.scalars().all())
