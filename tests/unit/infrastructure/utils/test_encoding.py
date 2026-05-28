@@ -2,23 +2,14 @@
 
 import pytest
 from sdpj.infrastructure.utils.encoding import (
-    base64_encode,
-    base64_decode,
     url_encode,
     url_decode,
     unicode_escape_encode,
     unicode_escape_decode,
-    hex_encode,
-    hex_decode,
     encode_text,
     decode_text,
 )
 from typing import Any
-
-
-def test_base64_roundtrip() -> None:
-    """测试 test base64 roundtrip."""
-    assert base64_decode(base64_encode("hello")) == "hello"
 
 
 def test_url_roundtrip() -> None:

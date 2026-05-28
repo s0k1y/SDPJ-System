@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from sdpj.infrastructure.utils.encoding import get_encoding_types
 
-VALID_MULTIMODAL_FORMATS: frozenset[str] = frozenset({"jpg", "png", "mp3", "wav", "txt", "mhtml"})
+VALID_MULTIMODAL_FORMATS: frozenset[str] = frozenset({"jpg", "png", "mp3", "wav"})
 
 
 def _valid_encoding_names() -> frozenset[str]:

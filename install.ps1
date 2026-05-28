@@ -66,6 +66,7 @@ Write-Host "[2/4] 安装 Python 依赖..." -ForegroundColor Yellow
 
 & $pythonCmd -m pip install --upgrade pip -q
 & $pythonCmd -m pip install -r requirements.txt -q
+& $pythonCmd -m pip install -e . -q
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  [错误] Python 依赖安装失败" -ForegroundColor Red

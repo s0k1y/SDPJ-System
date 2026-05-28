@@ -94,11 +94,11 @@ class SampleDBSessionManager:
             await conn.run_sync(Base.metadata.drop_all)
 
     @asynccontextmanager
-    async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
+    async def session(self) -> AsyncGenerator[AsyncSession, None]:
         """获取数据库会话(上下文管理器).
 
         使用示例:
-            async with session_manager.get_session() as session:
+            async with session_manager.session() as session:
                 # 执行数据库操作
                 result = await session.execute(...)
                 await session.commit()

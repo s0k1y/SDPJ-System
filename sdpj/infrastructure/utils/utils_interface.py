@@ -13,10 +13,6 @@ class UtilsInterface(Protocol):  # noqa: D101
     def write_file(self, file_path: str, content: str | bytes, mode: str = "text") -> bool: ...  # noqa: D102
     def validate_file_format(self, content: str, format_type: str) -> tuple[bool, str]: ...  # noqa: D102
 
-    # 加密
-    def symmetric_encrypt(self, plaintext: str, key: bytes) -> bytes: ...  # noqa: D102
-    def symmetric_decrypt(self, ciphertext: bytes, key: bytes) -> str: ...  # noqa: D102
-
     # 序列化
     def serialize_json(self, obj: Any) -> str: ...  # noqa: ANN401, D102
     def deserialize_json(self, text: str) -> Any: ...  # noqa: ANN401, D102

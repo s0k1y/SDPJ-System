@@ -23,7 +23,7 @@ class TestParseAttackPathValid:
         path = f"indirect:multi-encoding:{encoding}"
         assert parse_attack_path(path) == ("multi-encoding", encoding)
 
-    @pytest.mark.parametrize("modality", ["jpg", "png", "mp3", "wav", "txt", "mhtml"])
+    @pytest.mark.parametrize("modality", ["jpg", "png", "mp3", "wav"])
     def test_multi_modal(self, modality: str) -> None:
         """indirect:multi-modal:<格式> 应返回 ('multi-modal', <格式>)."""
         path = f"indirect:multi-modal:{modality}"

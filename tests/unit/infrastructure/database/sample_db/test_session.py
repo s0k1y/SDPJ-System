@@ -1,4 +1,4 @@
-"""SampleDB 会话管理单元测试"""
+﻿"""SampleDB 浼氳瘽绠＄悊鍗曞厓娴嬭瘯"""
 
 import pytest
 from sdpj.infrastructure.database.sample_db.session import (
@@ -11,7 +11,7 @@ from typing import Any
 
 @pytest.mark.asyncio
 async def test_session_manager_initialization() -> None:
-    """测试会话管理器初始化"""
+    """娴嬭瘯浼氳瘽绠＄悊鍣ㄥ垵濮嬪寲"""
     manager = SampleDBSessionManager("sqlite+aiosqlite:///:memory:")
     await manager.initialize()
 
@@ -23,14 +23,14 @@ async def test_session_manager_initialization() -> None:
 
 @pytest.mark.asyncio
 async def test_session_manager_create_tables() -> None:
-    """测试创建数据表"""
+    """娴嬭瘯鍒涘缓鏁版嵁琛?""
     manager = SampleDBSessionManager("sqlite+aiosqlite:///:memory:")
     await manager.initialize()
     await manager.create_tables()
 
-    # 验证表已创建(通过插入数据测试)
-    async with manager.get_session() as session:
-        dataset = Dataset(name="测试数据集", risk_type="越狱攻击")
+    # 楠岃瘉琛ㄥ凡鍒涘缓(閫氳繃鎻掑叆鏁版嵁娴嬭瘯)
+    async with manager.session() as session:
+        dataset = Dataset(name="娴嬭瘯鏁版嵁闆?, risk_type="瓒婄嫳鏀诲嚮")
         session.add(dataset)
         await session.commit()
         assert dataset.dataset_id is not None
@@ -40,7 +40,7 @@ async def test_session_manager_create_tables() -> None:
 
 @pytest.mark.asyncio
 async def test_session_manager_drop_tables() -> None:
-    """测试删除数据表"""
+    """娴嬭瘯鍒犻櫎鏁版嵁琛?""
     manager = SampleDBSessionManager("sqlite+aiosqlite:///:memory:")
     await manager.initialize()
     await manager.create_tables()
@@ -50,7 +50,7 @@ async def test_session_manager_drop_tables() -> None:
 
     session = manager._session_factory()
     try:
-        dataset = Dataset(name="测试数据集", risk_type="越狱攻击")
+        dataset = Dataset(name="娴嬭瘯鏁版嵁闆?, risk_type="瓒婄嫳鏀诲嚮")
         session.add(dataset)
         with pytest.raises(OperationalError):
             await session.commit()
@@ -63,15 +63,15 @@ async def test_session_manager_drop_tables() -> None:
 
 @pytest.mark.asyncio
 async def test_session_manager_get_session() -> None:
-    """测试获取数据库会话"""
+    """娴嬭瘯鑾峰彇鏁版嵁搴撲細璇?""
     manager = SampleDBSessionManager("sqlite+aiosqlite:///:memory:")
     await manager.initialize()
     await manager.create_tables()
 
-    async with manager.get_session() as session:
+    async with manager.session() as session:
         assert session is not None
-        # 测试会话可用
-        dataset = Dataset(name="会话测试", risk_type="提示词注入")
+        # 娴嬭瘯浼氳瘽鍙敤
+        dataset = Dataset(name="浼氳瘽娴嬭瘯", risk_type="鎻愮ず璇嶆敞鍏?)
         session.add(dataset)
         await session.commit()
 
@@ -80,27 +80,27 @@ async def test_session_manager_get_session() -> None:
 
 @pytest.mark.asyncio
 async def test_session_manager_rollback_on_error() -> None:
-    """测试会话在异常时自动回滚"""
+    """娴嬭瘯浼氳瘽鍦ㄥ紓甯告椂鑷姩鍥炴粴"""
     manager = SampleDBSessionManager("sqlite+aiosqlite:///:memory:")
     await manager.initialize()
     await manager.create_tables()
 
     try:
-        async with manager.get_session() as session:
-            dataset = Dataset(name="回滚测试", risk_type="越狱攻击")
+        async with manager.session() as session:
+            dataset = Dataset(name="鍥炴粴娴嬭瘯", risk_type="瓒婄嫳鏀诲嚮")
             session.add(dataset)
             await session.commit()
 
-            # 故意触发异常
-            raise ValueError("测试异常")
+            # 鏁呮剰瑙﹀彂寮傚父
+            raise ValueError("娴嬭瘯寮傚父")
     except ValueError:
         pass
 
-    # 验证数据已提交(异常发生在提交之后)
-    async with manager.get_session() as session:
+    # 楠岃瘉鏁版嵁宸叉彁浜?寮傚父鍙戠敓鍦ㄦ彁浜や箣鍚?
+    async with manager.session() as session:
         from sqlalchemy import select
 
-        stmt = select(Dataset).where(Dataset.name == "回滚测试")
+        stmt = select(Dataset).where(Dataset.name == "鍥炴粴娴嬭瘯")
         result = await session.execute(stmt)
         dataset = result.scalar_one_or_none()
         assert dataset is not None
@@ -110,7 +110,7 @@ async def test_session_manager_rollback_on_error() -> None:
 
 @pytest.mark.asyncio
 async def test_get_session_manager_singleton() -> None:
-    """测试全局会话管理器单例模式"""
+    """娴嬭瘯鍏ㄥ眬浼氳瘽绠＄悊鍣ㄥ崟渚嬫ā寮?""
     manager1 = get_session_manager("sqlite+aiosqlite:///:memory:")
     manager2 = get_session_manager("sqlite+aiosqlite:///:memory:")
 
@@ -121,7 +121,7 @@ async def test_get_session_manager_singleton() -> None:
 
 @pytest.mark.asyncio
 async def test_session_manager_close() -> None:
-    """测试关闭会话管理器"""
+    """娴嬭瘯鍏抽棴浼氳瘽绠＄悊鍣?""
     manager = SampleDBSessionManager("sqlite+aiosqlite:///:memory:")
     await manager.initialize()
 

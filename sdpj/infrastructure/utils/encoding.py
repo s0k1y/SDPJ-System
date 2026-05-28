@@ -1,6 +1,5 @@
 """UtilsLib 编码工具 — 编码注入样本生成器"""
 
-import base64
 from urllib.parse import quote, unquote
 
 from sdpj.infrastructure.utils.crypto_toolkit import (
@@ -45,16 +44,6 @@ def unicode_escape_encode(text: str) -> str:
 def unicode_escape_decode(encoded: str) -> str:
     """Unicode 转义解码"""
     return encoded.encode("ascii").decode("unicode_escape")
-
-
-def hex_encode(text: str) -> str:
-    """十六进制编码"""
-    return text.encode("utf-8").hex()
-
-
-def hex_decode(encoded: str) -> str:
-    """十六进制解码"""
-    return bytes.fromhex(encoded).decode("utf-8")
 
 
 # ---- 编码注册表（扩展至 13 种） ----

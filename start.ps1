@@ -11,9 +11,16 @@ Write-Host ""
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $scriptRoot
 
-$pythonExe = "D:\Anaconda\envs\SDPJ-System\python.exe"
-$backendPort = 8000
+if ($env:PYTHON_PATH) { $pythonExe = $env:PYTHON_PATH } else { $pythonExe = "python" }
+if ($env:API_PORT) { $backendPort = [int]$env:API_PORT } else { $backendPort = 8000 }
 $frontendPort = 5173
+
+$sdpjCmd = Get-Command sdpj -ErrorAction SilentlyContinue
+if (-not $sdpjCmd) {
+    Write-Host "[Init] WARNING: 'sdpj' CLI not found in PATH" -ForegroundColor Yellow
+    Write-Host "  Run .\install.ps1 first to register the CLI command" -ForegroundColor Gray
+    Write-Host "  Falling back to 'python -m sdpj'" -ForegroundColor Gray
+}
 
 # --- Init SSL Certificates (via SecureCommManager) ---
 Write-Host "[Init] Ensuring SSL certificates via SecureCommManager..." -ForegroundColor Yellow
@@ -49,6 +56,7 @@ Write-Host "[1/3] Stopping processes on ports $backendPort and $frontendPort..."
 function Stop-PortProcess {
     param([int]$Port)
     $killed = @()
+
     try {
         $pids = (netstat -ano 2>$null).Split("`n") |
             Where-Object { $_ -match ":$Port\s.*LISTENING" } |

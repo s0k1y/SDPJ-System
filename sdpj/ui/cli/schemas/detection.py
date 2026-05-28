@@ -7,17 +7,6 @@ from pydantic import BaseModel
 from sdpj.infrastructure.utils.attack_path import parse_attack_path
 
 
-def format_attack_path_label(kind: str, name: str | None = None) -> str:
-    """将解析结果格式化为攻击路径标签."""
-    if kind == "direct":
-        return "direct"
-    if kind == "multi-encoding":
-        return f"indirect:multi-encoding:{name}"
-    if kind == "multi-modal":
-        return f"indirect:multi-modal:{name}"
-    return kind
-
-
 class DetectionStartParams(BaseModel):  # noqa: D101
     model_id: str | int
     detection_type: str = "static"

@@ -47,6 +47,12 @@ fi
 PYTHON_VERSION=$("$PYTHON_EXE" --version 2>&1 | awk '{print $2}')
 echo "[Init] Using Python: $PYTHON_EXE (version $PYTHON_VERSION)"
 
+if ! command -v sdpj &> /dev/null; then
+    echo "[Init] WARNING: 'sdpj' CLI not found in PATH"
+    echo "  Run ./install.sh first to register the CLI command"
+    echo "  Falling back to 'python -m sdpj'"
+fi
+
 # Check curl installation (needed for health checks)
 if ! command -v curl &> /dev/null; then
     echo "[Error] curl is not installed or not in PATH"

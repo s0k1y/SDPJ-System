@@ -601,7 +601,7 @@ class DataProcessorInterface(Protocol):
 
         Args:
             poc: 明文 PoC 文本
-            modality: 目标模态,支持 jpg/png/mp3/wav/txt/mhtml
+            modality: 目标模态,支持 jpg/png/mp3/wav
 
         Returns:
             OpenAI content 数组(list[dict])

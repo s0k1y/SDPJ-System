@@ -1,8 +1,5 @@
-import argparse  # noqa: D100
 import base64
 import codecs
-import sys
-from typing import Any
 
 
 class BaseCodec:  # noqa: D101

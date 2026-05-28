@@ -54,6 +54,7 @@ echo "[2/4] 安装 Python 依赖..."
 
 $PYTHON_CMD -m pip install --upgrade pip -q
 $PYTHON_CMD -m pip install -r requirements.txt -q
+$PYTHON_CMD -m pip install -e . -q
 
 echo "  [OK] Python 依赖安装完成"
 
