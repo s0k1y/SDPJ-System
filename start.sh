@@ -14,8 +14,9 @@ cd "$SCRIPT_DIR"
 
 # Configuration
 PYTHON_EXE="${PYTHON_PATH:-python}"
-BACKEND_PORT="${BACKEND_PORT:-8000}"
+API_PORT="${API_PORT:-8000}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
+LOG_DIR="$SCRIPT_DIR/logs"
 
 # Check Python installation
 if ! command -v "$PYTHON_EXE" &> /dev/null; then
@@ -36,21 +37,12 @@ fi
 
 echo "[Init] Using Python: $PYTHON_EXE (version $PYTHON_VERSION)"
 
-# --- Init SSL Certificates (via SecureCommManager) ---
-echo "[Init] Ensuring SSL certificates via SecureCommManager..."
-CERT_INFO=$("$PYTHON_EXE" -c "from sdpj.core.secure_comm_manager import SecureCommManager; m = SecureCommManager(); cert, key = m.ensure_certificates(); print(f'{cert}|{key}')" 2>/dev/null || echo "")
-
-if [ -n "$CERT_INFO" ]; then
-    CERT_PATH=$(echo "$CERT_INFO" | cut -d'|' -f1)
-    KEY_PATH=$(echo "$CERT_INFO" | cut -d'|' -f2)
-    echo "[Init] SSL certificates ready"
-else
-    echo "[Init] WARNING: Failed to get certificate paths, falling back to certs/"
-    CERT_DIR="$SCRIPT_DIR/certs"
-    CERT_PATH="$CERT_DIR/cert.pem"
-    KEY_PATH="$CERT_DIR/key.pem"
+# Check curl installation (needed for health checks)
+if ! command -v curl &> /dev/null; then
+    echo "[Error] curl is not installed or not in PATH"
+    echo "Please install curl and try again"
+    exit 1
 fi
-echo ""
 
 # --- Init Database ---
 DB_PATH="sdpj/infrastructure/database/sdpj.db"
@@ -65,12 +57,13 @@ else
 fi
 
 # --- Step 1: Kill processes on target ports ---
-echo "[1/3] Stopping processes on ports $BACKEND_PORT and $FRONTEND_PORT..."
+echo "[1/3] Stopping processes on ports $API_PORT and $FRONTEND_PORT..."
 
 stop_port_process() {
     local port=$1
-    local pids=$(lsof -ti :$port 2>/dev/null || echo "")
-    
+    local pids
+    pids=$(ss -tlnp sport = :"$port" 2>/dev/null | grep -o 'pid=[0-9]*' | cut -d= -f2)
+
     if [ -n "$pids" ]; then
         for pid in $pids; do
             echo "  Stopping port $port process (PID: $pid)"
@@ -79,36 +72,62 @@ stop_port_process() {
     fi
 }
 
-stop_port_process $BACKEND_PORT
-stop_port_process $FRONTEND_PORT
+stop_port_process "$API_PORT"
+stop_port_process "$FRONTEND_PORT"
 
 # Wait for OS to release ports
 echo "  Waiting for ports to be released..."
 sleep 2
 
 # Check if ports are still in use
-if lsof -i :$BACKEND_PORT &>/dev/null; then
-    echo "[1/3] WARNING: Port $BACKEND_PORT still occupied"
+if ss -tln sport = :"$API_PORT" 2>/dev/null | grep -q ":$API_PORT"; then
+    echo "[1/3] WARNING: Port $API_PORT still occupied"
     echo "  Trying alternative port..."
-    BACKEND_PORT=8001
+    API_PORT=8001
 fi
+
+# Check frontend port conflict
+for _retry in $(seq 1 5); do
+    if ! ss -tln sport = :"$FRONTEND_PORT" 2>/dev/null | grep -q ":$FRONTEND_PORT"; then
+        break
+    fi
+    echo "[1/3] WARNING: Port $FRONTEND_PORT still occupied"
+    FRONTEND_PORT=$((FRONTEND_PORT + 1))
+    echo "  Trying alternative port: $FRONTEND_PORT"
+done
 
 echo "[1/3] Port cleanup done"
 echo ""
 
 # --- Step 2: Start backend ---
-echo "[2/3] Starting backend service on port $BACKEND_PORT..."
+echo "[2/3] Starting backend service on port $API_PORT..."
 
-# Start backend in background
-nohup "$PYTHON_EXE" -m sdpj.ui.webui.backend.app > /dev/null 2>&1 &
+mkdir -p "$LOG_DIR"
+
+# Start backend in background, export API_PORT so pydantic_settings picks it up
+export API_PORT
+nohup "$PYTHON_EXE" -m sdpj.ui.webui.backend.app > "$LOG_DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
 
-# Wait for backend to start
-sleep 5
+# Poll for backend readiness by checking health endpoint
+echo "  Waiting for backend to be ready..."
+BACKEND_READY=false
+for i in $(seq 1 15); do
+    if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
+        echo "[2/3] ERROR: Backend service failed to start"
+        echo "  Check logs: $LOG_DIR/backend.log"
+        exit 1
+    fi
+    if curl -sk "https://localhost:$API_PORT/health" &>/dev/null; then
+        BACKEND_READY=true
+        break
+    fi
+    sleep 1
+done
 
-# Check if backend is running
-if ! kill -0 $BACKEND_PID 2>/dev/null; then
-    echo "[2/3] ERROR: Backend service failed to start"
+if [ "$BACKEND_READY" != "true" ]; then
+    echo "[2/3] ERROR: Backend service did not start within 15 seconds"
+    echo "  Check logs: $LOG_DIR/backend.log"
     exit 1
 fi
 
@@ -140,22 +159,43 @@ if ! command -v npm &> /dev/null; then
     exit 1
 fi
 
+# Check if dependencies are installed
+if [ ! -d "$FRONTEND_DIR/node_modules" ]; then
+    echo "  node_modules not found, installing dependencies..."
+    (cd "$FRONTEND_DIR" && npm install)
+    echo "  Dependencies installed"
+fi
+
 # Sync backend port to frontend via .env.local
 ENV_LOCAL_PATH="$FRONTEND_DIR/.env.local"
-echo "VITE_BACKEND_PORT=$BACKEND_PORT" > "$ENV_LOCAL_PATH"
-echo "  Synced backend port $BACKEND_PORT to .env.local"
+echo "VITE_BACKEND_PORT=$API_PORT" > "$ENV_LOCAL_PATH"
+echo "  Synced backend port $API_PORT to .env.local"
 
 # Start frontend in background
 cd "$FRONTEND_DIR"
-nohup npm run dev > /dev/null 2>&1 &
+# Pass frontend port to vite dev server (handles port conflict fallback)
+nohup npm run dev -- --port "$FRONTEND_PORT" > "$LOG_DIR/frontend.log" 2>&1 &
 FRONTEND_PID=$!
 
 # Wait for frontend to start
-sleep 3
+echo "  Waiting for frontend to be ready..."
+FRONTEND_READY=false
+for i in $(seq 1 15); do
+    if ! kill -0 "$FRONTEND_PID" 2>/dev/null; then
+        echo "[3/3] ERROR: Frontend service failed to start"
+        echo "  Check logs: $LOG_DIR/frontend.log"
+        exit 1
+    fi
+    if ss -tln sport = :"$FRONTEND_PORT" 2>/dev/null | grep -q ":$FRONTEND_PORT"; then
+        FRONTEND_READY=true
+        break
+    fi
+    sleep 1
+done
 
-# Check if frontend is running
-if ! kill -0 $FRONTEND_PID 2>/dev/null; then
-    echo "[3/3] ERROR: Frontend service failed to start"
+if [ "$FRONTEND_READY" != "true" ]; then
+    echo "[3/3] ERROR: Frontend service did not start within 15 seconds"
+    echo "  Check logs: $LOG_DIR/frontend.log"
     exit 1
 fi
 
@@ -167,9 +207,13 @@ echo "========================================"
 echo "  Startup Complete!"
 echo "========================================"
 echo ""
-echo "  Backend API:  https://localhost:$BACKEND_PORT"
+echo "  Backend API:  https://localhost:$API_PORT"
 echo "  Frontend:     https://localhost:$FRONTEND_PORT"
-echo "  API Docs:     https://localhost:$BACKEND_PORT/docs"
+echo "  API Docs:     https://localhost:$API_PORT/docs"
+echo ""
+echo "Logs:"
+echo "  Backend:      $LOG_DIR/backend.log"
+echo "  Frontend:     $LOG_DIR/frontend.log"
 echo ""
 echo "Tips:"
 echo "  - If frontend cannot connect to backend, check the backend logs"

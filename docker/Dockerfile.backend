@@ -5,7 +5,6 @@ WORKDIR /app
 # 安装系统依赖
 RUN apt-get update && apt-get install -y \
     gcc \
-    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制依赖文件
@@ -22,8 +21,8 @@ COPY pyproject.toml .
 # 安装应用
 RUN pip install -e .
 
-# 创建数据目录
-RUN mkdir -p /app/data/db /app/logs
+# 创建数据目录(数据库、日志、报告等运行时数据)
+RUN mkdir -p /app/data
 
 # 暴露端口
 EXPOSE 8000

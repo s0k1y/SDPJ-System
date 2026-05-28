@@ -56,6 +56,7 @@ class Settings(BaseSettings):  # noqa: D101
     api_host: str = "0.0.0.0"  # noqa: S104
     api_port: int = 8000
     frontend_url: str = "http://localhost:5173"
+    session_https_only: bool = True
 
     def resolve_secret_key(self) -> str:  # noqa: D102
         if self.secret_key:

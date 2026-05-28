@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build:
@@ -9,17 +7,14 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - SAMPLE_DB_URL=sqlite+aiosqlite:///./data/db/sample.db
-      - RESULT_DB_URL=sqlite+aiosqlite:///./data/db/result.db
-      - USER_DB_URL=sqlite+aiosqlite:///./data/db/user.db
-      - API_HOST=0.0.0.0
-      - API_PORT=8000
+      - DB_URL=sqlite+aiosqlite:///./data/sdpj.db
+      - LOG_DIR=/app/data/logs
+      - SESSION_HTTPS_ONLY=false
     volumes:
       - ./data:/app/data
-      - ./logs:/app/logs
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -37,7 +32,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

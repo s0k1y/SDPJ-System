@@ -52,7 +52,7 @@ def create_app() -> FastAPI:  # noqa: C901, D103
         SessionMiddleware,
         secret_key=get_settings().resolve_secret_key(),
         same_site="lax",
-        https_only=True,
+        https_only=get_settings().session_https_only,
     )
 
     @app.exception_handler(HTTPException)
