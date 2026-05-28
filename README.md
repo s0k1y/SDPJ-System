@@ -3,7 +3,10 @@
 SDPJ-System 是一个大模型安全检测系统，支持 WebUI 和 CLI 两种使用方式。
 
 ## 一键安装
-
+```bash
+git clone https://github.com/s0k1y/SDPJ-System.git
+cd SDPJ-System
+```
 ### Windows (PowerShell)
 
 ```powershell
