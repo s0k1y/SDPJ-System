@@ -2,7 +2,6 @@
 
 SDPJ-System 是一个大模型安全检测系统，支持 WebUI 和 CLI 两种使用方式。
 
-
 ## 一键安装
 
 ### Windows (PowerShell)
@@ -101,3 +100,35 @@ sdpj -h
 ## 许可证
 
 Copyright (c) 2026 SDPJ-System. All rights reserved.
+本系统及相关文档文件（"系统"）的著作权归版权所有者所有。版权所有者保留所有未在此明确授予的权利。
+
+允许行为（无需另行授权）：
+为完成与本系统相关的毕业设计评审之目的，尊敬的评审老师、尊敬的答辩委员会成员可以：
+- 下载一份本系统的副本至本地计算机；
+- 运行本系统以验证其功能与结果；
+- 在评审报告中引用本系统的代码片段。
+
+其他任何人不得以任何方式使用、复制或分发本系统,包括但不限于:
+- 禁止将本系统或其任何部分用于商业目的；
+- 复制、修改、合并、发布、分发、再许可、销售本系统的副本；
+- 将本系统作为服务对外提供。
+
+
+
+The copyright of this system and associated documentation files (the "System") belongs
+to the copyright owner. The copyright owner retains all rights not expressly granted herein.
+
+Permitted Acts (without separate authorization):
+For the purpose of completing the graduation design review related to this System,
+esteemed review instructors and esteemed defense committee members may:
+- Download one copy of the System to a local computer;
+- Run the System to verify its functionality and results;
+- Quote brief code snippets from the System in review reports.
+
+No other person may use, copy, or distribute the System in any manner, including but not limited to:
+- Using the System or any part thereof for commercial purposes is prohibited;
+- Copy, modify, merge, publish, distribute, sublicense, or sell copies of the System;
+- Provide the System as a service to third parties.
+
+## 联系方式
+sky_it_isec@163.com
