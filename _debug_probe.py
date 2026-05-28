@@ -1,4 +1,9 @@
-import requests, json, time, urllib3, os
+import os
+import time
+
+import requests
+import urllib3
+
 urllib3.disable_warnings()
 s = requests.Session()
 s.verify = False

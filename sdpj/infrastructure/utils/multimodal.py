@@ -5,11 +5,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import io
 import os
+import socket
 import textwrap
 
+import aiohttp
 import edge_tts
 
 from sdpj.infrastructure.utils.attack_path import VALID_MULTIMODAL_FORMATS
@@ -91,14 +94,28 @@ async def _build_audio_content(poc: str, fmt: str) -> list[dict]:
     """将 PoC 文本合成为音频并构造 input_audio content."""
     # edge-tts 是对微软 Edge 浏览器"大声朗读"功能的逆向工程实现,
     # 非微软官方 API,无授权,无 SLA,仅用于研究/开发环境
-    communicate = edge_tts.Communicate(poc, _DEFAULT_VOICE)
-    buf = io.BytesIO()
-    async for chunk in communicate.stream():
-        if chunk["type"] == "audio":
-            buf.write(chunk["data"])
-    audio_bytes = buf.getvalue()
-    b64 = base64.b64encode(audio_bytes).decode("ascii")
-    return [{"type": "input_audio", "input_audio": {"data": b64, "format": fmt}}]
+    # 强制 IPv4: speech.platform.bing.com 的 IPv6 地址在国内网络环境下连接会被重置
+    connector = aiohttp.TCPConnector(family=socket.AF_INET)
+
+    max_retries = 3
+    last_exc: Exception | None = None
+    for attempt in range(max_retries):
+        buf = io.BytesIO()
+        try:
+            communicate = edge_tts.Communicate(poc, _DEFAULT_VOICE, connector=connector)
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    buf.write(chunk["data"])
+            audio_bytes = buf.getvalue()
+            b64 = base64.b64encode(audio_bytes).decode("ascii")
+            return [{"type": "input_audio", "input_audio": {"data": b64, "format": fmt}}]
+        except (OSError, aiohttp.ClientError) as exc:
+            last_exc = exc
+            if attempt < max_retries - 1:
+                await asyncio.sleep(1 * (attempt + 1))
+            continue
+    assert last_exc is not None
+    raise last_exc
 
 
 _FILE_MIME_MAP: dict[str, str] = {

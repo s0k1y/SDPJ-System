@@ -4,12 +4,17 @@ import asyncio
 import contextlib
 
 import click
+from rich.console import Console
+from rich.text import Text
 
 from sdpj.infrastructure.utils.attack_path import parse_attack_path
 from sdpj.ui.cli import OrderedGroup, require_scheduler
 from sdpj.ui.cli.schemas.detection import DetectionStartParams
 from sdpj.ui.cli.utils import output
+from sdpj.ui.cli.utils.output import colorize
 from sdpj.ui.cli.utils.result import unwrap
+
+_console = Console()
 
 _STAGE_LABELS = {
     "poc_selecting": "PoC池构建",
@@ -33,6 +38,7 @@ def _format_eta(seconds: float) -> str:
 
 async def _poll_progress(scheduler, interval: float = 3.0) -> None:  # noqa: ANN001
     last_key = None
+    reported_failures: set[str] = set()
     while True:
         await asyncio.sleep(interval)
         with contextlib.suppress(Exception):
@@ -59,12 +65,22 @@ async def _poll_progress(scheduler, interval: float = 3.0) -> None:  # noqa: ANN
                     f"{failed}失败",
                 ]
                 line = "  进度: " + ", ".join(parts)
-                if stage:
+                if stage and stage != "unknown":
                     line += f" | {_STAGE_LABELS.get(stage, stage)}"
                 eta_str = _format_eta(eta)
                 if eta_str:
                     line += f" | ETA: {eta_str}"
                 click.echo(click.style(line, fg="yellow"))
+                for c in g.get("children", []):
+                    tid = c.get("task_id", "")
+                    cstatus = c.get("status", "")
+                    if cstatus == "failed" and tid not in reported_failures:
+                        reported_failures.add(tid)
+                        ds = c.get("dataset_name", c.get("dataset_id", ""))
+                        err = c.get("error_message", "未知错误")
+                        click.echo(
+                            click.style(f"    子任务失败: {tid[:8]} ({ds}): {err}", fg="red"),
+                        )
 
 
 async def _execute_with_progress(scheduler, concurrency: int) -> dict:  # noqa: ANN001
@@ -211,7 +227,7 @@ def task_start(  # noqa: C901, PLR0913, PLR0915
                         parts.append(f"total={usage['total_tokens']}")
                     usage_str = f" ({', '.join(parts)})" if parts else ""
                 click.echo(click.style("── RESPONSE ✓ ──", fg="green") + usage_str)
-                click.echo(f"  {content}")
+                _console.print(Text("  "), colorize(content), sep="")
 
         scheduler.subscribe_llm_calls(_on_llm_call)
 

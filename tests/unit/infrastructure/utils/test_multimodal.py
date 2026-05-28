@@ -16,13 +16,12 @@ class TestImageContent:
 
     @pytest.mark.asyncio
     async def test_png_returns_image_url_content(self) -> None:
-        """build_multimodal_content('test', 'png') 应返回 image_url content."""
+        """build_multimodal_content('test', 'png') 应返回 image_url + text content."""
         result = await build_multimodal_content("Hello World", "png")
-        assert len(result) == 1
-        item = result[0]
-        assert item["type"] == "image_url"
-        url = item["image_url"]["url"]
-        assert url.startswith("data:image/png;base64,")
+        assert len(result) == 2
+        assert result[0]["type"] == "image_url"
+        assert result[0]["image_url"]["url"].startswith("data:image/png;base64,")
+        assert result[1]["type"] == "text"
 
     @pytest.mark.asyncio
     async def test_jpg_returns_image_url_content(self) -> None:

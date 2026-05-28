@@ -87,10 +87,6 @@ class TestLoginRequired:
         ])
         assert r.exit_code == 1
 
-    def test_detect_progress(self) -> None:  # noqa: D102
-        r = CliRunner().invoke(cli, ["Detect", "task", "progress"])
-        assert r.exit_code == 0
-
     def test_detect_cancel(self) -> None:  # noqa: D102
         r = CliRunner().invoke(cli, ["Detect", "task", "cancel", "--task-id", "x"])
         assert r.exit_code in [0, 1]

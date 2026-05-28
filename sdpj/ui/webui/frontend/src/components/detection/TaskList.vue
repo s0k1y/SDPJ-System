@@ -8,10 +8,11 @@
       <table>
         <thead>
           <tr>
-            <th style="width: 35%">任务组/任务</th>
-            <th style="width: 20%">状态</th>
-            <th style="width: 25%">进度</th>
-            <th style="width: 20%">操作</th>
+            <th style="width: 28%">任务组/任务</th>
+            <th style="width: 15%">攻击路径</th>
+            <th style="width: 17%">状态</th>
+            <th style="width: 22%">进度</th>
+            <th style="width: 18%">操作</th>
           </tr>
         </thead>
         <tbody v-if="flatRows.length > 0">
@@ -27,6 +28,9 @@
                     <span class="id-hint">{{ row.shortId }}</span>
                   </div>
                 </div>
+              </td>
+              <td>
+                <span v-if="!row.isGroup && row.attack_path" class="attack-path-tag">{{ formatAttackPath(row.attack_path) }}</span>
               </td>
               <td>
                 <el-tooltip
@@ -134,6 +138,17 @@ const formatErrors = (msg) => {
   return msg.split('\n').map(line => `<div>${line}</div>`).join('')
 }
 
+const formatAttackPath = (path) => {
+  if (!path || path === 'direct') return '直接注入'
+  if (path.startsWith('indirect:multi-encoding:')) {
+    return '间接注入-' + path.split(':')[2]
+  }
+  if (path.startsWith('indirect:multi-modal:')) {
+    return '间接注入(多模态)-' + path.split(':')[2]
+  }
+  return path
+}
+
 const canCancel = (status) => {
   return status === 'pending' || status === 'running'
 }
@@ -207,6 +222,7 @@ const flatRows = computed(() => {
           dataset_id: c.dataset_id || '',
           error_message: c.error_message || '',
           taskProgress: c.progress || null,
+          attack_path: c.attack_path || '',
         })
       }
     }
@@ -379,6 +395,16 @@ table tr:last-child td {
 .tag-cancelled {
   background: #f5f5f5;
   color: #aaa;
+}
+
+.attack-path-tag {
+  display: inline-block;
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: #f0f5ff;
+  color: #2563eb;
+  white-space: nowrap;
 }
 
 .progress-info {

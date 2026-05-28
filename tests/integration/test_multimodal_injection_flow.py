@@ -119,7 +119,7 @@ class TestMultimodalConfigOperation:
     async def test_multimodal_check_reads_cache(self) -> None:
         config = AsyncMock()
         config.read_config = AsyncMock(return_value={
-            "content": {"multimodal_test_result": {"supported_types": ["image_url"]}},
+            "multimodal_test_result": {"supported_types": ["image_url"]},
         })
         dac = AsyncMock()
         dac.check_access = AsyncMock(return_value=True)

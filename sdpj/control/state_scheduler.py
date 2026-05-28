@@ -884,6 +884,7 @@ class StateScheduler(StateSchedulerInterface):
                     "dataset_id": t.dataset_id,
                     "dataset_name": dataset_name_map.get(t.dataset_id, t.dataset_id),
                     "error_message": t.error_message if t.status.value == "failed" else "",
+                    "attack_path": t.metadata.get("attack_path", "direct"),
                 }
                 if task_prog:
                     child["progress"] = task_prog  # type: ignore[assignment]

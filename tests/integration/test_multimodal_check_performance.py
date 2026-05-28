@@ -35,7 +35,7 @@ class TestMultimodalCheckPerformance:
     async def test_check_with_cache_under_100ms(self) -> None:
         config = AsyncMock()
         config.read_config = AsyncMock(return_value={
-            "content": {"multimodal_test_result": {"supported_types": ["image_url", "input_audio"]}},
+            "multimodal_test_result": {"supported_types": ["image_url", "input_audio"]},
         })
         dac = AsyncMock()
         dac.check_access = AsyncMock(return_value=True)

@@ -177,12 +177,12 @@ class TestPrivateConfigRepository:
         assert result is True
 
     async def test_write_duplicate_private_config(self, user_db: Any, sample_resource: Any) -> None:
-        """测试写入重复的私有检测配置内容"""
+        """测试重复写入同一配置应幂等更新(upsert)"""
         config_content = {"detection_mode": "static"}
-        await user_db.write_private_config(sample_resource["resource_id"], config_content)
-
-        with pytest.raises(ValueError, match="已存在"):
-            await user_db.write_private_config(sample_resource["resource_id"], config_content)
+        result1 = await user_db.write_private_config(sample_resource["resource_id"], config_content)
+        result2 = await user_db.write_private_config(sample_resource["resource_id"], config_content)
+        assert result1 is True
+        assert result2 is True
 
     async def test_read_private_config(self, user_db: Any, sample_resource: Any) -> None:
         """测试读取私有检测配置内容"""
