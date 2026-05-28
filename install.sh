@@ -67,20 +67,21 @@ if ! command -v node &> /dev/null; then
     echo "  [信息] 未找到 Node.js，正在自动安装..."
     if [ "$(uname)" = "Darwin" ]; then
         if command -v brew &> /dev/null; then
-            brew install node@18
-            export PATH="/usr/local/opt/node@18/bin:$PATH"
+            brew install node@20
+            export PATH="/usr/local/opt/node@20/bin:$PATH"
         else
-            echo "  [错误] 未找到 Homebrew，请手动安装 Node.js 18+: https://nodejs.org/"
+            echo "  [错误] 未找到 Homebrew，请手动安装 Node.js 20+: https://nodejs.org/"
             exit 1
         fi
     elif command -v apt-get &> /dev/null; then
-        curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+        apt-get update -y
         apt-get install -y nodejs
     elif command -v yum &> /dev/null; then
-        curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
+        curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
         yum install -y nodejs
     else
-        echo "  [错误] 无法自动安装 Node.js，请手动安装 Node.js 18+: https://nodejs.org/"
+        echo "  [错误] 无法自动安装 Node.js，请手动安装 Node.js 20+: https://nodejs.org/"
         exit 1
     fi
 
