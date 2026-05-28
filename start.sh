@@ -13,28 +13,38 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # Configuration
-PYTHON_EXE="${PYTHON_PATH:-python}"
 API_PORT="${API_PORT:-8000}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 LOG_DIR="$SCRIPT_DIR/logs"
 
-# Check Python installation
-if ! command -v "$PYTHON_EXE" &> /dev/null; then
-    echo "[Error] Python is not installed or not in PATH"
-    echo "Please install Python 3.11+ and try again"
+# Auto-detect Python 3.11+ (prefer python3, then python)
+PYTHON_EXE=""
+if [ -n "${PYTHON_PATH:-}" ]; then
+    PYTHON_EXE="$PYTHON_PATH"
+else
+    for cmd in python3 python; do
+        if command -v "$cmd" &> /dev/null; then
+            version=$("$cmd" --version 2>&1 | awk '{print $2}')
+            major=$(echo "$version" | cut -d. -f1)
+            minor=$(echo "$version" | cut -d. -f2)
+            if [ "$major" -ge 3 ] && [ "$minor" -ge 11 ]; then
+                PYTHON_EXE="$cmd"
+                break
+            fi
+        fi
+    done
+fi
+
+if [ -z "$PYTHON_EXE" ]; then
+    echo "[Error] Python 3.11+ is required but not found"
+    echo "Please install Python 3.11+ or use conda:"
+    echo "  conda create -n SDPJ-System python=3.11"
+    echo "  conda activate SDPJ-System"
     exit 1
 fi
 
 # Check Python version
 PYTHON_VERSION=$("$PYTHON_EXE" --version 2>&1 | awk '{print $2}')
-PYTHON_MAJOR=$(echo "$PYTHON_VERSION" | cut -d. -f1)
-PYTHON_MINOR=$(echo "$PYTHON_VERSION" | cut -d. -f2)
-
-if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 11 ]); then
-    echo "[Error] Python 3.11+ is required, found Python $PYTHON_VERSION"
-    exit 1
-fi
-
 echo "[Init] Using Python: $PYTHON_EXE (version $PYTHON_VERSION)"
 
 # Check curl installation (needed for health checks)
