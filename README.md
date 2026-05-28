@@ -1,155 +1,157 @@
 # SDPJ-System
 
-基于SDPJ算法的大语言模型安全风险检测系统
-
-## 项目简介
-
-SDPJ-System是一个用于检测大语言模型安全风险的系统,实现了SDPJ(Self-Detection based on Post-Jailbreak)静态和动态自检测算法。
-
-### 核心功能
-
-- **SDPJ静态自检测**: 基于越狱攻击和提示词劫持的静态安全风险检测
-- **SDPJ动态自检测**: 基于迭代变异的动态安全风险检测
-- **多模态注入检测**: 支持图像、音频、视频等多模态注入攻击检测
-- **多编码注入检测**: 支持Base64、URL编码、Unicode等多编码注入检测
-- **可视化报告**: 生成详细的检测报告和可视化图表
-- **用户管理**: 支持用户注册、登录、权限控制
-- **私有配置**: 支持用户自定义检测配置、数据集、模型适配器
-
-### 检测范围
-
-- 提示词注入攻击(直接注入、间接注入)
-- 越狱攻击
-- 提示词劫持攻击
-- 系统提示词泄露攻击
-
-## 技术架构
-
-### 五层架构设计
-
-1. **用户界面层**: CLI命令行 + Web UI(Vue 3 + Element Plus)
-2. **应用控制层**: StateScheduler系统状态管理与调度
-3. **执行逻辑层**: 检测内核、任务队列、事件日志、用户管理等
-4. **抽象驱动层**: 数据处理、LLM接口、用户中心等
-5. **基础设施层**: 数据库、LLM适配器、工具库
-
-### 技术栈
-
-**后端:**
-- Python 3.11+
-- FastAPI 0.115+
-- SQLAlchemy 2.0+
-- Alembic 1.13+
-
-**前端:**
-- Vue 3.4+
-- Element Plus 2.8+
-- Pinia 2.1+
-- ECharts 5.5+
-
-**数据库:**
-- SQLite
+SDPJ-System 是一个大模型安全检测系统，支持多种启动方式，可在Windows、Linux、macOS上运行。
 
 ## 快速开始
 
-### 环境要求
+### 1. Docker一键运行（推荐）
 
-- Python 3.11+
-- Node.js 18+
-- npm 9+
+确保已安装Docker和Docker Compose，然后执行：
 
-### 安装步骤
-
-1. 克隆项目
 ```bash
-git clone <repository-url>
-cd SDPJ-System
+docker-compose up -d
 ```
 
-2. 安装Python依赖
+启动后访问：
+- 后端API：http://localhost:8000
+- 前端界面：http://localhost:80
+- API文档：http://localhost:8000/docs
+
+查看日志：
+```bash
+docker-compose logs -f
+```
+
+停止服务：
+```bash
+docker-compose down
+```
+
+### 2. Linux/macOS启动
+
+确保已安装Python 3.11+和Node.js，然后执行：
+
+```bash
+# 添加执行权限
+chmod +x start.sh
+
+# 启动系统
+./start.sh
+```
+
+启动后访问：
+- 后端API：https://localhost:8000
+- 前端界面：https://localhost:5173
+- API文档：https://localhost:8000/docs
+
+### 3. Windows启动
+
+```powershell
+.\start.ps1
+```
+
+启动后访问：
+- 后端API：https://localhost:8000
+- 前端界面：https://localhost:5173
+- API文档：https://localhost:8000/docs
+
+## 环境要求
+
+- Python 3.11+
+- Node.js 16+
+- Docker（可选，用于容器化部署）
+
+## 配置说明
+
+复制 `.env.example` 为 `.env` 并根据需要修改配置：
+
+```bash
+cp .env.example .env
+```
+
+主要配置项：
+- `API_HOST`：后端服务监听地址
+- `API_PORT`：后端服务端口
+- `PYTHON_PATH`：Python解释器路径
+- `BACKEND_PORT`：后端服务端口（启动脚本使用）
+- `FRONTEND_PORT`：前端服务端口（启动脚本使用）
+
+## 开发指南
+
+### 本地开发
+
+1. 安装Python依赖：
 ```bash
 pip install -r requirements.txt
 ```
 
-3. 初始化数据库
-```bash
-python -m sdpj.infrastructure.database.sample_db.init_db
-python -m sdpj.infrastructure.database.result_db.init_db
-python -m sdpj.infrastructure.database.user_db.init_db
-```
-
-4. 安装前端依赖
+2. 安装前端依赖：
 ```bash
 cd sdpj/ui/webui/frontend
 npm install
 ```
 
-### 运行
-
-**启动后端:**
+3. 启动后端：
 ```bash
 python -m sdpj.ui.webui.backend.app
 ```
 
-**启动前端:**
+4. 启动前端：
 ```bash
 cd sdpj/ui/webui/frontend
 npm run dev
 ```
 
-**使用CLI:**
-```bash
-python -m sdpj --help
-```
+### 测试
 
-## Docker部署
-
+运行测试：
 ```bash
-docker-compose up -d
+pytest tests/
 ```
 
 ## 项目结构
 
 ```
 SDPJ-System/
-├── sdpj/                   # 主应用包
-│   ├── ui/                 # 用户界面层
-│   ├── control/            # 应用控制层
-│   ├── core/               # 执行逻辑层
-│   ├── drivers/            # 抽象驱动层
-│   └── infrastructure/     # 基础设施层
-├── tests/                  # 测试
-├── docs/                   # 文档
-├── openspec/               # 规格文档
-└── docker/                 # Docker配置
+├── sdpj/                    # 主应用包
+├── tests/                   # 测试目录
+├── docker/                  # Docker配置
+├── start.ps1                # Windows PowerShell启动脚本
+├── start.sh                 # Linux/macOS启动脚本
+├── docker-compose.yml       # Docker Compose配置
+├── requirements.txt         # Python依赖
+└── README.md                # 项目说明
 ```
 
-## 开发指南
+## 常见问题
 
-### 运行测试
+### 端口被占用
+
+如果启动时提示端口被占用，启动脚本会自动尝试清理占用端口的进程。如果清理失败，可以手动终止占用端口的进程：
+
+Windows：
+```cmd
+netstat -ano | findstr :8000
+taskkill /F /PID <进程ID>
+```
+
+Linux/macOS：
+```bash
+lsof -ti :8000 | xargs kill -9
+```
+
+### Python版本不兼容
+
+确保使用Python 3.11+版本。可以通过以下命令检查版本：
 
 ```bash
-# 单元测试
-pytest tests/unit/
-
-# 集成测试
-pytest tests/integration/
-
-# 端到端测试
-pytest tests/e2e/
+python --version
 ```
 
-### 代码规范
+### Docker启动失败
 
-- 遵循PEP 8
-- 使用类型注解
-- 编写文档字符串
+确保Docker服务正在运行，并且有足够的磁盘空间和内存。
 
 ## 许可证
 
-MIT License
-
-## 联系方式
-
-- 项目主页: <repository-url>
-- 问题反馈: <issues-url>
+[待定]

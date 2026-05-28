@@ -55,6 +55,7 @@ dev = [
     "ruff>=0.8.0",
     "mypy>=1.13.0",
     "fonttools>=4.50.0",
+    "import-linter>=2.0",
 ]
 
 [project.scripts]
