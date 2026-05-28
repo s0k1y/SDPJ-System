@@ -83,17 +83,51 @@ try {
     $nodeVersion = & node --version 2>&1
     Write-Host "  [OK] Node.js $nodeVersion" -ForegroundColor Green
 } catch {
-    Write-Host "  [警告] 未找到 Node.js，跳过前端依赖安装" -ForegroundColor Yellow
-    Write-Host "  如需使用 WebUI，请安装 Node.js 16+: https://nodejs.org/" -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "========================================" -ForegroundColor Green
-    Write-Host "  安装完成 (仅CLI模式)" -ForegroundColor Green
-    Write-Host "========================================" -ForegroundColor Green
-    Write-Host ""
-    Write-Host "启动 CLI:" -ForegroundColor Cyan
-    Write-Host "  python -m sdpj --help" -ForegroundColor White
-    Write-Host ""
-    exit 0
+    Write-Host "  [信息] 未找到 Node.js，正在自动安装..." -ForegroundColor Yellow
+    
+    $installed = $false
+    
+    # 尝试使用 winget 安装
+    try {
+        $wingetVersion = & winget --version 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "  正在通过 winget 安装 Node.js 18..." -ForegroundColor Gray
+            & winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
+            if ($LASTEXITCODE -eq 0) {
+                $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+                $installed = $true
+            }
+        }
+    } catch {}
+    
+    # 尝试使用 Chocolatey 安装
+    if (-not $installed) {
+        try {
+            $chocoVersion = & choco --version 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "  正在通过 Chocolatey 安装 Node.js LTS..." -ForegroundColor Gray
+                & choco install nodejs-lts -y
+                if ($LASTEXITCODE -eq 0) {
+                    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+                    $installed = $true
+                }
+            }
+        } catch {}
+    }
+    
+    if (-not $installed) {
+        Write-Host "  [错误] 无法自动安装 Node.js" -ForegroundColor Red
+        Write-Host "  请手动安装 Node.js 18+: https://nodejs.org/" -ForegroundColor Yellow
+        exit 1
+    }
+    
+    try {
+        $nodeVersion = & node --version 2>&1
+        Write-Host "  [OK] Node.js 安装完成" -ForegroundColor Green
+    } catch {
+        Write-Host "  [错误] Node.js 安装失败，请手动安装: https://nodejs.org/" -ForegroundColor Red
+        exit 1
+    }
 }
 
 if (-not (Test-Path "$frontendDir\node_modules")) {

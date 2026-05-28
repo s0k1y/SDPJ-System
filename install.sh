@@ -64,17 +64,31 @@ echo "[3/4] 安装前端依赖..."
 FRONTEND_DIR="$SCRIPT_DIR/sdpj/ui/webui/frontend"
 
 if ! command -v node &> /dev/null; then
-    echo "  [警告] 未找到 Node.js，跳过前端依赖安装"
-    echo "  如需使用 WebUI，请安装 Node.js 16+: https://nodejs.org/"
-    echo ""
-    echo "========================================"
-    echo "  安装完成 (仅CLI模式)"
-    echo "========================================"
-    echo ""
-    echo "启动 CLI:"
-    echo "  sdpj --help"
-    echo ""
-    exit 0
+    echo "  [信息] 未找到 Node.js，正在自动安装..."
+    if [ "$(uname)" = "Darwin" ]; then
+        if command -v brew &> /dev/null; then
+            brew install node@18
+            export PATH="/usr/local/opt/node@18/bin:$PATH"
+        else
+            echo "  [错误] 未找到 Homebrew，请手动安装 Node.js 18+: https://nodejs.org/"
+            exit 1
+        fi
+    elif command -v apt-get &> /dev/null; then
+        curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+        apt-get install -y nodejs
+    elif command -v yum &> /dev/null; then
+        curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
+        yum install -y nodejs
+    else
+        echo "  [错误] 无法自动安装 Node.js，请手动安装 Node.js 18+: https://nodejs.org/"
+        exit 1
+    fi
+
+    if ! command -v node &> /dev/null; then
+        echo "  [错误] Node.js 安装失败，请手动安装: https://nodejs.org/"
+        exit 1
+    fi
+    echo "  [OK] Node.js 安装完成"
 fi
 
 node_version=$(node --version)
