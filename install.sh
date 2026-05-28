@@ -75,7 +75,6 @@ if ! command -v node &> /dev/null; then
         fi
     elif command -v apt-get &> /dev/null; then
         curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-        apt-get update -y
         apt-get install -y nodejs
     elif command -v yum &> /dev/null; then
         curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
