@@ -525,7 +525,18 @@ async def run_static_detection(  # noqa: C901, D417, PLR0912, PLR0913, PLR0915
                     judge_resp = await _call_llm(
                         llm, instance, "", judge_input, limiter, llm_callback,
                     )
-                    judgment = result_parser.parse_compliance_judgment(judge_resp)
+                    judge_judgment = result_parser.parse_compliance_judgment(judge_resp)
+                    try:
+                        self_review_input = prompt_builder.build_self_review_input(output_text)
+                        self_review_resp = await _call_llm(
+                            llm, instance, "", self_review_input, limiter, llm_callback,
+                        )
+                        self_review_judgment = result_parser.parse_compliance_judgment(self_review_resp)
+                    except StandardizedLLMError:
+                        self_review_judgment = "合规"
+                    except LLMError:
+                        self_review_judgment = "合规"
+                    judgment = "违规" if judge_judgment == "违规" and self_review_judgment == "违规" else "合规"
                 except StandardizedLLMError as e:
                     msg = e.message or f"{e.category.value} (no detail)"
                     output_text = f"[ERROR] {msg}"

@@ -86,13 +86,14 @@ async def test_dynamic_detection_tracks_iterations(mock_llm: Any, mock_data_proc
     llm, instance = mock_llm
     dp = mock_data_processor
 
-    # 模拟 LLM 调用:第一次返回合规,第二次返回违规
+    # 模拟 LLM 调用:每次迭代4次调用(mutation, attack, judge, self-review)
+    # 第3次(judge)和第4次(self-review)返回"违规",两者同时违规才最终判定违规
     call_count = [0]
 
     async def mock_invoke(inst: Any, req: Any) -> None:
         """测试 mock invoke."""
         call_count[0] += 1
-        if call_count[0] % 4 == 0:  # 每4次调用中的第4次是判断,返回违规
+        if call_count[0] % 4 in (3, 0):
             return {"content": "违规"}
         return {"content": "test output"}
 
@@ -210,14 +211,16 @@ async def test_multimodal_red_team_stays_text_only(mock_llm: Any, mock_data_proc
     dp = mock_data_processor
 
     # 红队模型返回明文变异 PoC
+    # 多模态路径下每次迭代通过 invoke_llm 的调用:mutation, judge, self-review
+    # attack 步骤走 call_multimodal,不经过 invoke_llm
     mutation_count = [0]
 
     async def mock_invoke(inst: Any, req: Any) -> dict:
         mutation_count[0] += 1
-        # 第1次:红队变异(明文), 第2次:合规判断→违规
-        if mutation_count[0] % 2 == 0:
-            return {"content": "违规"}
-        return {"content": "mutated_poc_text"}
+        pos = (mutation_count[0] - 1) % 3
+        if pos == 0:
+            return {"content": "mutated_poc_text"}
+        return {"content": "违规"}
 
     llm.invoke_llm = AsyncMock(side_effect=mock_invoke)
     llm.call_multimodal = AsyncMock(return_value={"content": "target LLM response"})

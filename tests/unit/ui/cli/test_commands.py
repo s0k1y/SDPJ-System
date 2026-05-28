@@ -289,48 +289,6 @@ class TestDetectStart:
         assert "登录" in result.output
 
 
-class TestDetectProgress:
-    """测试 TestDetectProgress 类."""
-
-    def test_progress_single_task(self) -> None:
-        """测试 test progress single task."""
-        s = _make_mock_scheduler()
-        s.query_detection_progress.return_value = {
-            "success": True,
-            "task_id": "t1",
-            "status": "running",
-        }
-        result = _invoke(["Detect", "task", "progress", "--task-id", "t1"], s)
-        assert result.exit_code == 0
-        assert "running" in result.output
-
-    def test_progress_full_view(self) -> None:
-        """测试 test progress full view."""
-        s = _make_mock_scheduler()
-        s.query_detection_progress.return_value = {
-            "success": True,
-            "groups": [
-                {
-                    "task_group_id": "tg-001",
-                    "model_name": "deepseek",
-                    "model_id": "deepseek",
-                    "status": "running",
-                    "progress": {
-                        "total": 10,
-                        "completed": 5,
-                        "failed": 0,
-                        "running": 3,
-                        "pending": 2,
-                    },
-                    "children": [],
-                }
-            ],
-        }
-        result = _invoke(["Detect", "task", "progress"], s)
-        assert result.exit_code == 0
-        assert "deepseek" in result.output
-
-
 class TestDetectCancel:
     """测试 TestDetectCancel 类."""
 

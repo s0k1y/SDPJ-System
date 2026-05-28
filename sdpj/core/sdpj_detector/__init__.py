@@ -92,10 +92,19 @@ class SDPJDetector(SDPJDetectorInterface):
         instance = await self._llm.get_service_instance(model_id)
         judge_input = prompt_builder.build_judge_input(judge_template, model_output)
         try:
-            resp = await _call_llm(self._llm, instance, "", judge_input, RateLimiter())
-            return result_parser.parse_compliance_judgment(resp)
+            judge_resp = await _call_llm(self._llm, instance, "", judge_input, RateLimiter())
+            judge_judgment = result_parser.parse_compliance_judgment(judge_resp)
         except LLMError:
-            return "合规"
+            judge_judgment = "合规"
+
+        self_review_input = prompt_builder.build_self_review_input(model_output)
+        try:
+            self_review_resp = await _call_llm(self._llm, instance, "", self_review_input, RateLimiter())
+            self_review_judgment = result_parser.parse_compliance_judgment(self_review_resp)
+        except LLMError:
+            self_review_judgment = "合规"
+
+        return "违规" if judge_judgment == "违规" and self_review_judgment == "违规" else "合规"
 
     async def write_result(  # noqa: D102
         self,

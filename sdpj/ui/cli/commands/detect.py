@@ -1,6 +1,7 @@
 """检测交互命令 (职责 1-3)."""
 
 import asyncio
+import contextlib
 
 import click
 
@@ -8,8 +9,73 @@ from sdpj.infrastructure.utils.attack_path import parse_attack_path
 from sdpj.ui.cli import OrderedGroup, require_scheduler
 from sdpj.ui.cli.schemas.detection import DetectionStartParams
 from sdpj.ui.cli.utils import output
-from sdpj.ui.cli.utils import progress as _progress
 from sdpj.ui.cli.utils.result import unwrap
+
+_STAGE_LABELS = {
+    "poc_selecting": "PoC池构建",
+    "static_detecting": "静态检测",
+    "dynamic_detecting": "动态检测",
+    "completed": "已完成",
+}
+
+
+def _format_eta(seconds: float) -> str:
+    if seconds <= 0:
+        return ""
+    m, s = divmod(int(seconds), 60)
+    h, m = divmod(m, 60)
+    if h > 0:
+        return f"{h}h{m:02d}m{s:02d}s"
+    if m > 0:
+        return f"{m}m{s:02d}s"
+    return f"{s}s"
+
+
+async def _poll_progress(scheduler, interval: float = 3.0) -> None:  # noqa: ANN001
+    last_key = None
+    while True:
+        await asyncio.sleep(interval)
+        with contextlib.suppress(Exception):
+            result = await scheduler.query_detection_progress()
+            if not result.get("success"):
+                continue
+            for g in result.get("groups", []):
+                prog = g.get("progress", {})
+                total = prog.get("total", 0)
+                completed = prog.get("completed", 0)
+                running = prog.get("running", 0)
+                pending = prog.get("pending", 0)
+                failed = prog.get("failed", 0)
+                key = (completed, running, pending, failed)
+                if key == last_key:
+                    continue
+                last_key = key
+                stage = g.get("stage_info", {}).get("stage", "")
+                eta = g.get("eta_seconds", -1)
+                parts = [
+                    f"{completed}/{total}完成",
+                    f"{running}执行中",
+                    f"{pending}等待",
+                    f"{failed}失败",
+                ]
+                line = "  进度: " + ", ".join(parts)
+                if stage:
+                    line += f" | {_STAGE_LABELS.get(stage, stage)}"
+                eta_str = _format_eta(eta)
+                if eta_str:
+                    line += f" | ETA: {eta_str}"
+                click.echo(click.style(line, fg="yellow"))
+
+
+async def _execute_with_progress(scheduler, concurrency: int) -> dict:  # noqa: ANN001
+    poll_task = asyncio.create_task(_poll_progress(scheduler))
+    try:
+        result: dict = await scheduler.execute_concurrent_tasks(concurrency)
+        return result
+    finally:
+        poll_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await poll_task
 
 
 @click.group("Detect", cls=OrderedGroup, no_args_is_help=True)
@@ -150,64 +216,19 @@ def task_start(  # noqa: C901, PLR0913, PLR0915
         scheduler.subscribe_llm_calls(_on_llm_call)
 
     try:
-        with _progress.spinner("正在执行检测任务"):
-            result = asyncio.run(scheduler.execute_concurrent_tasks(concurrency))
+        result = asyncio.run(_execute_with_progress(scheduler, concurrency))
         data = unwrap(result)
         if data.get("message"):
             output.info(data["message"])
         tasks = data.get("tasks", [])
         if tasks:
-            for t in _progress.show_progress(tasks, label="执行"):
+            click.echo("")
+            for t in tasks:
                 status = "OK" if t.get("success") else "FAIL"
-                click.echo(f"\n    {t.get('task_id', '?')[:8]}: {status}")
+                click.echo(f"    {t.get('task_id', '?')[:8]}: {status}")
     finally:
         if show_trace:
             scheduler.unsubscribe_llm_calls(_on_llm_call)
-
-
-@task_group.command("progress")
-@click.option("--task-id", default=None, help="队列任务标识 (省略则查询整体视图)")
-@click.pass_context
-@require_scheduler
-def task_progress(ctx, task_id) -> None:  # noqa: ANN001
-    """查询检测任务执行进度."""
-    scheduler = ctx.obj.scheduler
-    result = asyncio.run(scheduler.query_detection_progress(task_id))
-    data = unwrap(result)
-    if task_id:
-        output.info(f"任务 {task_id}: {data['status']}")
-        return
-    groups = data.get("groups", [])
-    if not groups:
-        output.info("当前无活跃任务")
-        return
-    for g in groups:
-        group_id_short = g.get("task_group_id", "")[:8]
-        model_name = g.get("model_name", g.get("model_id", ""))
-        status = g.get("status", "")
-        prog = g.get("progress", {})
-        total = prog.get("total", 0)
-        completed = prog.get("completed", 0)
-        failed = prog.get("failed", 0)
-        running = prog.get("running", 0)
-        pending = prog.get("pending", 0)
-        click.echo(
-            click.style(f"  任务组 {group_id_short}  模型: {model_name}  状态: {status}", fg="cyan"),  # noqa: E501
-        )
-        click.echo(
-            f"    进度: {completed}/{total} 完成, {running} 执行中, {pending} 等待, {failed} 失败",
-        )
-        children = g.get("children", [])
-        if children:
-            child_rows = []
-            for c in children:
-                tid = c.get("task_id", "")[:8]
-                cstatus = c.get("status", "")
-                ds_name = c.get("dataset_name", c.get("dataset_id", ""))
-                err = c.get("error_message", "")
-                child_rows.append([tid, cstatus, ds_name, err[:40] if err else ""])
-            output.table(["子任务ID", "状态", "数据集", "错误"], child_rows)
-        click.echo("")
 
 
 @task_group.command("cancel")
