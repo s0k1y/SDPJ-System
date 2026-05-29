@@ -1014,6 +1014,8 @@ class StateScheduler(StateSchedulerInterface):
                 for child in children:
                     if child.get("status") == "running" and "progress" in child:
                         prog = child["progress"]  # type: ignore[assignment]
+                        if not prog:
+                            continue
                         recent_speeds = prog.get("recent_speeds", [])  # type: ignore[attr-defined]
                         processed = prog.get("processed", 0)  # type: ignore[attr-defined]
                         task_total = prog.get("total", 0)  # type: ignore[attr-defined]
